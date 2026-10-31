@@ -129,6 +129,7 @@ jobs=(
   "tests/cheats_ingame.sh once"
   "tests/search.sh live"
   "tests/search.sh set"
+  "tests/search.sh ptr"
   "tests/search.sh cut"
   "tests/cheat_engine.sh 1/4"
   "tests/cheat_engine.sh 2/4"

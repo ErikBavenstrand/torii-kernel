@@ -151,6 +151,35 @@ against a chunk filled with the number, all through one narrow loop that
 keeps an outcome mask (equal, less, greater) with the sign bit flipped for
 a signed compare.
 
+## BCD and the pointer scan (v0.9.7)
+
+- **Stored as: BCD (scores):** elements are two decimal digits a byte (a
+  score of 1234 as `0x1234`), as many games keep scores. An element with a
+  nibble past 9 isn't one and every filter drops it (`cheatsearch_bcd_drop`,
+  a word at a time, from IWRAM with the compare). BCD's digits sort as its
+  bytes do, so the filters compare the bytes against the numbers as BCD;
+  only By moves the earlier numbers, as numbers (none past 99, 9999, ... or
+  below 0). Numbers are typed in decimal (2, 4 or 8 digits), the list shows
+  the digits, and a kept cheat writes the BCD. Negative numbers is greyed
+  while BCD is on. A new search in the same launch keeps the last one's
+  size, sign and format.
+- **The pointer scan:** for a value that moves in memory (Pokémon Emerald
+  moves its save blocks), Find pointers to it on a candidate's page lists
+  every word of EWRAM and IWRAM that points at most 4 KB
+  (`INGAME_POINTER_REACH`) below it, with the offset, up to 960
+  (`struct ingame_pointers`, cart SRAM `0x2E100`). Once the value has moved
+  (a door, a reload), the player finds it again with a new search, and
+  Check the pointers found keeps those that point the same way at the new
+  address. A pointer from the page is kept as `[POINTER]+OFFSET:VALUE`, a
+  pointer code the cheat interpreter already runs (AnyGBA's raw extension),
+  picked; in game it is set once, as the live block takes plain addresses.
+  One level: a chain of pointers isn't followed. `tests/search.sh ptr` moves
+  a block of BCD coins and keeps them through the pointer to it.
+- **Room:** the glyphs moved to `0x2DA00` and the search's lines start at
+  `0x3C100`, so the 58 lines fit before the state buffer.
+- **Speed:** a 16-bit BCD Equals first pass takes 89 frames; the first
+  filter reads the snapshot only for chunks that keep candidates.
+
 ## The compare
 
 `source/cheatsearch.c`, hardware-free (host tests in
@@ -260,8 +289,10 @@ Rename one on the Cheats page.
 ## Not done
 
 - Searching VRAM, palette or OAM (values are rarely kept there).
-- More than one level of Undo; BCD values; a pointer scan (data that
-  moves between sessions); a memory view around a candidate.
+- More than one level of Undo; pointer chains (a pointer to a pointer);
+  a memory view around a candidate; "on now" through a pointer (the live
+  block writes plain addresses: it is set once, and runs from the next
+  launch).
 - Naming a found cheat in game (no keyboard in the overlay): rename it in
   Torii.
 

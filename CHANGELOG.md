@@ -4,6 +4,14 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Added:** the cheat search reads BCD scores (Stored as: BCD, 1234 kept
+  as the digits 12 34), and finds pointers to a value that moves in memory:
+  Find pointers to it, then, once it has moved and is found again, Check the
+  pointers found; one kept is filed as `[POINTER]+OFFSET:VALUE` and follows
+  the value (c7fa7671).
+
 ## v0.9.9
 
 - **Added:** the cheat search's filters Up by and Down by an amount, More

@@ -115,7 +115,7 @@ static u32 line_draw(struct ingame_line *l, const char *s, u32 len, u32 max_w)
 // thousands separator, in the body font
 static void glyphs_draw(struct ingame_glyph *g)
 {
-	static const char chars[] = "0123456789ABCDEF -+";  // the space: the thousands separator's place
+	static const char chars[] = "0123456789ABCDEF -+[]";  // the space: the thousands separator's place
 	memset(g, 0, INGAME_GLYPHS * sizeof(*g));
 	for (u32 i = 0; i < INGAME_GLYPHS; i++) {
 		const char *s = i == INGAME_GLYPH_THOUSANDS ? S(STR_FORMAT_THOUSANDS) : &chars[i];
@@ -464,6 +464,13 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 		[INGAME_TEXT_SEARCH_SIGNED] = STR_INGAME_SEARCH_SIGNED_OFF,
 		[INGAME_TEXT_SEARCH_SIGNED_ON] = STR_INGAME_SEARCH_SIGNED_ON,
 		[INGAME_TEXT_SEARCH_FIRST_LOST] = STR_INGAME_SEARCH_FIRST_LOST,
+		[INGAME_TEXT_SEARCH_FORMAT] = STR_INGAME_SEARCH_FORMAT_PLAIN,
+		[INGAME_TEXT_SEARCH_FORMAT_BCD] = STR_INGAME_SEARCH_FORMAT_BCD,
+		[INGAME_TEXT_SEARCH_PTR_FIND] = STR_INGAME_SEARCH_PTR_FIND,
+		[INGAME_TEXT_SEARCH_PTR_CHECK] = STR_INGAME_SEARCH_PTR_CHECK,
+		[INGAME_TEXT_SEARCH_POINTERS] = STR_INGAME_SEARCH_POINTERS,
+		[INGAME_TEXT_SEARCH_PTR_MANY] = STR_INGAME_SEARCH_PTR_MANY,
+		[INGAME_TEXT_SEARCH_PTR_NONE] = STR_INGAME_SEARCH_PTR_NONE,
 		[INGAME_TEXT_SEARCH_NONE] = STR_INGAME_SEARCH_NONE,
 		[INGAME_TEXT_SEARCH_BUSY] = STR_INGAME_SEARCH_BUSY,
 		[INGAME_TEXT_SEARCH_HINT] = STR_INGAME_SEARCH_HINT,
@@ -505,6 +512,7 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 		{STR_INGAME_SEARCH_BETWEEN, INGAME_TEXT_SEARCH_BETWEEN, 2},
 		{STR_INGAME_SEARCH_LEFT, INGAME_TEXT_SEARCH_LEFT, 1},
 		{STR_INGAME_SEARCH_VALUE, INGAME_TEXT_SEARCH_VALUE, 1},
+		{STR_INGAME_SEARCH_PTR_FOUND, INGAME_TEXT_SEARCH_PTR_FOUND, 1},
 	};
 	static char split[sizeof(split_ids) / sizeof(split_ids[0])][3][48] EWRAM_BSS;  // 1 KB: off the stack
 	for (u32 i = 0; i < sizeof(split_ids) / sizeof(split_ids[0]); i++) {
@@ -548,8 +556,10 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 	}
 	bad += sram_put(INGAME_SRAM_SESSION + INGAME_SESSION_SAVE_SLOT, (const u8 *)slot_name, sizeof(slot_name));
 	bad += sram_put(INGAME_SRAM_SESSION + INGAME_SESSION_OUT, (const u8 *)&out, sizeof(out));
-	// No cheats found yet (the last session's were filed at the boot after it)
+	// No cheats found yet (the last session's were filed at the boot after
+	// it), and no pointers
 	bad += sram_put(INGAME_SRAM_FOUND, NULL, 8);
+	bad += sram_put(INGAME_SRAM_POINTERS, NULL, 16);
 	SetRampage(0);
 	if (bad) {
 		tlog_error("launch: the in-game menu's %lu bytes in cart SRAM read back %lu different",
@@ -729,14 +739,20 @@ static int found_after_game(const char *path)
 		u32 later = 0;
 		on[i] = 0;
 		for (u32 j = 0; j < n; j++)
-			if (found.cheat[j].address == c->address && found.cheat[j].size == c->size) {
+			if (found.cheat[j].address == c->address && found.cheat[j].size == c->size &&
+			    ((found.cheat[j].flags ^ c->flags) & INGAME_FOUND_POINTER) == 0 &&
+			    found.cheat[j].reserved == c->reserved) {
 				later |= j > i;
 				on[i] |= found.cheat[j].flags & INGAME_FOUND_ON;
 			}
 		if (later)
 			continue;
-		char addr[12], name[40], code[24];
-		snprintf(addr, sizeof(addr), "%08lX", (unsigned long)c->address);
+		char addr[24], name[48], code[40];
+		// Through a pointer (v0.9.7): AnyGBA's [PPPPPPPP]+O, as cheatcode.c reads it
+		if (c->flags & INGAME_FOUND_POINTER)
+			snprintf(addr, sizeof(addr), "[%08lX]+%X", (unsigned long)c->address, (unsigned)c->reserved);
+		else
+			snprintf(addr, sizeof(addr), "%08lX", (unsigned long)c->address);
 		SF(name, sizeof(name), STR_CHEATS_FOUND_NAME, LS(addr));
 		if (c->size == 1)
 			snprintf(code, sizeof(code), "%s:%02lX", addr, (unsigned long)(c->value & 0xFF));

@@ -55,6 +55,9 @@
 // The cheats the search found, for Back to Torii to file: struct
 // ingame_found, in the backups' page window after the screenshot's backup
 #define INGAME_SRAM_FOUND 0x2E000
+// The pointer scan's pointers (v0.9.7): struct ingame_pointers, after the
+// found cheats, to the whole names
+#define INGAME_SRAM_POINTERS 0x2E100
 #define INGAME_SHOTS_END 0xF0000  // their room's end: the cart log's page follows
 
 // The backups, from INGAME_SRAM_BACKUP: all in one 64 KB page window
@@ -92,12 +95,16 @@ struct ingame_search {
 	uint32_t undo_left;  // with undo, the candidates left before the last pass
 	uint8_t first;  // INGAME_FIRST_*
 	uint8_t first_pass;  // the pass that kept it (its undo loses it)
-	uint16_t reserved;
+	uint8_t bcd;  // 1: elements are BCD, two decimal digits a byte (scores)
+	uint8_t reserved;
 };
 
 #define INGAME_FOUND_MAGIC 0x31444E46u  // "FND1"
 #define INGAME_FOUND_MAX 16
 #define INGAME_FOUND_ON 0x01  // flags: picked, and on now (live) or set once in game
+// flags: through a pointer (v0.9.7): address is the pointer's, reserved the
+// offset from where it points; filed as [address]+offset:value
+#define INGAME_FOUND_POINTER 0x02
 struct ingame_found_cheat {
 	uint32_t address;  // in EWRAM or IWRAM
 	uint32_t value;  // cut to size
@@ -105,6 +112,26 @@ struct ingame_found_cheat {
 	uint8_t flags;  // INGAME_FOUND_*
 	uint16_t reserved;
 };
+// The pointer scan (v0.9.7): words of the game's RAM that point at most
+// INGAME_POINTER_REACH bytes below target, each with its offset (target
+// minus what it points at). Checking keeps those that point the same way at
+// a new target (the value found again after it moved).
+#define INGAME_POINTERS_MAGIC 0x31525450u  // "PTR1"
+#define INGAME_POINTER_REACH 0x1000
+#define INGAME_POINTERS_MAX 960
+struct ingame_pointer {
+	uint32_t at;  // the pointer's address
+	uint32_t offset;  // below INGAME_POINTER_REACH
+};
+struct ingame_pointers {
+	uint32_t magic;  // INGAME_POINTERS_MAGIC
+	uint16_t count;  // pointers kept
+	uint16_t full;  // 1: the scan found more than fit
+	uint32_t target;  // the address they point to now
+	uint32_t reserved;
+	struct ingame_pointer p[INGAME_POINTERS_MAX];
+};
+
 struct ingame_found {
 	uint32_t magic;  // INGAME_FOUND_MAGIC; the overlay writes a record, then this head
 	uint16_t count;  // records filled
@@ -425,6 +452,15 @@ enum ingame_text {
 	INGAME_TEXT_SEARCH_SIGNED,  // "Negative numbers: off", then on
 	INGAME_TEXT_SEARCH_SIGNED_ON,
 	INGAME_TEXT_SEARCH_FIRST_LOST,  // the footer on Compare when the first scan wasn't kept
+	INGAME_TEXT_SEARCH_FORMAT,  // "Stored as: plain numbers", then BCD
+	INGAME_TEXT_SEARCH_FORMAT_BCD,
+	INGAME_TEXT_SEARCH_PTR_FIND,  // a candidate's rows: the pointer scan
+	INGAME_TEXT_SEARCH_PTR_CHECK,
+	INGAME_TEXT_SEARCH_POINTERS,  // the pointers' page's title
+	INGAME_TEXT_SEARCH_PTR_FOUND,  // its footer: "{n} found"
+	INGAME_TEXT_SEARCH_PTR_FOUND_AFTER,
+	INGAME_TEXT_SEARCH_PTR_MANY,  // more than the page lists, or than fit
+	INGAME_TEXT_SEARCH_PTR_NONE,
 	INGAME_TEXT_SEARCH_SHOW,
 	INGAME_TEXT_SEARCH_NEW,
 	INGAME_TEXT_SEARCH_UNDO,
@@ -452,12 +488,14 @@ enum ingame_text {
 };
 
 // The glyphs the overlay draws numbers with (the kernel's body font): 0-9,
-// A-F, then the thousands separator (none: width 0), minus and plus, at
-// INGAME_SRAM_GLYPHS
-#define INGAME_GLYPHS 19
+// A-F, then the thousands separator (none: width 0), minus, plus and the
+// brackets of a pointer, at INGAME_SRAM_GLYPHS
+#define INGAME_GLYPHS 21
 #define INGAME_GLYPH_THOUSANDS 16
 #define INGAME_GLYPH_MINUS 17
 #define INGAME_GLYPH_PLUS 18
+#define INGAME_GLYPH_OPEN 19
+#define INGAME_GLYPH_CLOSE 20
 struct ingame_glyph {
 	uint8_t width;  // its advance, at most 8
 	uint8_t reserved[3];
@@ -621,8 +659,10 @@ struct ingame_session {
 // Text n's line in cart SRAM: the session block's, and from the cheat
 // search's (v0.9) on, the block after the whole names, which the session
 // block has no room for
-#define INGAME_SRAM_TEXTS 0x3C400
-#define INGAME_SRAM_GLYPHS 0x3FC00  // struct ingame_glyph[INGAME_GLYPHS]
+#define INGAME_SRAM_TEXTS 0x3C100
+// struct ingame_glyph[INGAME_GLYPHS]: after the screenshot's IWRAM backup,
+// before the found cheats
+#define INGAME_SRAM_GLYPHS 0x2DA00
 #define INGAME_TEXT_SRAM(n) \
 	((n) < INGAME_TEXT_SEARCH ? INGAME_SRAM_SESSION + INGAME_SESSION_TEXT(n) \
 				  : INGAME_SRAM_TEXTS + ((n) - INGAME_TEXT_SEARCH) * sizeof(struct ingame_line))
@@ -695,9 +735,13 @@ _Static_assert(INGAME_SRAM_TEXTS >= INGAME_SRAM_WIDE + INGAME_CHEATS * sizeof(st
 		       INGAME_TEXT_SRAM(INGAME_TEXTS) <= INGAME_SRAM_STATE &&
 		       INGAME_TEXT_SRAM(INGAME_TEXTS) <= (INGAME_SRAM_TEXTS & ~0xFFFFu) + 0x10000,
 	       "the search's lines after the whole names, before the state buffer, in their 64 KB page window");
-_Static_assert(INGAME_TEXT_SRAM(INGAME_TEXTS) <= INGAME_SRAM_GLYPHS &&
-		       INGAME_SRAM_GLYPHS + INGAME_GLYPHS * sizeof(struct ingame_glyph) <= INGAME_SRAM_STATE,
-	       "the glyphs after the search's lines");
+_Static_assert(INGAME_SRAM_GLYPHS >= INGAME_BACKUP_SHOT + INGAME_BACKUP_SHOT_BYTES &&
+		       INGAME_SRAM_GLYPHS + INGAME_GLYPHS * sizeof(struct ingame_glyph) <= INGAME_SRAM_FOUND,
+	       "the glyphs after the screenshot's backup, before the found cheats");
+_Static_assert(INGAME_SRAM_POINTERS >= INGAME_SRAM_FOUND + sizeof(struct ingame_found) &&
+		       INGAME_SRAM_POINTERS + sizeof(struct ingame_pointers) <= INGAME_SRAM_WIDE &&
+		       sizeof(struct ingame_pointers) % 4 == 0,
+	       "the pointers after the found cheats, before the whole names");
 _Static_assert(sizeof(struct ingame_shot) <= INGAME_DUMP_PAL && sizeof(struct ingame_shot) % 4 == 0 &&
 		       offsetof(struct ingame_shot, io) % 4 == 0,
 	       "the screenshot's header");

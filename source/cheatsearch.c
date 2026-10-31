@@ -87,10 +87,88 @@ void cheatsearch_shift(uint8_t *out, const uint8_t *in, uint32_t n, uint32_t siz
 	}
 }
 
-uint32_t cheatsearch_chunk(const uint8_t *now, const uint8_t *prev, uint8_t *work, uint8_t *bits, uint32_t n,
-			   uint32_t size, uint32_t op, uint32_t sign, uint32_t a, uint32_t b)
+int cheatsearch_from_bcd(uint32_t value, uint32_t size, uint32_t *out)
 {
-	const uint32_t flip = sign ? 1u << (8 * size - 1) : 0;
+	uint32_t n = 0;
+	value &= cheatsearch_max(size);
+	for (int sh = 8 * (int)size - 4; sh >= 0; sh -= 4) {
+		uint32_t d = value >> sh & 15;
+		if (d > 9)
+			return 0;
+		n = n * 10 + d;
+	}
+	*out = n;
+	return 1;
+}
+
+uint32_t cheatsearch_to_bcd(uint32_t number, uint32_t size)
+{
+	uint32_t v = 0;
+	for (uint32_t sh = 0; sh < 8 * size; sh += 4) {
+		v |= number % 10 << sh;
+		number /= 10;
+	}
+	return v;
+}
+
+// Drops from bits the candidates whose element of in (n bytes, a word at
+// a time) isn't BCD: a nibble past 9 has its 8 bit and its 4 or 2 bit set.
+// The overlay runs it from IWRAM with the compare.
+void cheatsearch_bcd_drop(const uint8_t *in, uint8_t *bits, uint32_t n, uint32_t size)
+{
+	const uint32_t *w32 = (const uint32_t *)(const void *)in;
+	const uint32_t per = 4 / size, lanes = (1u << per) - 1, lane = cheatsearch_max(size);
+	for (uint32_t j = 0; j < n / 4; j++) {
+		uint32_t e = j * per, sh = e & 7, cand = (uint32_t)bits[e >> 3] >> sh & lanes;
+		uint32_t w = w32[j], bad = (w & 0x88888888u) >> 3 & ((w & 0x44444444u) >> 2 | (w & 0x22222222u) >> 1);
+		if (!cand || !bad)
+			continue;
+		for (uint32_t l = 0; l < per; l++)
+			if (bad >> (8 * size * l) & lane)
+				cand &= ~(1u << l);
+		bits[e >> 3] = (uint8_t)((bits[e >> 3] & ~(lanes << sh)) | cand << sh);
+	}
+}
+
+// By on BCD: each candidate's earlier number (its digits) plus or minus a,
+// as BCD into out; one past the size's digits, or below 0, as a value no
+// BCD element is (all nibbles 15)
+static void bcd_shift(uint8_t *out, const uint8_t *prev, const uint8_t *bits, uint32_t n, uint32_t size, uint32_t a,
+		      int up)
+{
+	const uint32_t top = cheatsearch_largest(size, CHEATSEARCH_BCD);
+	for (uint32_t e = 0; e < n / size; e++) {
+		if (!(bits[e >> 3] >> (e & 7) & 1))
+			continue;
+		uint32_t v = 0, t = cheatsearch_max(size);
+		cheatsearch_from_bcd(cheatsearch_get(prev + e * size, size), size, &v);
+		if (up ? a <= top - v : a <= v)
+			t = cheatsearch_to_bcd(up ? v + a : v - a, size);
+		for (uint32_t k = 0; k < size; k++)
+			out[e * size + k] = (uint8_t)(t >> (8 * k));
+	}
+}
+
+uint32_t cheatsearch_chunk(const uint8_t *now, const uint8_t *prev, uint8_t *work, uint8_t *bits, uint32_t n,
+			   uint32_t size, uint32_t op, uint32_t mode, uint32_t a, uint32_t b)
+{
+	if (mode == CHEATSEARCH_BCD) {
+		// Elements that aren't BCD go; the rest compare as their bytes do,
+		// in the digits' order, against the numbers as BCD (By: the earlier
+		// numbers moved by a)
+		const uint32_t top = cheatsearch_largest(size, CHEATSEARCH_BCD);
+		cheatsearch_bcd_drop(now, bits, n, size);
+		if (cheatsearch_relative(op))
+			cheatsearch_bcd_drop(prev, bits, n, size);
+		if (op == CHEATSEARCH_UP_BY || op == CHEATSEARCH_DOWN_BY) {
+			bcd_shift(work, prev, bits, n, size, a, op == CHEATSEARCH_UP_BY);
+			return cheatsearch_narrow(now, work, bits, n, size, CHEATSEARCH_EQ, 0);
+		}
+		a = cheatsearch_to_bcd(a < top ? a : top, size);
+		b = cheatsearch_to_bcd(b < top ? b : top, size);
+		mode = CHEATSEARCH_UNSIGNED;
+	}
+	const uint32_t flip = mode == CHEATSEARCH_SIGNED ? 1u << (8 * size - 1) : 0;
 	switch (op) {
 	case CHEATSEARCH_SAME:
 		return cheatsearch_narrow(now, prev, bits, n, size, CHEATSEARCH_EQ, flip);
@@ -132,9 +210,21 @@ uint32_t cheatsearch_count(const uint8_t *bits, uint32_t bytes)
 	return n;
 }
 
-uint32_t cheatsearch_digits(uint32_t size)
+uint32_t cheatsearch_digits(uint32_t size, uint32_t mode)
 {
-	return size == 1 ? 3 : size == 2 ? 5 : 10;
+	return mode == CHEATSEARCH_BCD ? 2 * size : size == 1 ? 3 : size == 2 ? 5 : 10;
+}
+
+uint32_t cheatsearch_largest(uint32_t size, uint32_t mode)
+{
+	if (mode == CHEATSEARCH_SIGNED)
+		return cheatsearch_max(size) / 2;
+	if (mode != CHEATSEARCH_BCD)
+		return cheatsearch_max(size);
+	uint32_t v = 0;
+	for (uint32_t i = 0; i < 2 * size; i++)
+		v = v * 10 + 9;
+	return v;
 }
 
 void cheatsearch_decimal(uint32_t value, uint8_t *out, uint32_t n)
@@ -160,12 +250,15 @@ static uint32_t edit_digits(uint32_t value, uint32_t n, uint32_t place, int step
 	return (uint32_t)v;
 }
 
-uint32_t cheatsearch_edit(uint32_t value, uint32_t size, uint32_t sign, uint32_t place, int step)
+uint32_t cheatsearch_edit(uint32_t value, uint32_t size, uint32_t mode, uint32_t place, int step)
 {
-	const uint32_t n = cheatsearch_digits(size), max = cheatsearch_max(size);
+	const uint32_t n = cheatsearch_digits(size, mode), max = cheatsearch_max(size);
 	value &= max;
-	if (!sign)
-		return place < n ? edit_digits(value, n, place, step, max) : value;
+	if (mode != CHEATSEARCH_SIGNED) {
+		const uint32_t top = cheatsearch_largest(size, mode);
+		value = value < top ? value : top;
+		return place < n ? edit_digits(value, n, place, step, top) : value;
+	}
 	const uint32_t half = max / 2 + 1;  // 128, 32768, 2^31: the most negative's size
 	uint32_t neg = (value & half) != 0, mag = neg ? (0u - value) & max : value;
 	if (place == 0) {  // the sign

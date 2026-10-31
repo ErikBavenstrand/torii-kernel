@@ -4,6 +4,12 @@
 // white squares on a blue screen, and every 16 frames the ROM logs
 // "searchtest: lives N" (mGBA's debug output), read after the VBlank in
 // which the cheats ran: a cheat that holds the lives shows here at once.
+//
+// And coins for the pointer scan: a block in EWRAM, which a pointer in
+// IWRAM points to, holds them as BCD (150 as 0x0150) at offset 0x24.
+// SELECT adds 25; B moves the block 0x100 bytes on (its old copy left
+// behind), as games that shuffle their save in memory do. The log line
+// also says "coins N" (the BCD's digits).
 #include <stdint.h>
 
 #define REG_DISPCNT (*(volatile uint16_t *)0x04000000)
@@ -20,9 +26,15 @@
 #define VRAM ((volatile uint16_t *)0x06000000)
 #define RGB(r, g, b) ((r) | ((g) << 5) | ((b) << 10))
 #define KEY_A 1
+#define KEY_B 2
+#define KEY_SELECT 4
 
 static volatile unsigned frames;
 static volatile uint8_t lives;
+
+#define BLOCK_BASE 0x02010000u
+#define COINS_AT 0x24  // the coins' offset in the block
+static volatile uint8_t *volatile block;
 
 __attribute__((target("arm"))) static void on_irq(void)
 {
@@ -31,9 +43,32 @@ __attribute__((target("arm"))) static void on_irq(void)
 	++frames;
 }
 
+static uint16_t coins(void)
+{
+	return (uint16_t)(block[COINS_AT] | block[COINS_AT + 1] << 8);
+}
+
+static void set_coins(uint16_t v)
+{
+	block[COINS_AT] = (uint8_t)v;
+	block[COINS_AT + 1] = (uint8_t)(v >> 8);
+}
+
+// BCD a + b, four digits
+static uint16_t bcd_add(uint16_t a, uint16_t b)
+{
+	uint16_t out = 0, carry = 0;
+	for (unsigned sh = 0; sh < 16; sh += 4) {
+		unsigned d = (a >> sh & 15) + (b >> sh & 15) + carry;
+		carry = d > 9;
+		out |= (uint16_t)((carry ? d - 10 : d) << sh);
+	}
+	return out;
+}
+
 static void log_lives(unsigned n)
 {
-	static const char text[] = "searchtest: lives ";
+	static const char text[] = "searchtest: lives ", text2[] = " coins ";
 	REG_DEBUG_ENABLE = 0xC0DE;
 	if (REG_DEBUG_ENABLE != 0x1DEA)
 		return;
@@ -45,6 +80,11 @@ static void log_lives(unsigned n)
 	if (n >= 10)
 		REG_DEBUG_STRING[i++] = (char)('0' + n / 10 % 10);
 	REG_DEBUG_STRING[i++] = (char)('0' + n % 10);
+	for (unsigned k = 0; text2[k]; k++)
+		REG_DEBUG_STRING[i++] = text2[k];
+	uint16_t c = coins();
+	for (int sh = 12; sh >= 0; sh -= 4)
+		REG_DEBUG_STRING[i++] = (char)('0' + (c >> sh & 15));
 	REG_DEBUG_STRING[i] = 0;
 	REG_DEBUG_FLAGS = 4 | 0x100;
 }
@@ -65,6 +105,8 @@ int main(void)
 	for (int i = 0; i < 240 * 160; i++)
 		VRAM[i] = RGB(2, 6, 20);
 	lives = 5;
+	block = (volatile uint8_t *)BLOCK_BASE;
+	set_coins(0x0150);
 	IRQ_HANDLER = on_irq;
 	REG_DISPSTAT = 1 << 3;
 	REG_IE = 1;
@@ -80,6 +122,14 @@ int main(void)
 		unsigned keys = ~REG_KEYINPUT & 0x3FF;
 		if ((keys & KEY_A) && !(held & KEY_A))
 			lives = n ? n - 1 : 5;
+		if ((keys & KEY_SELECT) && !(held & KEY_SELECT))
+			set_coins(bcd_add(coins(), 0x0025));
+		if ((keys & KEY_B) && !(held & KEY_B)) {  // the block moves on, its old copy left
+			volatile uint8_t *to = block + 0x100;
+			for (unsigned k = 0; k < 0x40; k++)
+				to[k] = block[k];
+			block = to;
+		}
 		held = keys;
 	}
 }
