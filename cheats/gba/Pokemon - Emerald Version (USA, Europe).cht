@@ -5,7 +5,7 @@ cheat0_code = "[03005D8C]+0490:000F423F^[03005D90]+00AC"
 cheat0_format = "VBA"
 cheat0_folder = "Money"
 cheat0_keys = "always"
-cheat0_guide = "Keeps your money at 999,999. Written with your save's own key, so nothing else changes. Torii only."
+cheat0_guide = "Keeps your money at 999,999. Written with your save's own key, so nothing else changes."
 cheat0_enable = false
 
 cheat1_desc = "Money: Max coins"
@@ -13,7 +13,7 @@ cheat1_code = "[03005D8C]+0494:270F^[03005D90]+00AC"
 cheat1_format = "VBA"
 cheat1_folder = "Money"
 cheat1_keys = "always"
-cheat1_guide = "Keeps the Game Corner coins at 9,999 (you need the Coin Case). Torii only."
+cheat1_guide = "Keeps the Game Corner coins at 9,999 (you need the Coin Case)."
 cheat1_enable = false
 
 cheat2_desc = "Money: Max Battle Points"

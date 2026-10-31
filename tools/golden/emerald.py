@@ -783,9 +783,7 @@ def ar(*parts):
     return code
 
 
-def cheats(emulators=False):
-    """emulators: the copy for mGBA and RetroArch, whose 512-character lines
-    take only the short patches (the old shiny, nature and gender ones)"""
+def cheats():
     out = []
 
     def add(folder, name, code, guide, keys="always"):
@@ -796,13 +794,13 @@ def cheats(emulators=False):
         "Money",
         "Max money",
         vba(f"[03005D8C]+0490:000F423F^{KEY}"),
-        "Keeps your money at 999,999. Written with your save's own key, so nothing else changes. Torii only.",
+        "Keeps your money at 999,999. Written with your save's own key, so nothing else changes.",
     )
     add(
         "Money",
         "Max coins",
         vba(f"[03005D8C]+0494:270F^{KEY}"),
-        "Keeps the Game Corner coins at 9,999 (you need the Coin Case). Torii only.",
+        "Keeps the Game Corner coins at 9,999 (you need the Coin Case).",
     )
     add(
         "Money",
@@ -864,19 +862,7 @@ def cheats(emulators=False):
     add(
         "Pokémon",
         "All new Pokémon shiny",
-        vba(*Mixed(personality(0, 1), None).lines)
-        if not emulators
-        else rom_code(
-            words(
-                [
-                    (0x08067C74, 0x89908951),
-                    (0x08067C78, 0x883B4048),
-                    (0x08067C7C, 0x80784058),
-                    (0x08067C80, 0x04008990),
-                    (0x08067C84, 0x46C04301),
-                ]
-            )
-        ),
+        vba(*Mixed(personality(0, 1), None).lines),
         "Every Pokémon you get is shiny: wild, gifts, eggs. Caught ones stay shiny. Works with Nature and Gender. "
         + LAUNCH,
         "launch",
@@ -913,9 +899,7 @@ def cheats(emulators=False):
         add(
             "Pokémon",
             f"Nature: {nature}",
-            vba(*Mixed(personality(2, n), None).lines)
-            if not emulators
-            else rom_code([(0x08067EAE, 0x2500 | n)]),
+            vba(*Mixed(personality(2, n), None).lines),
             f"New wild, gift and egg Pokémon are {nature}. Works with Shiny and Gender. "
             + LAUNCH,
             "launch",
@@ -924,9 +908,7 @@ def cheats(emulators=False):
         add(
             "Pokémon",
             f"Gender: {name}",
-            vba(*Mixed(personality(4, v), None).lines)
-            if not emulators
-            else rom_code([(0x0806AF78, {0xFF: 0x21FF, 0x00: 0x2100}[v])]),
+            vba(*Mixed(personality(4, v), None).lines),
             f"New wild, gift and egg Pokémon that can be either are {name.lower()}. Works with Shiny and Nature. "
             + LAUNCH,
             "launch",
@@ -1195,16 +1177,8 @@ def walls():
 
 
 def main():
-    """With --emulators: the copy for mGBA and RetroArch, without the cheats
-    only Torii runs (the menus, whose code lines pass mGBA's 512 characters
-    and fail the whole file there, and the keyed money and coins)"""
-    emulators = "--emulators" in sys.argv[1:]
-    cs = cheats(emulators)
-    if emulators:
-        cs = [
-            c for c in cs if not (isinstance(c.code, Mixed) or "Torii only" in c.guide)
-        ]
-    lines = [  # no comments: mGBA reads a file only while every line starts with "cheat"
+    cs = cheats()
+    lines = [
         f"cheats = {len(cs)}",
         "",
     ]
