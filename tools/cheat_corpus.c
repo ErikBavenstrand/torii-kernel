@@ -3,6 +3,11 @@
 // per cheat and a summary by status. Built for the host under ASan and UBSan
 // by tests/cheat_corpus.sh; each code is a heap copy without a NUL.
 //
+// Each cheat is also decoded as the kernel does (cheat_decode_split, its ROM
+// patches outside the ops) and lowered (cheat_lower_onto): that has to give
+// the same status, table, load and patches as the reading above, or the
+// tool says so and exits 1.
+//
 // Usage: cheat_corpus FILE.cht... > rows.tsv
 // Each row: file, cheat number, status, lowering, format, ops (in
 // tools/cheat_oracle.c's form, to compare with mGBA's decoding).
@@ -19,6 +24,30 @@
 static struct cheat_op ops[OPS_MAX];
 static u32 prog[PROG_MAX];
 static struct cheat_patch patches[PATCHES_MAX];
+static struct cheat_op split_ops[OPS_MAX];
+static u32 split_prog[PROG_MAX];
+static struct cheat_patch split_patches[PATCHES_MAX];
+static unsigned long split_differ, split_joined;
+
+static int is_cond(u8 type);
+
+// A cheat without conditionals whose ops, its ROM patches left out, are the
+// split reading's n_split: its writes run alike, though rows of writes the
+// patches parted may now be one run in the table
+static int same_but_runs(u32 n_ops, u32 n_split)
+{
+	u32 i, k = 0;
+	for (i = 0; i < n_ops; ++i) {
+		if (is_cond(ops[i].type))
+			return 0;
+		if (ops[i].type == CHEAT_OP_ROM_PATCH)
+			continue;
+		if (k >= n_split || memcmp(&ops[i], &split_ops[k], sizeof(ops[i])))
+			return 0;
+		++k;
+	}
+	return k == n_split;
+}
 
 static const char *const status_names[] = {"OK", "MASTER_ONLY", "PLACEHOLDER", "UNREADABLE", "TOO_BIG"};
 static const char *const lower_names[] = {"LOWERABLE", "TOO_BIG", "TOO_MANY_PATCHES", "BAD_ADDRESS", "CANT_RUN"};
@@ -83,17 +112,52 @@ static void dump(u32 n_ops)
 			printf(" %08X/%X/%u", ops[i].address, ops[i].value & mask(ops[i].width), ops[i].width);
 }
 
+// The kernel's split reading of the cheat (from d0, the decoder before it)
+// against the one above (status, lowering, its outputs, and d after it)
+static void check_split(const struct cheat_decoder *d0, const struct cheat_decoder *d, const char *file,
+			unsigned long n, const char *code, u32 len, u8 status, u8 lower, u32 n_ops_old, u32 n_prog,
+			u32 cost, u32 n_patches)
+{
+	struct cheat_decoder sd = *d0;
+	struct cheat_patches ps = {split_patches, PATCHES_MAX, 0, NULL, 0};
+	u32 n_ops, words = 0, scost = 0;
+	u8 sstatus = cheat_decode_split(&sd, code, len, split_ops, OPS_MAX, &n_ops, &ps), slower = 0xFF;
+	if (sstatus == CHEAT_OK)
+		slower = cheat_lower_onto(split_ops, n_ops, split_prog, PROG_MAX, &words, &scost, &ps);
+	const char *why = NULL;
+	if (sstatus != status)
+		why = "status";
+	else if (memcmp(&sd, d, sizeof(sd)))
+		why = "decoder state";
+	else if (status == CHEAT_OK && slower != lower)
+		why = "lowering";
+	else if (status == CHEAT_OK && lower == CHEAT_LOWER_OK &&
+		 (words != n_prog || scost != cost || memcmp(split_prog, prog, words * 4))) {
+		if (same_but_runs(n_ops_old, n_ops))
+			++split_joined;
+		else
+			why = "table";
+	} else if (status == CHEAT_OK && lower == CHEAT_LOWER_OK &&
+		   (ps.n != n_patches || memcmp(split_patches, patches, ps.n * sizeof(patches[0]))))
+		why = "patches";
+	if (why) {
+		fprintf(stderr, "split reading differs (%s): %s cheat %lu\n", why, file, n);
+		++split_differ;
+	}
+}
+
 static void decode(struct cheat_decoder *d, const char *file, unsigned long n, const char *text, u32 len)
 {
 	char *code = malloc(len ? len : 1);
 	u32 n_ops, n_prog = 0, cost = 0, n_patches = 0;
+	struct cheat_decoder d0 = *d;
+	u8 lower = 0xFF;
 	memcpy(code, text, len);
 	u8 status = cheat_decode(d, code, len, ops, OPS_MAX, &n_ops);
-	free(code);
 	++by_status[status];
 	printf("%s\t%lu\t%s\t", file, n, status_names[status]);
 	if (status == CHEAT_OK) {
-		u8 lower = cheat_lower(ops, n_ops, prog, PROG_MAX, &n_prog, &cost, patches, PATCHES_MAX, &n_patches);
+		lower = cheat_lower(ops, n_ops, prog, PROG_MAX, &n_prog, &cost, patches, PATCHES_MAX, &n_patches);
 		++by_lower[lower];
 		++by_format[d->last];
 		if (lower == CHEAT_LOWER_OK) {
@@ -108,6 +172,8 @@ static void decode(struct cheat_decoder *d, const char *file, unsigned long n, c
 		printf("-\t%s\t", status == CHEAT_MASTER_ONLY ? format_names[d->last] : "-");
 	}
 	putchar('\n');
+	check_split(&d0, d, file, n, code, len, status, lower, status == CHEAT_OK ? n_ops : 0, n_prog, cost, n_patches);
+	free(code);
 }
 
 // Reads a libretro .cht file's cheatN_code lines in order, sharing one decoder
@@ -164,5 +230,7 @@ int main(int argc, char **argv)
 	for (i = 1; i < 7; ++i)
 		fprintf(stderr, "  %-12s %5lu\n", format_names[i], by_format[i]);
 	fprintf(stderr, "  (read alone (no key, or format detected again): %lu)\n", alone_reads);
-	return 0;
+	fprintf(stderr, "split readings that differ: %lu (and %lu whose writes join into runs)\n", split_differ,
+		split_joined);
+	return split_differ ? 1 : 0;
 }

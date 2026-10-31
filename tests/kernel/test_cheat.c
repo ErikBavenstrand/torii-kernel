@@ -10,6 +10,7 @@
 #include "../../source/cheatstore.h"
 #include "../../source/GBApatch.h"
 #include "../../source/ingame_abi.h"
+#include "../../source/engine/cycles.h"
 #include "../../source/engine/stage.h"
 #include "torii_test.h"
 #include "tests.h"
@@ -244,33 +245,35 @@ void test_cheatstore(void)
 	gl_cheat_count = gl_cheat_bytes = gl_cheat_patches = 0;
 
 	// ROM patches: the load takes PSRAM and pReadCache, so a launch keeps them
-	// in EWRAM, CHEATSTORE_ROM_PATCHES at most, a cheat's all or none: 200
-	// kept, then one of 100 and a RAM write left out whole (never its write
-	// without its patches, or some of them), then 10 kept. The text is made
-	// in the cheat table's room, free until the launch.
-	static const u32 sizes[3] = {200, 100, 10};
+	// in cart SRAM, CHEATSTORE_ROM_PATCHES at most, a cheat's all or none:
+	// one of 2,048 (a cheat's most), one of 1,500 and one of 400 with a RAM
+	// write kept, then one of 200 and a RAM write left out whole (never its
+	// write without its patches, or some of them), then 148 kept: 4,096. One
+	// of 2,049 is too big. Each is a CodeBreaker slide into the ROM; the text
+	// is made in the cheat table's room, free until the launch.
+	static const u32 sizes[6] = {2048, 1500, 400, 200, 148, 2049};
 	char *t = (char *)cheatstore()->cheats;
 	u32 n = 0;
-	for (u32 c = 0; c < 3; c++) {
-		n += (u32)snprintf(t + n, 128, "cheat%lu_enable = true\ncheat%lu_code = \"%s", (unsigned long)c,
-				   (unsigned long)c, c == 1 ? "02001000:01+" : "");
-		for (u32 i = 0; i < sizes[c]; i++)
-			n += (u32)snprintf(t + n, 32, "%s08%06lX:4770", i ? "+" : "",
-					   (unsigned long)(0x1000 + c * 0x1000 + i * 2));
-		n += (u32)snprintf(t + n, 8, "\"\n");
-	}
+	for (u32 c = 0; c < 6; c++)
+		n += (u32)snprintf(t + n, 160,
+				   "cheat%lu_enable = true\ncheat%lu_code = \"%s4%07lX 4770+0000%04lX 0002\"\n",
+				   (unsigned long)c, (unsigned long)c, c == 2 || c == 3 ? "32001000 0001+" : "",
+				   (unsigned long)(0x8010000 + c * 0x10000), (unsigned long)sizes[c]);
 	CHECK(put(T_CHT, t));
 	cheatstore_launch(T_ROM, 0);
-	CHECK_EQ(gl_cheat_count, 0);  // cheat 1's RAM write left out with its patches
-	CHECK_EQ(gl_cheat_patches, 210);
-	CHECK_EQ(CHEATSTORE_ROM_PATCHES, 256);
+	CHECK_EQ(gl_cheat_count, 1);  // cheat 3's RAM write left out with its patches
+	CHECK_EQ(gl_cheat_patches, 4096);
+	CHECK_EQ(CHEATSTORE_ROM_PATCHES, 4096);
 	// One cheat of the most patches a cheat may have: kept whole
 	n = (u32)snprintf(t, 128, "cheat0_enable = true\ncheat0_code = \"");
 	for (u32 i = 0; i < CHEATFILE_PATCHES_MAX; i++)
 		n += (u32)snprintf(t + n, 32, "%s08%06lX:4770", i ? "+" : "", (unsigned long)(0x1000 + i * 2));
 	snprintf(t + n, 8, "\"\n");
 	CHECK(put(T_CHT, t));
+	u32 start = cycles_now();
 	cheatstore_launch(T_ROM, 0);
+	tlog("cheat test: a cheat of %u ROM patches read, decoded and kept in %lu cycles", CHEATFILE_PATCHES_MAX,
+	     (unsigned long)cycles_since(start));
 	CHECK_EQ(gl_cheat_patches, CHEATFILE_PATCHES_MAX);
 	gl_cheat_count = gl_cheat_bytes = gl_cheat_patches = 0;
 

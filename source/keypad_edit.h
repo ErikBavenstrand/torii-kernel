@@ -98,6 +98,7 @@ struct keypad_check {
 	u8 line;    // KEYPAD_SHAPE's line
 	s32 score;  // the first line's plausibility as a GameShark format (cheat_detect)
 	u32 ops;    // ops decoded; the first is w->ops[0]
+	u32 patches;  // ROM patches decoded beside them (w->patches)
 };
 
 // Checks the code: in format (CHEAT_FMT_AUTO: detected, decoded with ctx,

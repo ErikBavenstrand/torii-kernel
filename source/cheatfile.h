@@ -52,12 +52,17 @@
 #define CHEATFILE_CYCLES_MAX (CHEAT_LOAD_MAX - CHEAT_LOAD(CHEAT_COST_CALL))
 #define CHEATFILE_PROG_MAX (CHEATFILE_BYTES_MAX / 4)  // a cheat's table words
 #define CHEATFILE_OPS_MAX 256      // a cheat's decoded ops
-#define CHEATFILE_PATCHES_MAX 256  // a cheat's ROM patches
+// A cheat's ROM patches (4 KB of ROM data): they are decoded straight into
+// the patch room (cheatfile_patch_room), not into ops
+#define CHEATFILE_PATCHES_MAX 2048
 // The picked cheats' ROM patches together: what a launch keeps for the game
-// (cheatstore.h's CHEATSTORE_ROM_PATCHES), so any one legal cheat fits
-#define CHEATFILE_PICKED_PATCHES_MAX CHEATFILE_PATCHES_MAX
+// (cheatstore.h's CHEATSTORE_ROM_PATCHES, in cart SRAM), 8 KB of ROM data
+#define CHEATFILE_PICKED_PATCHES_MAX 4096
+_Static_assert(CHEATFILE_PICKED_PATCHES_MAX >= CHEATFILE_PATCHES_MAX, "any one legal cheat fits");
 #define CHEATFILE_NONE 0xFFFFFFFFu  // no such line (or cheat)
 #define CHEATFILE_VALUE_MAX 0xFFFF  // a longer value isn't read: its line counts for nothing
+// but a code's, up to this: 2,048 Action Replay ROM patch codes take 74 KB
+#define CHEATFILE_CODE_MAX 0x1FFFF
 
 // What a cheat is, once decoded
 enum cheatfile_status {
@@ -98,11 +103,11 @@ struct cheatfile_cheat {
 	u8 enable_len;
 	u8 status;           // enum cheatfile_status
 	u16 number;          // its N
-	u16 bytes;           // its share of the interpreter's table once decoded (OK only)
 	u16 cost;            // its cycles a frame, at most (OK only)
-	u16 patches : 9;     // ROM patches once decoded (OK only; at most CHEATFILE_PATCHES_MAX)
-	u16 folder : 7;      // cheatN_folder's (the last line's): its entry in the file's folders + 1, 0 none
 	u16 keys;            // cheatN_keys' value (cheatkeys.h), 0: no line or not a value
+	u32 bytes : 13;      // its share of the interpreter's table once decoded (OK only)
+	u32 patches : 12;    // ROM patches once decoded (OK only; at most CHEATFILE_PATCHES_MAX)
+	u32 folder : 7;      // cheatN_folder's (the last line's): its entry in the file's folders + 1, 0 none
 	u32 hash;            // its table part's and patches' hash once decoded (OK only; else 0)
 	u8 picked : 1;       // now
 	u8 was : 1;          // as the text has it (what writing back changes from)
@@ -115,6 +120,7 @@ struct cheatfile_cheat {
 	// (cheatfile_next): its variant, with other values written to the same
 	// places, so a pick of one stands for the run (cheatfile_group)
 	u8 variant : 1;
+	u8 code_hi : 1;      // code_len's bit 16: a code may be up to CHEATFILE_CODE_MAX bytes (cheatfile_code_len)
 	u16 act;             // once decoded (OK or SAME): the activation its code implies (cheatkeys_derive),
 			     // with CHEATFILE_ACT_UNGATED; else 0
 };
@@ -143,7 +149,14 @@ static inline u32 cheatfile_guide_len(const struct cheatfile_cheat *c)
 	return c->guide == CHEATFILE_NONE ? 0 : c->guide & CHEATFILE_GUIDE_LEN_MAX;
 }
 
-_Static_assert(CHEATFILE_PATCHES_MAX < 1u << 9, "a cheat's patches fit their bits");
+// Cheat c's code's bytes
+static inline u32 cheatfile_code_len(const struct cheatfile_cheat *c)
+{
+	return c->code_len | (u32)c->code_hi << 16;
+}
+
+_Static_assert(CHEATFILE_PATCHES_MAX < 1u << 12, "a cheat's patches fit their bits");
+_Static_assert(CHEATFILE_BYTES_MAX < 1u << 13, "a cheat's bytes fit their bits");
 
 // A folder's name (cheatN_folder's value) is 1 to CHEATFILE_FOLDER_MAX
 // bytes of UTF-8 with no control character; any other leaves the cheat in
@@ -277,8 +290,14 @@ struct cheatfile_work {
 	u32 last, last_shape;
 	struct cheat_op ops[CHEATFILE_OPS_MAX];
 	u32 prog[CHEATFILE_PROG_MAX];
-	struct cheat_patch patches[CHEATFILE_PATCHES_MAX];
+	struct cheat_patch *patches;  // the patch room's (cheatfile_patch_room)
 };
+
+// Where every cheatfile_work's ROM patches go: CHEATFILE_PATCHES_MAX of them
+// at at, each stored through put if it isn't NULL (PSRAM on the cart: the
+// work's own room in pReadCache has no space for them). Set it before
+// decoding.
+void cheatfile_patch_room(struct cheat_patch *at, void (*put)(struct cheat_patch *dst, const struct cheat_patch *src));
 
 // Starts decoding f's cheats from the first
 void cheatfile_begin(struct cheatfile_work *w);

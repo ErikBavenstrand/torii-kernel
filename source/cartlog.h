@@ -20,6 +20,10 @@
 #define CARTLOG_RUMBLE_PROBE 0x0E001A00  // the rumble probe ROM's report (source/rumbleprobe.h)
 #define CARTLOG_INGAME_PROBE 0x0E001B00  // the in-game probe ROM's report (source/ingameprobe.h)
 #define CARTLOG_INGAME_REFUSED 0x0E001C00  // why the in-game menu's stub didn't open it (struct ingame_refused)
+// A launch's ROM patches of the picked cheats, from its first pass to its
+// second (cheatstore_launch): not for the next boot, but in no one's way
+#define CARTLOG_CHEAT_PATCHES 0x0E002000
+#define CARTLOG_CHEAT_PATCHES_SIZE 0xC000
 // Pages Diagnostics may write test patterns to: free SRAM past the states.
 #define CARTLOG_TEST_PAGE 0xC0
 

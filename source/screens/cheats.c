@@ -864,9 +864,9 @@ static void detail_text(u32 at)
 	}
 	// The code: lines between its '+'s, but a pointer's offset's
 	const char *code = f->text + c->code;
-	for (u32 i = 0, from = 0; i <= c->code_len; i++)
-		if (i == c->code_len ||
-		    (code[i] == '+' && !cheat_plus_joins(code + from, c->code_len - from, i - from))) {
+	u32 code_len = cheatfile_code_len(c);
+	for (u32 i = 0, from = 0; i <= code_len; i++)
+		if (i == code_len || (code[i] == '+' && !cheat_plus_joins(code + from, code_len - from, i - from))) {
 			code_line(&n, code + from, i - from);
 			from = i + 1;
 		}
@@ -1321,18 +1321,18 @@ static u32 cs_code(u32 at, int fill)
 	ask.ctx = &ctx;
 	snprintf(cs.name, sizeof(cs.name), "%s", cs.new_name);
 	if (c) {
-		if (!keypad_edit_typable(f->text + c->code, c->code_len)) {
+		if (!keypad_edit_typable(f->text + c->code, cheatfile_code_len(c))) {
 			dialog_message(cs.heading, S(STR_CHEATS_UNTYPABLE), DIALOG_INFO);
 			return row;
 		}
-		if (c->code_len > KEYPAD_CODE_MAX) {
+		if (cheatfile_code_len(c) > KEYPAD_CODE_MAX) {
 			dialog_message(cs.heading, S(STR_CHEATS_TOO_LONG), DIALOG_INFO);
 			return row;
 		}
-		memcpy(cs.code, f->text + c->code, c->code_len);
-		cs.code[c->code_len] = 0;
+		memcpy(cs.code, f->text + c->code, cheatfile_code_len(c));
+		cs.code[cheatfile_code_len(c)] = 0;
 		ask.code = cs.code;
-		ask.code_len = c->code_len;
+		ask.code_len = cheatfile_code_len(c);
 		ask.format = c->format;
 		cs.name[0] = 0;
 		if (c->desc != CHEATFILE_NONE)

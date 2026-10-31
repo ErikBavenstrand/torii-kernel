@@ -141,37 +141,66 @@ static int runs(const struct cheat_op *op)
 }
 
 struct out {
-	struct cheat_patch *patches;
-	u32 patches_max, n_patches;
+	struct cheat_patches *ps;
 	u32 *prog;
 	u32 prog_max, n;
 	u32 cost;
 	u8 status;
 };
 
-// One byte into the ROM
-static void put_patch_byte(struct out *o, u32 address, u8 value)
+static void store(struct cheat_patches *ps, u32 i, const struct cheat_patch *p)
 {
-	u32 offset = (address - ROM_BASE) & ~1u;
-	u32 shift = (address & 1) * 8;
-	struct cheat_patch *p = o->n_patches ? &o->patches[o->n_patches - 1] : NULL;
-	if (!p || p->offset != offset) {
-		if (o->n_patches >= o->patches_max) {
-			o->status = CHEAT_LOWER_TOO_MANY_PATCHES;
-			return;
-		}
-		p = &o->patches[o->n_patches++];
-		p->offset = offset;
-		p->value = 0;
-		p->mask = 0;
+	if (ps->put)
+		ps->put(&ps->at[i], p);
+	else
+		ps->at[i] = *p;
+}
+
+// mask's bytes of value into the halfword at offset: merged into the last
+// patch when it is that halfword's, else a new patch. 0 if none was left.
+static int put_half(struct cheat_patches *ps, u32 offset, u32 value, u32 mask)
+{
+	struct cheat_patch p;
+	if (ps->n && ps->at[ps->n - 1].offset == offset) {
+		p = ps->at[ps->n - 1];
+		p.value = (u16)((p.value & ~mask) | (value & mask));
+		p.mask = (u16)(p.mask | mask);
+		store(ps, ps->n - 1, &p);
+		return 1;
 	}
-	p->value = (u16)((p->value & ~(0xFFu << shift)) | ((u32)value << shift));
-	p->mask |= (u16)(0xFFu << shift);
+	if (ps->n >= ps->max) {
+		ps->full = 1;
+		return 0;
+	}
+	p.offset = offset;
+	p.value = (u16)(value & mask);
+	p.mask = (u16)mask;
+	store(ps, ps->n++, &p);
+	return 1;
+}
+
+int cheat_patches_add(struct cheat_patches *ps, u32 address, u32 width, u32 value)
+{
+	// Aligned down, as a CPU store and mGBA's ROM patches are; a byte at a
+	// time, as each lands, the bytes of one halfword together
+	u32 base = address & ~(width - 1), half = 0, bits = 0, mask = 0;
+	for (u32 b = 0; b < width; ++b) {
+		u32 a = base + b, offset = (a - ROM_BASE) & ~1u, shift = (a & 1) * 8;
+		if (mask && offset != half) {
+			if (!put_half(ps, half, bits, mask))
+				return 0;
+			bits = mask = 0;
+		}
+		half = offset;
+		bits |= ((value >> (8 * b)) & 0xFFu) << shift;
+		mask |= 0xFFu << shift;
+	}
+	return !mask || put_half(ps, half, bits, mask);
 }
 
 static void patches_of(struct out *o, const struct cheat_op *op)
 {
-	u32 count, address = op->address, value = op->value, k, b;
+	u32 count, address = op->address, value = op->value, k;
 	if (op->type == CHEAT_OP_ROM_PATCH)
 		count = 1;
 	else if (op->type == CHEAT_OP_WRITE && is_rom(op->address))
@@ -179,9 +208,8 @@ static void patches_of(struct out *o, const struct cheat_op *op)
 	else
 		return;
 	for (k = 0; k < count && o->status == CHEAT_LOWER_OK; ++k) {
-		for (b = 0; b < op->width; ++b)
-			// Aligned down, as a CPU store and mGBA's ROM patches are
-			put_patch_byte(o, (address & ~(u32)(op->width - 1)) + b, (u8)(value >> (8 * b)));
+		if (!cheat_patches_add(o->ps, address, op->width, value))
+			o->status = CHEAT_LOWER_TOO_MANY_PATCHES;
 		address += (u32)op->addr_step;
 		value += (u32)op->value_step;
 	}
@@ -286,32 +314,78 @@ static void put_op(struct out *o, const struct cheat_op *op)
 		word(o, extra[k]);
 }
 
+// ROM patches take no place in the table: they are applied at launch, and
+// a conditional's counts skip them (cheat_lower). One stays, as a step that
+// does nothing, where it is the first op a conditional with an ELSE covers
+// and every op that conditional covers is a ROM patch: a conditional
+// covering no ops tests nothing, so its ELSE would run every frame. (The
+// decoders' split reading, cheat_decode_split, puts the same step there.)
+static int kept(const struct cheat_op *ops, u32 n_ops, u32 i)
+{
+	const struct cheat_op *cond = i ? &ops[i - 1] : NULL;
+	u32 j;
+	if (ops[i].type != CHEAT_OP_ROM_PATCH)
+		return 1;
+	if (!cond || !is_cond(cond->type) || !cond->count || !cond->else_count)
+		return 0;
+	for (j = i; j < n_ops && j < i + cond->count; ++j)
+		if (ops[j].type != CHEAT_OP_ROM_PATCH)
+			return 0;
+	return 1;
+}
+
+// The ops of [from, from + count) the table keeps
+static u32 kept_in(const struct cheat_op *ops, u32 n_ops, u32 from, u32 count)
+{
+	u32 n = 0;
+	for (u32 j = from; j < n_ops && j - from < count; ++j)
+		n += (u32)kept(ops, n_ops, j);
+	return n;
+}
+
 u8 cheat_lower(const struct cheat_op *ops, u32 n_ops, u32 *prog, u32 prog_max, u32 *prog_words, u32 *cost,
 	       struct cheat_patch *patches, u32 patches_max, u32 *n_patches)
 {
-	struct out o = {patches, patches_max, 0, prog, prog_max, 0, 0, CHEAT_LOWER_OK};
+	struct cheat_patches ps = {patches, patches_max, 0, NULL, 0};
+	u8 status = cheat_lower_onto(ops, n_ops, prog, prog_max, prog_words, cost, &ps);
+	*n_patches = ps.n;
+	return status;
+}
+
+u8 cheat_lower_onto(const struct cheat_op *ops, u32 n_ops, u32 *prog, u32 prog_max, u32 *prog_words, u32 *cost,
+		    struct cheat_patches *ps)
+{
+	struct out o = {ps, prog, prog_max, 0, 0, CHEAT_LOWER_OK};
 	u32 i, j, n = 0, guarded = 0, walked = 0, until = 0;
 	int plain = 1, any = 0;
 
-	*prog_words = *cost = *n_patches = 0;
+	*prog_words = *cost = 0;
 	for (i = 0; i < n_ops; ++i)
-		if (!cheat_op_address_ok(&ops[i]))
+		if (!cheat_op_address_ok(&ops[i])) {
+			ps->n = 0;
 			return CHEAT_LOWER_BAD_ADDRESS;
-	if (n_ops > CHEAT_PROG_OPS_MAX)
+		}
+	if (n_ops > CHEAT_PROG_OPS_MAX) {
+		ps->n = 0;
 		return CHEAT_LOWER_TOO_BIG;
+	}
 	for (i = 0; i < n_ops; ++i)
 		if (is_cond(ops[i].type))
 			plain = 0;
 	for (i = 0; i < n_ops; ++i)
-		if (cant_run(&ops[i], !plain))
+		if (cant_run(&ops[i], !plain)) {
+			ps->n = 0;
 			return CHEAT_LOWER_CANT_RUN;
+		}
 	for (i = 0; i < n_ops; ++i) {
 		patches_of(&o, &ops[i]);
 		if (runs(&ops[i]))
 			any = 1;
 	}
-	if (o.status != CHEAT_LOWER_OK)
+	if (o.status != CHEAT_LOWER_OK) {
+		ps->n = 0;
 		return o.status;
+	}
 
 	if (any) {
 		word(&o, 0);  // the header, filled in below
@@ -321,8 +395,16 @@ u8 cheat_lower(const struct cheat_op *ops, u32 n_ops, u32 *prog, u32 prog_max, u
 			if (!plain) {
 				// Ops a conditional without an ELSE covers run only while
 				// it holds: guarded. With an ELSE, one branch always runs.
+				// A conditional's counts are of the ops the table keeps
+				struct cheat_op c = *op;
 				u32 before = o.cost;
-				put_op(&o, op);  // every op in its place: the conditions count them
+				if (!kept(ops, n_ops, i))
+					continue;
+				if (is_cond(op->type)) {
+					c.count = kept_in(ops, n_ops, i + 1, op->count);
+					c.else_count = (u16)kept_in(ops, n_ops, i + 1 + op->count, op->else_count);
+				}
+				put_op(&o, &c);
 				if (i < until) {
 					guarded += o.cost - before;
 					walked += CHEAT_COST_WALK;  // passed over while the condition fails
@@ -367,12 +449,10 @@ u8 cheat_lower(const struct cheat_op *ops, u32 n_ops, u32 *prog, u32 prog_max, u
 			o.status = CHEAT_LOWER_TOO_BIG;
 	}
 	if (o.status != CHEAT_LOWER_OK) {
-		o.n = o.cost = o.n_patches = 0;
-		*n_patches = 0;
+		ps->n = 0;
 		return o.status;
 	}
 	*prog_words = o.n;
 	*cost = o.cost;
-	*n_patches = o.n_patches;
 	return CHEAT_LOWER_OK;
 }

@@ -12,7 +12,7 @@
 //   of counts.txt), and at a
 //   launch within cheatstore_launch's first pass, before the game is loaded
 //   (the second, once it is in PSRAM, writes the ROM patches the first kept
-//   in EWRAM: the load takes all of pReadCache).
+//   in cart SRAM: the load takes all of pReadCache).
 // - All of it: bulk SD, NOR, SRAM and PSRAM transfers inside one operation:
 //   starting a game (chunks, patch files, the save), writing a game to NOR,
 //   the NOR list's record, save backup and restore,

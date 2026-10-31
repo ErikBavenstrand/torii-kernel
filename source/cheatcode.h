@@ -153,7 +153,38 @@ enum cheat_status {
 // line holding a raw CodeBreaker key line other than the file's key takes it
 // as the file's new key when the old key reads the cheat as nonsense and the
 // new one doesn't.
+// Written once into the ROM at launch: the halfword at offset (from
+// 0x08000000, even) becomes (old & ~mask) | (value & mask)
+struct cheat_patch {
+	u32 offset;
+	u16 value;
+	u16 mask;
+};
+
+// ROM patches as they are made: at holds n of them, max at most (full once
+// one more didn't fit); put, if not NULL, stores one where a plain store
+// can't (PSRAM, which takes no byte stores and is written slower)
+struct cheat_patches {
+	struct cheat_patch *at;
+	u32 max, n;
+	void (*put)(struct cheat_patch *dst, const struct cheat_patch *src);
+	u8 full;
+};
+// width bytes of value into the ROM at address (0x08000000-based, aligned
+// down to the width), merged into the last patch when it is the same
+// halfword; 0 (and ps->full) if they didn't fit
+int cheat_patches_add(struct cheat_patches *ps, u32 address, u32 width, u32 value);
+
 u8 cheat_decode(struct cheat_decoder *d, const char *code, u32 len, struct cheat_op *ops, u32 ops_max, u32 *n_ops);
+// cheat_decode, with the ROM patch lines (Action Replay v3's and GameShark
+// v1's patch codes, the VBA format's ROM lines) made straight into ps
+// (emptied first) instead of ops: ops holds the rest, and a conditional's
+// counts are of those, as cheat_lower counts them; a block whose THEN holds
+// only patches gets a step that does nothing, as an empty one does. A
+// patch outside the ROM stays an op, for the address checks. More patches
+// than ps->max read as CHEAT_TOO_BIG. cheat_lower_onto lowers the result.
+u8 cheat_decode_split(struct cheat_decoder *d, const char *code, u32 len, struct cheat_op *ops, u32 ops_max, u32 *n_ops,
+		      struct cheat_patches *ps);
 
 // Whether the '+' at line[i] is part of the line that starts at line (len
 // bytes from there to the code's end), not between lines: a pointer's
@@ -168,14 +199,6 @@ int cheat_plus_joins(const char *line, u32 len, u32 i);
 // receives: 0x100 or more is certain, below 0 unlikely. Other formats score
 // 0x100: their shape alone tells them apart.
 u8 cheat_detect(const char *line, u32 len, s32 *score);
-
-// Written once into the ROM at launch: the halfword at offset (from
-// 0x08000000, even) becomes (old & ~mask) | (value & mask)
-struct cheat_patch {
-	u32 offset;
-	u16 value;
-	u16 mask;
-};
 
 // --- The interpreter's table ------------------------------------------------
 // What the in-game interpreter (source/cheatrun.s) runs each frame: per
@@ -279,9 +302,12 @@ enum cheat_lower_status {
 // its condition holds, and the game's PSRAM can't be written in game. Nor
 // can an add, or or and on the ROM (0x09xxxxxx holds the cart's command
 // registers), checked at each element's address. A cheat without conditionals runs its ops in order, writes of a
-// width in a row as one run; one with conditionals keeps every op in its
-// place (ROM patches and slowdown codes as nothing), so a condition's count
-// covers the ops it covers in mGBA. IF_BUTTON tests CHEAT_BUTTON_KEYS.
+// width in a row as one run; one with conditionals keeps every other op in
+// its place (slowdown codes as nothing), so a condition's count covers the
+// ops it covers in mGBA. ROM patches take no place and cost nothing: a
+// condition's counts leave out those it covers, but for one kept as nothing
+// where a condition with an ELSE covers only ROM patches (so its ELSE still
+// waits on it), as cheat_decode_split reads them. IF_BUTTON tests CHEAT_BUTTON_KEYS.
 // Slowdown codes do nothing. An address is good in EWRAM or IWRAM (mirrors
 // too, as the hardware has them), IO, palette, VRAM, OAM, the ROM's first
 // 32 MB mapping or SRAM; other mirrors and regions are bad, which catches
@@ -289,6 +315,10 @@ enum cheat_lower_status {
 // before anything else. On any status but OK, the outputs are 0.
 u8 cheat_lower(const struct cheat_op *ops, u32 n_ops, u32 *prog, u32 prog_max, u32 *prog_words, u32 *cost,
 	       struct cheat_patch *patches, u32 patches_max, u32 *n_patches);
+// cheat_lower onto the ps->n patches cheat_decode_split made: the ROM
+// writes' patches are added after them; on any status but OK, ps->n is 0
+u8 cheat_lower_onto(const struct cheat_op *ops, u32 n_ops, u32 *prog, u32 prog_max, u32 *prog_words, u32 *cost,
+		    struct cheat_patches *ps);
 
 // Whether every address op touches is good, as cheat_lower checks it: a
 // pointer write's pointer, a fill's or a counted add's whole range, a ROM

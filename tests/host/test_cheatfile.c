@@ -480,38 +480,71 @@ void test_cheatfile_budget(void)
 // out
 void test_cheatfile_patches_budget(void)
 {
-	static char text[16384];
-	static const u32 n[4] = {100, 100, 60, 56};
+	static char text[110000];
+	static const u32 n[6] = {2048, 1000, 1000, 50, 48, 2049};
 	char *p = text;
-	for (u32 c = 0; c < 4; c++) {
+	for (u32 c = 0; c < 6; c++) {
 		p += sprintf(p, "cheat%u_code = \"", (unsigned)c);
 		for (u32 i = 0; i < n[c]; i++)
 			p += sprintf(p, "%s08%u%05X:4770", i ? "+" : "", (unsigned)c, (unsigned)(i * 2));
 		p += sprintf(p, "\"\n");
 	}
 	load_str(text);
-	for (u32 c = 0; c < 4; c++) {
+	for (u32 c = 0; c < 5; c++) {
 		CHECK_EQ(cheats[c].status, CHEATFILE_OK);
 		CHECK_EQ(cheats[c].patches, n[c]);
 	}
-	CHECK(cheatfile_toggle(&file, 0));
-	CHECK(cheatfile_toggle(&file, 1));
-	CHECK_EQ(file.patches, 200);
-	CHECK_EQ(cheatfile_why(&file, 2), CHEATFILE_WHY_PATCHES);  // 260 of 256
-	CHECK(!cheatfile_toggle(&file, 2));
-	CHECK_EQ(cheatfile_why(&file, 3), CHEATFILE_PICKABLE);  // 256 exactly
-	CHECK(cheatfile_toggle(&file, 3));
+	CHECK_EQ(cheats[5].status, CHEATFILE_BIG);  // one past a cheat's 2,048
+	for (u32 c = 0; c < 3; c++)
+		CHECK(cheatfile_toggle(&file, c));
+	CHECK_EQ(file.patches, 4048);
+	CHECK_EQ(cheatfile_why(&file, 3), CHEATFILE_WHY_PATCHES);  // 4,098 of 4,096
+	CHECK(!cheatfile_toggle(&file, 3));
+	CHECK_EQ(cheatfile_why(&file, 4), CHEATFILE_PICKABLE);  // 4,096 exactly
+	CHECK(cheatfile_toggle(&file, 4));
 	CHECK_EQ(file.patches, CHEATFILE_PICKED_PATCHES_MAX);
 	CHECK(cheatfile_toggle(&file, 1));  // dropped: room again
-	CHECK_EQ(file.patches, 156);
-	CHECK_EQ(cheatfile_why(&file, 2), CHEATFILE_PICKABLE);
+	CHECK_EQ(file.patches, 3096);
+	CHECK_EQ(cheatfile_why(&file, 3), CHEATFILE_PICKABLE);
 	// Decoded again, the running total holds
 	cheatfile_begin(&work);
 	while (cheatfile_next(&file, &work) >= 0)
 		;
-	CHECK_EQ(file.patches, 156);
-	// One cheat of the most ROM patches a cheat may have fits alone
-	CHECK_EQ(CHEATFILE_PICKED_PATCHES_MAX, CHEATFILE_PATCHES_MAX);
+	CHECK_EQ(file.patches, 3096);
+	CHECK_EQ(CHEATFILE_PATCHES_MAX, 2048);
+	CHECK_EQ(CHEATFILE_PICKED_PATCHES_MAX, 4096);
+}
+
+// One cheat of 2,048 Action Replay v3 ROM patch codes and a key-gated write:
+// its code (74 KB) is past a value's 64 KB, which only a code may pass, and
+// its patches cost nothing in the table
+void test_cheatfile_long_code(void)
+{
+	static char text[160000];
+	char *p = text;
+	p += sprintf(p, "cheat0_format = \"PARv3 raw\"\ncheat0_code = \"");
+	for (u32 i = 0; i < 2048; i++)
+		p += sprintf(p, "00000000 18%06X+0000%04X 00000000+", (unsigned)(0x780000 + i), (unsigned)i);
+	p += sprintf(p, "0A400130 000003FE+0223F700 00000077\"\n");
+	u32 code_len = (u32)(p - text) - (u32)strlen("cheat0_format = \"PARv3 raw\"\ncheat0_code = \"\"\n");
+	CHECK(code_len > CHEATFILE_VALUE_MAX);
+	p += sprintf(p, "cheat1_code = \"32001000 0001\"\n");
+	load_str(text);
+	CHECK_EQ(file.count, 2);
+	CHECK_EQ(cheatfile_code_len(&cheats[0]), code_len);
+	CHECK_EQ(cheats[0].status, CHEATFILE_OK);
+	CHECK_EQ(cheats[0].patches, 2048);
+	CHECK_EQ(cheats[0].bytes, 4 * (1 + 3 + 2));  // the header, the key test and its write
+	CHECK_EQ(cheats[1].status, CHEATFILE_OK);
+	// A desc past 64 KB isn't read
+	p = text;
+	p += sprintf(p, "cheat0_desc = \"");
+	memset(p, 'a', 0x10000);
+	p += 0x10000;
+	p += sprintf(p, "\"\ncheat0_code = \"32001000 0001\"\n");
+	load_str(text);
+	CHECK_EQ(cheats[0].desc, CHEATFILE_NONE);
+	CHECK_EQ(cheats[0].status, CHEATFILE_OK);
 }
 
 // A pick's enable line counts against the file's cap: a pick the card
@@ -1038,8 +1071,8 @@ void test_cheatfile_big(void)
 	CHECK_EQ(cheats[999].status, CHEATFILE_OK);
 	free(text);
 
-	// A value over 65,535 bytes isn't read: its line counts for nothing
-	u32 long_len = 70000;
+	// A code over CHEATFILE_CODE_MAX bytes isn't read: its line counts for nothing
+	u32 long_len = CHEATFILE_CODE_MAX + 1;
 	char *lng = malloc(long_len + 64);
 	p = lng + sprintf(lng, "cheat0_code = \"");
 	memset(p, 'q', long_len);
