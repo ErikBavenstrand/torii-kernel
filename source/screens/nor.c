@@ -24,6 +24,7 @@
 #include "../gamename.h"
 #include "../lang.h"
 #include "../library.h"
+#include "../shotlist.h"
 #include "../tlog.h"
 #include "../engine/frame.h"
 #include "../ui/art_ids.h"
@@ -31,6 +32,7 @@
 #include "../ui/ui.h"
 #include "../userdata.h"
 #include "game_saves.h"
+#include "shots.h"
 
 #define NOR_TOTAL 0x4000000u  // the game NOR's 64 MB
 #define MB 0x100000u
@@ -125,8 +127,9 @@ struct nor_state {
 	char name[NAME_SLOTS][sizeof(pNorFS[0].filename)];
 	char size[NAME_SLOTS][12];
 	// The popup and its questions
-	struct ui_pop_item items[4];
-	u8 ids[4];
+	struct ui_pop_item items[5];
+	u8 ids[5];
+	char shots[8];  // the popup's Screenshots: how many the game has (SHOTLIST_FILES_MAX at most)
 	struct ui_popup menu;
 	char pop_title[sizeof(pNorFS[0].filename)];
 	char title[sizeof(pNorFS[0].filename) + 16];
@@ -446,6 +449,7 @@ enum {
 	POP_LAUNCH,
 	POP_INFO,
 	POP_SAVES,
+	POP_SHOTS,
 	POP_DELETE,
 };
 
@@ -480,6 +484,12 @@ static void popup(u32 game)
 		nor.ids[n] = POP_SAVES;
 		nor.items[n++] = (struct ui_pop_item){S(STR_GSAVES_TITLE), 0, 0};
 	}
+	u32 shots = shotlist_count(path);
+	if (shots) {
+		snprintf(nor.shots, sizeof(nor.shots), "%u", (unsigned)(shots % 100000));
+		nor.ids[n] = POP_SHOTS;
+		nor.items[n++] = (struct ui_pop_item){S(STR_GAMES_POP_SHOTS), nor.shots, 0};
+	}
 	nor.ids[n] = POP_DELETE;
 	nor.items[n++] = (struct ui_pop_item){S(STR_NOR_DELETE), 0, UI_POP_DANGER};
 	nor.menu = (struct ui_popup){nor.pop_title, ART_ICON8_NOR + 1, nor.items, (u8)n, 0, 0};
@@ -497,6 +507,14 @@ static void popup(u32 game)
 		if (pick == POP_SAVES) {
 			ui_popup_close();
 			saves(game);
+			return;
+		}
+		if (pick == POP_SHOTS) {
+			ui_popup_close();
+			shots_run_game(path);
+			nor.next_row = game;
+			nor.next_row_set = 1;
+			nav_reshow();
 			return;
 		}
 		if (pick == POP_INFO) {

@@ -27,6 +27,7 @@
 #include "../savename.h"
 #include "../sdlist.h"
 #include "../settings.h"
+#include "../shotname.h"
 #include "../tlog.h"
 #include "../userdata.h"
 #include "../engine/cycles.h"
@@ -38,6 +39,7 @@
 #include "../ui/ui.h"
 #include "game_saves.h"
 #include "rename.h"
+#include "shots.h"
 #include "../gamesave.h"
 
 // --- Look, px (spec.md's grid: title bar 0-18, content 20-143, hints at 147) ---
@@ -90,6 +92,7 @@ enum {
 	POP_DELETE,
 	POP_INFO,
 	POP_SAVES,
+	POP_VIEW,
 };
 
 struct sd_state {
@@ -299,11 +302,14 @@ static int show_all_setting(void)
 	return settings_get(&v, SET_SHOW_ALL) != 0;
 }
 
+// The entry for the hidden rule: a game it starts and a picture the viewer
+// shows (.bmp) list without Show all files
 static u32 entry_flags(const FILINFO *fi)
 {
 	return ((fi->fattrib & AM_DIR) ? GAMENAME_DIR : 0) |
 	       ((fi->fattrib & (AM_HID | AM_SYS)) ? GAMENAME_ATTR_HIDDEN : 0) |
-	       (library_console_of(fi->fname) != LIB_CONSOLE_NONE ? GAMENAME_OPENABLE : 0);
+	       (library_console_of(fi->fname) != LIB_CONSOLE_NONE || shotname_is_bmp(fi->fname) ? GAMENAME_OPENABLE
+												: 0);
 }
 
 static void count_stop(void)
@@ -636,6 +642,26 @@ static void page_again(void)
 
 static void launch(u32 how, u32 hard);
 
+// 1 if the entry is a picture the viewer opens
+static int is_bmp(const struct sdlist_rec *r)
+{
+	return !sdlist_is_dir(r) && shotname_is_bmp(sdlist_name(r));
+}
+
+// View: the folder's pictures in the viewer, from entry i's
+static void view_pictures(u32 i)
+{
+	if (!take_entry(i)) {
+		error(8);
+		return;
+	}
+	memo_store();  // the cursor the page comes back with
+	count_stop();
+	sd.find = 0;
+	shots_run_folder(currentpath, &sd.list, sd.name);
+	page_again();
+}
+
 // Saves: the game's saves page; playing a slot there starts the game as
 // Play's « » said, without asking for the slot again
 static void saves_game(void)
@@ -818,6 +844,8 @@ static int file_popup_open(u32 i)
 				     S(STR_GAMES_HINT_BOOT)};
 	if (sdlist_is_dir(r)) {
 		pop_add(POP_OPEN, S(STR_SD_OPEN), 0);
+	} else if (is_bmp(r)) {
+		pop_add(POP_VIEW, S(STR_SD_VIEW), 0);
 	} else if (console != LIB_CONSOLE_NONE) {
 		// Play: a GBA game's start steps with LEFT/RIGHT (its own way,
 		// clean, and with addons while one is on); Write to NOR writes it
@@ -912,6 +940,9 @@ static void file_popup_run(u32 i)
 		case POP_SAVES:
 			saves_game();
 			break;
+		case POP_VIEW:
+			view_pictures(i);
+			break;
 		default:
 			info(i);
 			break;
@@ -930,6 +961,8 @@ static void activate(u32 arg)
 	const struct sdlist_rec *r = sdlist_at(&sd.list, i);
 	if (sdlist_is_dir(r)) {
 		folder_in(i);
+	} else if (is_bmp(r)) {
+		view_pictures(i);
 	} else if (sdlist_console(r) == LIB_CONSOLE_NONE) {
 		file_popup(i);
 	} else if (!take_entry(i)) {

@@ -383,6 +383,8 @@ enum ui_kind {
 	UI_CAROUSEL,
 	// Pixels a screen paints itself (the rename keyboard, ui/ui_paper.c)
 	UI_CANVAS,
+	// A full-colour picture (the screenshot viewer, ui/ui_widgets.c)
+	UI_PICTURE,
 	UI_KINDS,
 };
 
@@ -676,6 +678,20 @@ struct ui_canvas_config {
 // Asks for a repaint in the next draw (several calls before it, one paint)
 void ui_canvas_redraw(u8 node);
 
+// A picture (docs/design/v0.9/shot-viewer.md): w x h 8bpp tiles of its own
+// in row order, on a plane of its own, which its view turns to 8bpp; a
+// pixel of colour n shows BG colour n. It takes the BG banks from
+// UI_BANKS on, UI_PICTURE_BANKS of them (UI_PICTURE_COLOURS colours from
+// UI_PICTURE_FIRST): the two after them stay free for a confirmation over
+// it. It starts blank (colour 0, transparent); data is NULL.
+#define UI_PICTURE_BANKS (16 - UI_BANKS - 2)
+#define UI_PICTURE_FIRST (UI_BANKS * 16)
+#define UI_PICTURE_COLOURS (UI_PICTURE_BANKS * 16)
+// Shows other tiles (w x h x 64 bytes, word-aligned, read at VBlank: they
+// must stay put until the copy lands, gfx_queue_ticket). 0 if the VRAM
+// queue is full (try again next frame).
+int ui_picture_show(u8 node, const void *tiles);
+
 // --- Views and nodes ------------------------------------------------------
 
 struct ui_node {
@@ -712,6 +728,7 @@ struct ui_view {
 	s8 opening;       // 1 opening, -1 closing (ui_close), 0 still
 	u8 front;         // with UI_V_OBJS: planes in front of its sprites (bit p)
 	u8 tall;          // planes whose map is 32 x 64 tiles (a list's, bit p)
+	u8 bpp8;          // planes of 8bpp tiles (a picture's, bit p)
 };
 #define UI_OPEN 256
 

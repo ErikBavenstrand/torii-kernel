@@ -86,6 +86,7 @@ enum {
 #define TAG_OBJ_PALETTE 0x5501
 #define TAG_SHARED 0x5510  // + character block
 #define BGCNT_32X64 0x8000  // a list's map (UI_RING_MAP_LINES)
+#define BGCNT_8BPP 0x0080  // a picture's tiles
 #define PRIO_NONE 0xFF      // a view whose sprites don't show
 #define STAGE_WORDS 512    // the staging area: one 2 KB screenblock
 #define STAGE_SPANS 8      // map row spans staged until the queue empties
@@ -1548,7 +1549,7 @@ static void regs_update(void)
 		if (prio > 3)
 			prio = 3;
 		gfx_set_bgcnt(p, (u16)(prio | ui_plane_cb(p) << 2 | (u32)res_bg_screenblock(v->maps[p]) << 8 |
-				       (v->tall >> p & 1 ? BGCNT_32X64 : 0)));
+				       (v->tall >> p & 1 ? BGCNT_32X64 : 0) | (v->bpp8 >> p & 1 ? BGCNT_8BPP : 0)));
 		if (!((ui.hidden | ui.lists_hidden) >> p & 1) && !gone)
 			dispcnt |= (u16)DISP_BG(p);
 		shown |= LAYER_BG(p);

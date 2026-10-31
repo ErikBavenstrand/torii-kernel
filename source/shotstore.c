@@ -12,6 +12,7 @@
 #include "ingame_abi.h"
 #include "lang.h"
 #include "ppu_render.h"
+#include "shotlist.h"
 #include "shotpack.h"
 #include "saveslot.h"
 #include "slotstore.h"
@@ -325,6 +326,8 @@ int shotstore_file(const char *game, const u8 *launch_clock)
 		filed += ok;
 		at = next;
 	}
+	if (filed)
+		shotlist_forget();  // the game popups' counts: PSRAM page 2 outlives a reset
 	if (ok && filed) {  // all on the card: the list goes
 		u32 none = 0;
 		sram_io(INGAME_SRAM_SHOT, &none, 4, 1);

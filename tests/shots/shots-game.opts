@@ -1,0 +1,39 @@
+# The screenshot viewer (source/screens/shots.c, docs/design/v0.9/shot-viewer.md)
+# from a game's popup: Screenshots after Saves, with Hello's count (three:
+# one with no clock, which comes last, and a file of another game's that
+# starts the same, which doesn't count) (popup.png). A opens the newest, a
+# picture in fewer than 176 colours, with the overlay: its date and "1 of 3"
+# (first.png); the overlay goes after 2 seconds (bare.png). RIGHT steps to
+# the older one, in thousands of colours cut to 176 (many.png), and RIGHT
+# again to the one with no clock, a small picture centred on black, its name
+# in the overlay (small.png). START asks to delete it (delete.png); B
+# cancels, and B goes back to the popup's page.
+#! sd-file "/torii/screenshots/Hello 2026-10-28 14-03-22.bmp" 0 tests/shots/data/shot-scene.bmp
+#! sd-file "/torii/screenshots/Hello 2026-10-27 09-15-00.bmp" 0 tests/shots/data/shot-many.bmp
+#! sd-file "/torii/screenshots/Hello-2.bmp" 0 tests/shots/data/small.bmp
+#! sd-file "/torii/screenshots/Hello 2 2026-10-28 14-03-22.bmp" 0 tests/shots/data/small.bmp
+-w "nav: home ready"
+-k @8:RIGHT -k @12:-
+-k @20:A -k @24:-
+-w "nav: page gba ready"
+-k @8:START -k @12:-
+-w "screen ready: game-popup"
+-s @8:popup.png
+-k @12:DOWN -k @16:- -k @24:DOWN -k @28:-
+-k @36:A -k @40:-
+-w "screen ready: shot-picture 1"
+-s @2:first.png
+-s @130:bare.png
+-k @140:RIGHT -k @144:-
+-w "screen ready: shot-picture 2"
+-s @2:many.png
+-k @8:RIGHT -k @12:-
+-w "screen ready: shot-picture 3"
+-s @2:small.png
+-k @8:START -k @12:-
+-w "screen ready: confirm"
+-s @30:delete.png
+-k @34:B -k @38:-
+-k @70:B -k @74:-
+-w "screen ready: games"
+-s @20:back.png

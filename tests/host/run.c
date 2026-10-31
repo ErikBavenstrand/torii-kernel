@@ -160,6 +160,7 @@ static const struct {
 	{"lz77_round_trip", test_lz77_round_trip},
 	{"lz77_compresses", test_lz77_compresses},
 	{"shotpack", test_shotpack},
+	{"picture", test_picture},
 	{"ingame_abi", test_ingame_abi},
 	{"ppu_render_text", test_ppu_render_text},
 	{"ppu_render_sprites", test_ppu_render_sprites},

@@ -1,0 +1,19 @@
+# The viewer's read-ahead (source/screens/shots.c): resting on the first
+# shot starts decoding the next as a job between frames; RIGHT while it
+# runs takes its decode over and finishes it (the log says so), and the
+# picture shows (next.png): photo-like, cut to 176 colours and dithered.
+#! sd-file "/torii/screenshots/Hello 2026-10-28 14-03-22.bmp" 0 tests/shots/data/shot-scene.bmp
+#! sd-file "/torii/screenshots/Hello 2026-10-27 09-15-00.bmp" 0 tests/shots/data/shot-many.bmp
+-w "nav: home ready"
+-k @8:RIGHT -k @12:-
+-k @20:A -k @24:-
+-w "nav: page gba ready"
+-k @8:START -k @12:-
+-w "screen ready: game-popup"
+-k @12:DOWN -k @16:- -k @24:DOWN -k @28:-
+-k @36:A -k @40:-
+-w "screen ready: shot-picture 1"
+-k @20:RIGHT -k @24:-
+-w "the read-ahead's decode goes on"
+-w "screen ready: shot-picture 2"
+-s @2:next.png

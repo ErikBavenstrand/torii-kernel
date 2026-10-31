@@ -1,0 +1,21 @@
+# shots-game.opts in Swedish (v0.9.2): the game popup's Skärmbilder with its
+# count (popup.png), and the viewer's overlay with the date in Swedish and
+# "1 av 2" (first.png).
+#! settings 0=22094
+#! sd-file /torii/lang/sv.lng 0 dist/lang/sv.lng
+#! sd-file "/torii/screenshots/Hello 2026-10-28 14-03-22.bmp" 0 tests/shots/data/shot-scene.bmp
+#! sd-file "/torii/screenshots/Hello-2.bmp" 0 tests/shots/data/small.bmp
+-w "nav: home ready"
+-k @8:RIGHT -k @12:-
+-k @20:A -k @24:-
+-w "nav: page gba ready"
+-k @8:START -k @12:-
+-w "screen ready: game-popup"
+-s @8:popup.png
+-k @12:DOWN -k @16:- -k @24:DOWN -k @28:-
+-k @36:A -k @40:-
+-w "screen ready: shot-picture 1"
+-s @2:first.png
+-k @8:START -k @12:-
+-w "screen ready: confirm"
+-s @30:delete.png

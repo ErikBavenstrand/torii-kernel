@@ -675,6 +675,21 @@ settings-dark/frames 37-37 A037C0FC820F7052
 settings-dark/frames 38-38 CA541704684BDBF5
 settings-dark/frames 39-45 8DC21F50A4966475
 settings-start-hidden/row 0CAAE9ACBBE3D16E
+shots-ahead/next 9B121D3112278DED
+shots-game/back 1E6044F0A7D02798
+shots-game/bare CEC52ECD02655E0C
+shots-game/delete E1516E8C0FFF62F4
+shots-game/first 0B42A6524702DD73
+shots-game/many 62B0D0BC3104F629
+shots-game/popup DB76763EC08597E0
+shots-game/small 3DE58173DCD470B7
+shots-sd/back 2A7C6CC3F2E549BD
+shots-sd/deleted 8B2FB35BACC4FB21
+shots-sd/folder 0F2952865EB88ECF
+shots-sd/holiday 1B9B8778EC7ED6A3
+shots-sd/popup E379FCDA317AE7BC
+shots-sd/rle 660A4DB89E0FE435
+shots-sd/small D592D4E952537047
 slot-new-name/empty 12645B2E2358B52B
 slot-new-name/typed 12645B2E2358B52B
 slot-new-popup/popup 3153AA40029E6635
@@ -960,6 +975,11 @@ sv-settings/frames 102-102 EA4965DF9F03A783
 sv-settings/frames 103-103 34925818C143DC33
 sv-settings/frames 104-104 B240AB9DF893CB73
 sv-settings/frames 105-233 D6D328D1012D7203
+sv-shots-game/delete D02DA5FDE23F98D3
+sv-shots-game/first DD025FDE62BDB4C1
+sv-shots-game/popup C251D2B02A30062C
+sv-shots-sd/delete 47625187BF99B47D
+sv-shots-sd/rle 61A07C89F4DBFE17
 sv-slot-picker/picker 15CD6AEB1D37F47A
 sv-slot-picker/picker-down F12257F08C1CBC04
 ui-dialog/closed 942FEA8E68027B47

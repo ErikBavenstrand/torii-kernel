@@ -21,6 +21,7 @@
 #include "ingame.h"
 #include "ingame_abi.h"
 #include "settings_model.h"
+#include "shotname.h"
 #include "shotstore.h"
 #include "statestore.h"
 #include "tlog.h"
@@ -50,22 +51,6 @@ static u32 sram_put(u32 at, const u8 *src, u32 n)
 	for (u32 i = 0; i < n; i++)
 		bad += dst[i] != (src ? src[i] : 0);
 	return bad;
-}
-
-// The file name's last part without its extension, cut to fit
-static void game_name(char *out, u32 size, const char *path)
-{
-	const char *base = strrchr(path, '/');
-	base = base ? base + 1 : path;
-	const char *dot = strrchr(base, '.');
-	u32 n = dot && dot != base ? (u32)(dot - base) : strlen(base);
-	if (n > size - 1)
-		n = size - 1;
-	// never a cut UTF-8 sequence at the end
-	while (n && (base[n] & 0xC0) == 0x80)
-		n--;
-	memcpy(out, base, n);
-	out[n] = 0;
 }
 
 static const struct torii_glyph *glyph(u32 cp)
@@ -308,6 +293,8 @@ int ingame_states_launch(const char *rom_path, const char *save_slot, const char
 	return !slot || loaded ? 1 : r;
 }
 
+_Static_assert(INGAME_NAME_BYTES == SHOTNAME_STEM_BYTES, "a session's name is its screenshots' stem");
+
 int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 {
 	// The block's head (its fields before the lines); the cheats are
@@ -322,7 +309,7 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 	h->version = INGAME_SESSION_VERSION;
 	h->bytes = sizeof(struct ingame_session);
 	h->rom_bytes = rom_bytes;
-	game_name(h->name, sizeof(h->name), name);
+	shotname_stem(h->name, sizeof(h->name), name);  // its screenshots' names start with it
 	u16 banks[UI_BANKS * 16];
 	ui_theme_banks(ui_theme_setting(), PAL_GBA, banks);
 	memcpy(h->palette, banks, sizeof(h->palette));

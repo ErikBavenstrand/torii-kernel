@@ -18,6 +18,7 @@
 #include "NORflash_OP.h"
 #include "safefile.h"
 #include "saveslot.h"
+#include "shotlist.h"
 #include "tlog.h"
 #include "userdata.h"
 #include "engine/cycles.h"
@@ -326,6 +327,7 @@ int action_delete_file(const char *path)
 		return 0;
 	}
 	tlog("delete: %s", path_copy);
+	shotlist_changed(path_copy);  // a screenshot: the game popups' counts
 	tlog_card_freed();
 	userdata_forget(path_copy);
 	library_forget(path_copy);
@@ -725,6 +727,7 @@ u32 action_rename_file(const char *path, const char *new_name)
 	if (f_stat(path, &fileinfo) == FR_OK && (fileinfo.fattrib & AM_DIR))
 		return ACTION_RENAME_BAD;  // a folder: what is in it wouldn't follow
 	tlog_open_now();  // the file may be the log the background open holds
+	shotlist_changed(path);  // a screenshot: the game popups' counts
 	int case_only = same_name(w->name, new_name);
 	if (console != LIB_CONSOLE_NONE) {
 		// Its saves must keep the record's name, and no other save may be
@@ -813,6 +816,8 @@ u32 action_rename_file(const char *path, const char *new_name)
 		journal_clear();
 		return ACTION_RENAME_FAILED;
 	}
+	if (console != LIB_CONSOLE_NONE)
+		shotlist_rename(w->name, new_name);  // its screenshots follow it, as far as they can
 	if (console != LIB_CONSOLE_NONE && w->has[SIDE_ART_AT])
 		boxart_forget();  // its listing of the card's art follows
 	u32 partly = !gamename_store_move(path, w->new_path);

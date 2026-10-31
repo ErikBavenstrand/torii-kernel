@@ -89,7 +89,33 @@
 // - READCACHE_LANG, 64 KB from 0x8000, clear of the stage: a language pack
 //   on its way from the card to PSRAM (lang_load.c), checked whole there,
 //   within lang_switch.
+// - READCACHE_SHOTS_LIST, 64 KB from 0x8000, clear of the stage: the game
+//   popup's look at /torii/screenshots (shotlist.c, struct list_work), within
+//   shotlist_count: the folder's entries and their counts on their way to
+//   PSRAM page 2.
+// - READCACHE_SHOTS_MOVE, 4 KB from the start: a renamed game's screenshots
+//   moving to its new name (shotlist.c, struct move_work), within
+//   shotlist_rename, which action_rename_file calls after its share walk
+//   and before anything else that borrows the start.
+// - READCACHE_SHOTS, all 128 KB: the screenshot viewer (screens/shots.c)
+//   while it runs, which calls nothing else that borrows past the stage but
+//   a delete (whose borrowers stay below READCACHE_SHOTS_STATE; the
+//   read-ahead stops first). Its state (struct sv_state: the picture's
+//   tiles, which the VRAM queue reads after the call that made them, its
+//   colours, the list's order, the read-ahead job's decode) from
+//   READCACHE_SHOTS_STATE to the end; the decoder's colour table
+//   (picture.h), 32 KB from READCACHE_SHOTS_TABLE, clear of the stage, as
+//   the read-ahead's steps run between frames; and from the start, over the
+//   stage, the list's names and dates on their way to PSRAM page 2, within
+//   the list's read.
 #define MAX_pReadCache_size 0x20000
+#define READCACHE_SHOTS_MOVE 0x0
+#define READCACHE_SHOTS_MOVE_SIZE 0x1000
+#define READCACHE_SHOTS_LIST 0x8000
+#define READCACHE_SHOTS_LIST_SIZE 0x10000
+#define READCACHE_SHOTS 0x0
+#define READCACHE_SHOTS_TABLE 0x8000
+#define READCACHE_SHOTS_STATE 0x10000
 #define READCACHE_LANG 0x8000
 #define READCACHE_LANG_SIZE 0x10000
 #define READCACHE_ART_SHEET 0x8000
