@@ -23,9 +23,8 @@ from typing import ClassVar
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "tools"))
-import names_db
-
 import cheats
+import names_db
 
 FIXTURE = ROOT / "tests" / "cheats" / "gamehacking_gba_50.html"
 NODE = shutil.which("node")
