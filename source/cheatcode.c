@@ -718,6 +718,7 @@ static int raw_line(const char *p, u32 len, struct line *l)
 	u32 at, vlen, k;
 	int ptr, kptr;
 	l->flags = 0;
+	l->key = l->key_off = 0;  // none but a ^KEY's: never the last line's
 	at = raw_ref(p, len, &l->op1, &l->off, &ptr, &l->marks);
 	if (!at || at >= len || (p[at] != ':' && p[at] != '|'))
 		return 0;
