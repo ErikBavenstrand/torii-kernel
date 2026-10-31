@@ -9,6 +9,7 @@
 #include "cutpoint.h"
 #include "ez_define.h"
 #include "Ezcard_OP.h"
+#include "cartlog.h"
 #include "GBApatch.h"
 #include "ff.h"
 #include "ingame.h"
@@ -1640,13 +1641,15 @@ int cheatstore_drop(void)
 }
 
 // The halfword at offset in the game's PSRAM image becomes (old & ~mask) |
-// (value & mask); PSRAM shows 8 MB a page
-static void rom_patch(const struct cheat_patch *p)
+// (value & mask); PSRAM shows 8 MB a page. *page: the page set now, changed
+// only when p is on another (the caller sets 0 back)
+static void rom_patch(const struct cheat_patch *p, u16 *page)
 {
 	vu16 *at = (vu16 *)((u8 *)PSRAMBase_S98 + (p->offset & 0x7FFFFF));
-	SetPSRampage((u16)((p->offset >> 23) * 0x1000));
+	u16 want = (u16)((p->offset >> 23) * 0x1000);
+	if (*page != want)
+		SetPSRampage(*page = want);
 	*at = (u16)((*at & ~p->mask) | (p->value & p->mask));
-	SetPSRampage(0);
 }
 
 static const char *const status_names[] = {
@@ -1654,20 +1657,46 @@ static const char *const status_names[] = {
 _Static_assert(sizeof(status_names) / sizeof(status_names[0]) == CHEATFILE_SAME + 1, "a name for each");
 
 // The first pass's ROM patches, for the second: the game's load takes PSRAM,
-// where the text is, and all of pReadCache. With the names of the first
-// cheats they come from, for the second pass's log.
+// where the text is, and all of pReadCache, and EWRAM has no room for
+// CHEATSTORE_ROM_PATCHES of them, so they wait in cart SRAM page 0xF0
+// (CARTLOG_CHEAT_PATCHES), each with the cheat it comes from. The names of
+// the first cheats they come from stay here, for the second pass's log.
 #define KEPT_NAMES 8
 #define KEPT_NAME_LEN 24
 #define KEPT_NO_NAME 0xFF
+struct kept_patch {
+	struct cheat_patch patch;
+	u16 number;  // the cheat's N
+	u8 name;  // its name in names, or KEPT_NO_NAME
+	u8 pad;
+};
+_Static_assert(CHEATSTORE_ROM_PATCHES * sizeof(struct kept_patch) <= CARTLOG_CHEAT_PATCHES_SIZE,
+	       "the kept ROM patches fit their room in cart SRAM");
 static struct {
 	u32 rom;  // the ROM path's CRC32: the second pass is the same game's
 	u32 n;
-	struct cheat_patch patches[CHEATSTORE_ROM_PATCHES];
-	u16 number[CHEATSTORE_ROM_PATCHES];  // the cheat's N
-	u8 name[CHEATSTORE_ROM_PATCHES];  // its name in names, or KEPT_NO_NAME
 	u32 names_used;
 	char names[KEPT_NAMES][KEPT_NAME_LEN];
 } kept EWRAM_BSS;
+
+// Kept patch i into cart SRAM, or n of them from i out of it: a byte at a
+// time (its bus is 8 bits wide); the caller sets the page (kept_put), or
+// it is set back to 0 (kept_get)
+static void kept_put(u32 i, const struct kept_patch *k)
+{
+	vu8 *at = (vu8 *)(CARTLOG_CHEAT_PATCHES + i * sizeof(*k));
+	for (u32 b = 0; b < sizeof(*k); b++)
+		at[b] = ((const u8 *)k)[b];
+}
+
+static void kept_get(u32 i, struct kept_patch *k, u32 n)
+{
+	const vu8 *at = (const vu8 *)(CARTLOG_CHEAT_PATCHES + i * sizeof(*k));
+	SetRampage(CARTLOG_PAGE);
+	for (u32 b = 0; b < n * sizeof(*k); b++)
+		((u8 *)k)[b] = at[b];
+	SetRampage(0);
+}
 
 static u32 path_crc(const char *path)
 {
@@ -1685,25 +1714,30 @@ static void keep_patches(const struct cheatfile *f, const struct cheatfile_cheat
 		snprintf(kept.names[name], KEPT_NAME_LEN, "%.*s", c->desc != CHEATFILE_NONE ? (int)c->desc_len : 0,
 			 c->desc != CHEATFILE_NONE ? f->text + c->desc : "");
 	}
+	SetRampage(CARTLOG_PAGE);
 	for (u32 p = 0; p < w->n_patches && kept.n < CHEATSTORE_ROM_PATCHES; p++) {
-		kept.patches[kept.n] = w->patches[p];
-		kept.number[kept.n] = c->number;
-		kept.name[kept.n] = name;
-		kept.n++;
+		struct kept_patch k = {w->patches[p], c->number, name, 0};
+		kept_put(kept.n++, &k);
 	}
+	SetRampage(0);
 }
 
 // The second pass: the kept ROM patches into the game in PSRAM (psram_bytes
 // of it), but for any past its end or over the kernel's own patches
 static void write_patches(const char *rom_path, u32 psram_bytes)
 {
-	u32 applied = 0, skipped = 0, guarded = 0;
+	u32 applied = 0, skipped = 0, guarded = 0, start = cycles_now();
 	if (kept.rom != path_crc(rom_path)) {
 		tlog_error("cheats: %s: its ROM patches weren't kept before the load: none written", rom_path);
 		return;
 	}
+	struct kept_patch some[16];
+	u16 page = 0;  // as every user of another PSRAM page leaves it
 	for (u32 p = 0; p < kept.n; p++) {
-		const struct cheat_patch *pt = &kept.patches[p];
+		if (!(p % 16))
+			kept_get(p, some, kept.n - p < 16 ? kept.n - p : 16);
+		const struct kept_patch *k = &some[p % 16];
+		const struct cheat_patch *pt = &k->patch;
 		if (pt->offset + 2 > psram_bytes) {
 			skipped++;
 			continue;
@@ -1713,16 +1747,18 @@ static void write_patches(const char *rom_path, u32 psram_bytes)
 		if (rom_guard_hits(pt->offset, 2)) {
 			if (!guarded++ || tlog_wants(TLOG_DEBUG))
 				tlog("cheats: cheat %u (%s): its ROM patch at %08lX is over the kernel's own, left out",
-				     kept.number[p], kept.name[p] != KEPT_NO_NAME ? kept.names[kept.name[p]] : "?",
+				     k->number, k->name != KEPT_NO_NAME ? kept.names[k->name] : "?",
 				     (unsigned long)0x08000000 + pt->offset);
 			continue;
 		}
-		rom_patch(pt);
+		rom_patch(pt, &page);
 		applied++;
 	}
-	tlog("cheats: %lu ROM patches written into the game%s%s", (unsigned long)applied,
+	if (page)
+		SetPSRampage(0);
+	tlog("cheats: %lu ROM patches written into the game%s%s (%lu cycles)", (unsigned long)applied,
 	     skipped ? ", some past its end left out" : "",
-	     guarded ? ", some over the kernel's own patches left out" : "");
+	     guarded ? ", some over the kernel's own patches left out" : "", (unsigned long)cycles_since(start));
 }
 
 void cheatstore_launch_none(void)

@@ -52,10 +52,14 @@
 #define CHEATFILE_CYCLES_MAX (CHEAT_LOAD_MAX - CHEAT_LOAD(CHEAT_COST_CALL))
 #define CHEATFILE_PROG_MAX (CHEATFILE_BYTES_MAX / 4)  // a cheat's table words
 #define CHEATFILE_OPS_MAX 256      // a cheat's decoded ops
-#define CHEATFILE_PATCHES_MAX 256  // a cheat's ROM patches
+// A cheat's ROM patches: the decoder's work (struct cheatfile_work) lives in
+// pReadCache's cheat share, which has no room for more (and its ops cap an
+// Action Replay v3 cheat, a ROM patch an op, a little lower)
+#define CHEATFILE_PATCHES_MAX 256
 // The picked cheats' ROM patches together: what a launch keeps for the game
-// (cheatstore.h's CHEATSTORE_ROM_PATCHES), so any one legal cheat fits
-#define CHEATFILE_PICKED_PATCHES_MAX CHEATFILE_PATCHES_MAX
+// (cheatstore.h's CHEATSTORE_ROM_PATCHES, in cart SRAM), 4 KB of ROM data
+#define CHEATFILE_PICKED_PATCHES_MAX 2048
+_Static_assert(CHEATFILE_PICKED_PATCHES_MAX >= CHEATFILE_PATCHES_MAX, "any one legal cheat fits");
 #define CHEATFILE_NONE 0xFFFFFFFFu  // no such line (or cheat)
 #define CHEATFILE_VALUE_MAX 0xFFFF  // a longer value isn't read: its line counts for nothing
 

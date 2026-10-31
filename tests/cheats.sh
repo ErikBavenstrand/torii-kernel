@@ -180,6 +180,59 @@ want 2 0203F300 aa "the device button, R and SELECT held"
 want 3 0203F400 77 "CodeBreaker's key test, A held"
 echo "PASS: cheats: every op type runs in game: conditions and ELSE, the button and key test, pointers, add/or/and, slides, palette and VRAM"
 
+# ROM patches: a launch keeps 2,048 of the picked cheats' (in cart SRAM
+# between its passes) and writes them all into the game; past that a cheat
+# is left out whole. An Action Replay v3 cheat of 200 ROM patches and a key
+# test (the shape of a menu written into free ROM) costs no more in game
+# than its key test: its patches take no place in the table.
+cp "$cart/clean/sd.img" "$cart/sd.img"
+cp "$cart/clean/kernel-nor.bin" "$cart/"
+rm -f "$cart/sram.bin"
+n=0
+patches() { # FIRST COUNT: VBA ROM patches over the header's title, values from FIRST
+  local i out=""
+  for ((i = 0; i < $2; i++)); do
+    out+="${out:++}$(printf '%08X:%04X' $((0x080000A0 + 2 * (i % 6))) $(($1 + i)))"
+  done
+  printf '%s' "$out"
+}
+{
+  for c in 0 1 2 3 4 5 6; do
+    code "Patches $c" "$(patches $((c * 0x1000)) 256)"
+  done
+  code "Patches 7" "$(patches 0x7000 56)"
+  ar=""
+  for ((i = 0; i < 200; i++)); do
+    ar+="$(printf '00000000 18%06X+0000%04X 00000000+' $((0x50 + i % 6)) $((0x8000 + i)))"
+  done
+  # IF [KEYINPUT] == 03FE (A held), the next code: 0203F700 = 0077
+  code "Menu" "${ar}0A400130 000003FE+0223F700 00000077"
+  printf 'cheat%d_format = "PARv3 raw"\n\n' $((n - 1))
+  code "One more" "080000AC:1234"
+} >"$cart/Hello.cht"
+mcopy -o -i "$cart/sd.img" "$cart/Hello.cht" "::/torii/cheats/Hello.cht"
+# shellcheck disable=SC2046 # nav.sh's options
+boot $(nav_launch /Hello.gba addon) -w "BOOT WITH ADDON" -m @240:0x080000A0:14 -m @240:0x0203F700:2 \
+  -k @300:A -k @340:- -m @330:0x0203F700:2 -f 4000 >"$cart/patches.txt" 2>&1 ||
+  fail "the ROM patches' launch didn't run: $(grep -a '^kernel' "$cart/patches.txt" | tail -3)"
+grep -q "cheats: .*Hello.cht: 10 picked, 1 run in game" "$cart/patches.txt" ||
+  fail "the ROM patches' launch read: $(grep -a 'cheats:' "$cart/patches.txt" | head -3)"
+grep -q "cheats: cheat 9 (One more): its 1 ROM patches don't fit beside 2048, left out" "$cart/patches.txt" ||
+  fail "the cheat past 2,048 patches: $(grep -a 'cheats: cheat' "$cart/patches.txt" | head -3)"
+grep -q "cheats: 2048 ROM patches written into the game" "$cart/patches.txt" ||
+  fail "the ROM patches weren't all written: $(grep -a 'cheats:' "$cart/patches.txt" | tail -3)"
+cycles=$(sed -n 's/.*cheats: 2048 ROM patches written into the game (\([0-9]*\) cycles).*/\1/p' "$cart/patches.txt")
+echo "cheats: 2048 ROM patches written in ${cycles:-?} cycles"
+pat() { sed -n "s/^mem frame [0-9]* $2: //p" "$cart/patches.txt" | sed -n "$1p" | tr -d ' \n' | tr A-F a-f; }
+# The Action Replay cheat's last patches (200 of them, values 8000 on): the
+# title's six halfwords hold 80C2-80C7; the next is the game's own
+[ "$(pat 1 080000A0 | cut -c1-24)" = c680c780c280c380c480c580 ] ||
+  fail "the title after 2,048 ROM patches reads $(pat 1 080000A0)"
+[ "$(pat 1 080000A0 | cut -c25-28)" != 3412 ] || fail "the patch past 2,048 was written"
+[ "$(pat 1 0203F700)" != 7700 ] || fail "the menu cheat's write ran without A"
+[ "$(pat 2 0203F700)" = 7700 ] || fail "the menu cheat's write didn't run with A held: $(pat 2 0203F700)"
+echo "PASS: cheats: a launch keeps 2,048 ROM patches and writes them all, leaves out a cheat past that whole, and a 200-patch cheat's key test runs"
+
 # Activation from cheatN_keys (v0.10, docs/plans/cheat-guides.md): a cheat
 # whose keys say Hold L adds 1 to its counter only while L is held; one
 # whose keys say Press R adds 1 once a press, however long R is held
