@@ -32,6 +32,9 @@ git log, not here.
   to 128 KB, and the picked cheats 4,096 (8 KB): patch lines are decoded
   straight into the cheat's patches, kept in PSRAM, instead of one 32-byte
   op each, so a menu written into free ROM fits one cheat (cbd4aa71).
+- **Fixed:** a cheat whose raw line ORs or writes through a pointer without
+  a key (`[03005D8C]+137C|80`) no longer reads as unreadable on the cart:
+  the line took the last line's key, or stack garbage (399cbbd8).
 
 ## v0.9.10
 
