@@ -306,7 +306,7 @@ Not verified headlessly, to check on the real cart: Skip trainer battles (every 
 
 - Cheat folders (`cheatN_folder`): branch `claude/cheat-folders-449ad5`, merged to main.
 - ROM patches free in game and 2,048 a cheat, 4,096 picked: branch `claude/rom-patch-limits-a52fb3`.
-- Approved, pending: `raw_line` keeps the previous line's key for a line without `^KEY`, so a cheat whose first keyed line is `[P]+O|V` is refused on the cart (the golden set no longer uses `|`).
+- `raw_line` kept the previous line's key for a line without `^KEY`, so a cheat whose first keyed line was `[P]+O|V` was refused on the cart: fixed on the same branch (399cbbd8); the golden set no longer uses `|`.
 
 ## The decisions (2026-10-31)
 
