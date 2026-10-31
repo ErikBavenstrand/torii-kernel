@@ -735,7 +735,6 @@ NATURES = [
     "Careful",
     "Quirky",
 ]
-LAUNCH = "Set when the game starts: pick it on the Cheats screen before you play."
 
 
 def title(name):
@@ -789,36 +788,6 @@ def cheats():
     def add(folder, name, code, guide, keys="always"):
         out.append(Cheat(folder, f"{folder}: {name}", code, guide, keys))
 
-    # Money (D8)
-    add(
-        "Money",
-        "Max money",
-        vba(f"[03005D8C]+0490:000F423F^{KEY}"),
-        "Keeps your money at 999,999. Written with your save's own key, so nothing else changes.",
-    )
-    add(
-        "Money",
-        "Max coins",
-        vba(f"[03005D8C]+0494:270F^{KEY}"),
-        "Keeps the Game Corner coins at 9,999 (you need the Coin Case).",
-    )
-    add(
-        "Money",
-        "Max Battle Points",
-        ar(AR.write_ptr(2, SB2, 9999, 0xEB8)),
-        "Keeps your Battle Frontier points at 9,999.",
-    )
-    add(
-        "Money",
-        "Everything costs 1",
-        ar(
-            AR.cond("NE", 4, 0x02039F70, 0, "next2"),  # sShopData, while a shop is open
-            AR.write_ptr(2, 0x02039F70, 1, 0x2000),
-            AR.write_ptr(2, 0x02039F70, 0, 0x2002),
-        ),
-        "Any purchase in a shop costs 1, whatever the list shows: one item or 99.",
-    )
-
     # The menus (D9, D15-D23)
     items, items_at = item_menu()
     code = Code(AR)
@@ -829,8 +798,8 @@ def cheats():
             "Menus",
             "Menus: Item shop (L+R+B)",
             code,
-            "Press L+R+B where you can walk: a shop of every item opens (Marts at game prices, "
-            "tickets free). B goes back. Pick it before you play.",
+            "L+R+B opens a shop of every item at game prices; the event tickets are free. B goes back. "
+            "Pick before you play.",
             None,
         )
     )
@@ -852,19 +821,48 @@ def cheats():
             "Menus",
             "Menus: Field menu (L+R+A)",
             code,
-            "L+R+A facing nothing: PC, heal, warp, legendaries again, gifts, move relearner, badges, symbols, Pokédex. "
-            "L+R+Up heals, +Down opens the PC, +Left warps, +Right relearns moves. Pick it before you play.",
+            "L+R+A opens it (face away from people): PC, Heal, Warp, Legends, Gifts, Moves, Unlock. Shortcuts: "
+            "L+R+Up heal, L+R+Down PC, L+R+Left warp, L+R+Right moves. Pick before you play.",
             None,
         )
+    )
+
+    # Money (D8)
+    add(
+        "Money",
+        "Max money",
+        vba(f"[03005D8C]+0490:000F423F^{KEY}"),
+        "Keeps your money at 999,999.",
+    )
+    add(
+        "Money",
+        "Max coins",
+        vba(f"[03005D8C]+0494:270F^{KEY}"),
+        "Keeps your Game Corner coins at 9,999. Needs the Coin Case.",
+    )
+    add(
+        "Money",
+        "Max Battle Points (BP)",
+        ar(AR.write_ptr(2, SB2, 9999, 0xEB8)),
+        "Keeps your Battle Frontier BP at 9,999.",
+    )
+    add(
+        "Money",
+        "Shopping costs 1",
+        ar(
+            AR.cond("NE", 4, 0x02039F70, 0, "next2"),  # sShopData, while a shop is open
+            AR.write_ptr(2, 0x02039F70, 1, 0x2000),
+            AR.write_ptr(2, 0x02039F70, 0, 0x2002),
+        ),
+        "Every purchase costs 1 in total, however many you buy. The list still shows the normal prices.",
     )
 
     # Pokémon (D24-D26)
     add(
         "Pokémon",
-        "All new Pokémon shiny",
+        "Shiny",
         vba(*Mixed(personality(0, 1), None).lines),
-        "Every Pokémon you get is shiny: wild, gifts, eggs. Caught ones stay shiny. Works with Nature and Gender. "
-        + LAUNCH,
+        "Every new Pokémon is shiny: wild, gift and egg. Works with Nature and Gender.",
         "launch",
     )
     add(
@@ -875,24 +873,21 @@ def cheats():
                 [(0x08067DC8, 0x43C02000), (0x08067E12, 0x2000), (0x08067E14, 0x43C0)]
             )
         ),
-        "Wild, gift and egg Pokémon get 31 in every IV. Trainers' and yours don't change. "
-        + LAUNCH,
+        "Every new Pokémon (wild, gift, egg) has 31 in every IV.",
         "launch",
     )
     add(
         "Pokémon",
         "Max friendship",
         rom_code([(0x0806DAB0, 0x46C0)]),
-        "Friendship jumps to 255 at its next change (a level up, a walk, a vitamin). "
-        + LAUNCH,
+        "Friendship goes to 255 at its next change: a level up, a walk or a vitamin.",
         "launch",
     )
     add(
         "Pokémon",
         "Max EVs from battles",
         rom_code([(0x0806DBC6, 0x24FF)]),
-        "A Pokémon that earns EVs gets the maximum, all in HP and Attack. Stats follow at its next level. "
-        + LAUNCH,
+        "Each battle that gives EVs fills HP and Attack up to the 510 total. Stats update at the next level.",
         "launch",
     )
     for n, nature in enumerate(NATURES):
@@ -900,8 +895,7 @@ def cheats():
             "Pokémon",
             f"Nature: {nature}",
             vba(*Mixed(personality(2, n), None).lines),
-            f"New wild, gift and egg Pokémon are {nature}. Works with Shiny and Gender. "
-            + LAUNCH,
+            f"Every new Pokémon (wild, gift, egg) is {nature}. Works with Shiny and Gender.",
             "launch",
         )
     for name, v in (("Male", 0xFF), ("Female", 0x00)):
@@ -909,13 +903,12 @@ def cheats():
             "Pokémon",
             f"Gender: {name}",
             vba(*Mixed(personality(4, v), None).lines),
-            f"New wild, gift and egg Pokémon that can be either are {name.lower()}. Works with Shiny and Nature. "
-            + LAUNCH,
+            f"Every new Pokémon that can be either is {name.lower()}. Works with Shiny and Nature.",
             "launch",
         )
     add(  # PokemonUseItemEffects' two EV checks: 100 a stat becomes 255; the 510 total stays
         "Pokémon",
-        "Vitamins up to 255 EVs",
+        "Vitamins up to 255",
         rom_code(
             [
                 (a + d, v)
@@ -923,22 +916,22 @@ def cheats():
                 for d, v in ((0, 0x2BFE), (8, 0x29FF), (14, 0x30FF))
             ]
         ),
-        "Vitamins (HP Up, Protein...) work until a stat has 255 EVs, not 100, within the game's 510 in all. "
-        "Lower them with the EV berries. " + LAUNCH,
+        "Vitamins (HP Up, Protein...) raise a stat up to 255 EVs instead of 100, within the 510 total. "
+        "EV berries lower them.",
         "launch",
     )
     add(
         "Pokémon",
         "Pokérus when caught",
         rom_code([(0x0806B0F4, 0x7029)]),
-        "Pokémon you catch have Pokérus, which doubles the EVs they earn. " + LAUNCH,
+        "Pokémon you catch have Pokérus: they earn double EVs.",
         "launch",
     )
     add(
         "Pokémon",
         "Eggs hatch fast",
         ar(AR.write_ptr(1, SB1, 0xFE, 0x314C)),
-        "Each step counts as a whole egg cycle: eggs hatch in a few dozen steps.",
+        "Eggs hatch after a few dozen steps.",
     )
 
     # Battle (D28-D30)
@@ -952,7 +945,7 @@ def cheats():
                 for op in (CB.op("GT", a, 1), CB.write16(a, 1))
             )
         ),
-        "Foes have 1 HP, so any hit that lands knocks them out (both in double battles).",
+        "Foes have 1 HP: any hit that lands knocks them out.",
     )
     add(
         "Battle",
@@ -967,21 +960,21 @@ def cheats():
                 ]
             )
         ),
-        "Your Pokémon take no damage in battle. " + LAUNCH,
+        "Your Pokémon take no damage in battle.",
         "launch",
     )
     add(
         "Battle",
         "Infinite PP",
         rom_code([(0x08046B28, 0x07E9)]),
-        "Your moves use no PP in battle. " + LAUNCH,
+        "Your moves use no PP in battle.",
         "launch",
     )
     add(
         "Battle",
-        "Skip trainer battles",
+        "No trainer challenges",
         rom_code([(0x080B3D6C, 0xE038)]),
-        "Trainers who see you don't challenge you; talk to one to battle. " + LAUNCH,
+        "Trainers who see you don't challenge you. Talk to one to battle.",
         "launch",
     )
     for mult in (2, 3, 5, 10, 255):
@@ -1002,22 +995,20 @@ def cheats():
                     (0x0804A68C, 0x6018),
                 ]
             ),
-            f"Battle EXP x{mult}, up to 14,335 a Pokémon. It replaces the Lucky Egg's bonus. "
-            + LAUNCH,
+            f"Battles give x{mult} EXP. Replaces the Lucky Egg's bonus.",
             "launch",
         )
     add(
         "Battle",
-        "EXP for the whole party",
+        "EXP shared with the party",
         cb(CB.write8(0x020243FE, 0xFF)),
-        "Every Pokémon in your party shares the EXP of a battle, as if all had fought.",
+        "Every Pokémon in your party gets a share of each battle's EXP, as if all had fought.",
     )
     add(
         "Battle",
         "Every ball catches",
         rom_code([(0x08056566, 0x46C0)]),
-        "A thrown ball always catches (trainers' Pokémon still can't be caught). "
-        + LAUNCH,
+        "Every ball you throw at a wild Pokémon catches it.",
         "launch",
     )
 
@@ -1032,8 +1023,7 @@ def cheats():
             "Wild",
             f"Species: {title(name)}",
             rom_code(words([(0x080B4E6C, v)])),
-            f"Every wild Pokémon is {title(name)}, at the levels and places of the area's own. "
-            + LAUNCH,
+            f"Every wild Pokémon is {title(name)}, at the area's usual levels.",
             "launch",
         )
     for level in range(5, 101, 5):
@@ -1041,21 +1031,20 @@ def cheats():
             "Wild",
             f"Level {level}",
             rom_code(words([(0x080B4C74, 0x47702000 | level)])),
-            f"Wild Pokémon are level {level} (grass, water, fishing, Rock Smash). "
-            + LAUNCH,
+            f"Every wild Pokémon is level {level}.",
             "launch",
         )
     add(
         "Wild",
         "No wild encounters",
         cb(CB.write8(0x020375D4, 0)),
-        "No wild Pokémon in grass, caves or water while it's on. Fishing still works.",
+        "No wild Pokémon in grass, caves or water. Fishing still works.",
     )
     add(
         "Wild",
         "Encounter every step",
         rom_code(words([(0x080B5170, 0x47702001)])),
-        "A wild Pokémon on almost every step in grass, caves and water. " + LAUNCH,
+        "A wild Pokémon on almost every step in grass, caves and water.",
         "launch",
     )
 
@@ -1066,52 +1055,49 @@ def cheats():
         rom_code(
             [(0x08123E50, 0x2102)]
         ),  # GetMapsecType: a town not visited is CITY_CANFLY too
-        "On the Fly map every town can be picked, visited or not. " + LAUNCH,
+        "Fly to any town, even ones you haven't visited.",
         "launch",
     )
     add(
         "Overworld",
         "Free Day Care",
         cb(CB.write16(0x020375E2, 0)),
-        "The Day Care takes no money to give your Pokémon back. The lady still names the price; it isn't taken.",
+        "Taking a Pokémon back from the Day Care is free. The lady still names a price.",
     )
     add(
         "Overworld",
         "Walk through walls (hold R)",
         vba(*Mixed(walls(), None).lines),
-        "Hold R to walk through walls, people and water edges. Let go on normal ground; if you're stuck, hold R "
-        "and walk back. " + LAUNCH,
+        "Hold R to walk through walls, people and water. Let go only on normal ground; if stuck, hold R and walk back.",
         "launch",
     )
     add(
         "Overworld",
         "Field moves without badges",
         rom_code([(0x081B54EA, 0xE01B)]),
-        "Cut, Surf, Fly and the rest work from the POKéMON menu without their badge. "
-        + LAUNCH,
+        "Use Cut, Surf, Fly and the other field moves from the POKéMON menu without their badges.",
         "launch",
     )
     add(
         "Overworld",
-        "Gym leaders ready for a rematch",
+        "Gym leader rematches",
         ar(*(AR.write_ptr(1, SB1, 1, 0x9CA + i) for i in range(65, 73))),
-        "The 8 gym leaders accept a rematch (a double battle with their strongest team): run it once, then visit "
-        "them. Needs the game beaten.",
+        "Run it once, then talk to any gym leader for a rematch (a double battle). Needs the game beaten.",
     )
     add(
         "Overworld",
-        "No species limit at the Battle Tower",
+        "Any Pokémon in the Battle Tower",
         rom_code([(0x081A3F44, 0x42A8), (0x081B8648, 0x46C0)]),
-        "Legendaries and any other Pokémon may enter the Battle Tower. " + LAUNCH,
+        "Legendaries and any other Pokémon may enter the Battle Tower.",
         "launch",
     )
 
     # Minigames (D31, D43)
     add(
         "Minigames",
-        "Infinite Safari Zone",
+        "Endless Safari Zone",
         cb(CB.write8(0x0203A04C, 30), CB.write16(0x0203A04E, 500)),
-        "In the Safari Zone you keep 30 Safari Balls and 500 steps.",
+        "In the Safari Zone you keep 30 balls and 500 steps.",
     )
     block, slot = (
         SB1,
@@ -1126,25 +1112,25 @@ def cheats():
             AR.write_ptr(2, block, 0xFFFF, slot + 4),
             AR.write_ptr(2, block, 0x0001, slot + 6),
         ),
-        "Puts a gold Pokéblock with every flavor at its maximum in your case's last slot. Run it once.",
+        "Run it once: a gold Pokéblock with every flavor at max goes in your case's last slot.",
     )
     add(
         "Minigames",
         "Quick contests",
         cb(CB.op("EQ", 0x02002E30, 0), CB.write8(0x02002E31, 4)),
-        "Contest rounds go by at once.",
+        "Contests skip straight to the results.",
     )
     add(
         "Minigames",
         "Max contest score",
         cb(CB.op("EQ", 0x02002F62, 0x082D), CB.write8(0x02002EF4, 0xFF)),
-        "Your appeal score in a contest is the maximum.",
+        "Your contest appeal score is always the maximum.",
     )
     add(
         "Minigames",
         "Full Soot Sack",
         ar(AR.write_ptr(2, SB1, 9999, var_offset(0x4048))),
-        "Your Soot Sack holds 9,999 steps of ash, for the glass flutes and decorations at Route 113.",
+        "Your Soot Sack holds 9,999 ash, for the Glass Workshop on Route 113.",
     )
     return out
 

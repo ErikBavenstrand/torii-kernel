@@ -28,7 +28,7 @@ Every cheat we have (GameHacking, plus libretro's three of its own), grouped. "P
 | --- | --- | --- | --- | --- | --- |
 | 11 | Free MOD Shop Items |  | keep |  | drop: writes the heap outside a shop |
 | 12 | Infinite Money |  | keep (golden) | standalone | replaced: Money: Max money (AnyGBA, keyed) |
-| 13 | Items Cost $1 |  | keep |  | keep: Money: Everything costs 1 |
+| 13 | Items Cost $1 |  | keep |  | keep: Money: Shopping costs 1 |
 | 14 | Max Coins |  | test | writes 02002DEC, not the coins (SaveBlock1 +494): likely wrong; a correct one can be made | replaced: Money: Max coins (keyed) |
 | 15 | Max Coins From Pokies |  | test | writes 02002DEC, not the coins (SaveBlock1 +494): likely wrong; a correct one can be made | replaced: Money: Max coins (keyed) |
 | 16 | Max Money |  | test | writes 02000568, not the money: likely wrong | drop |
@@ -90,7 +90,7 @@ Every cheat we have (GameHacking, plus libretro's three of its own), grouped. "P
 | 57 | Easy Win (Trainer) |  | keep |  | drop |
 | 58 | Infinite PP |  | keep |  | replaced: Battle: Infinite PP (AnyGBA) |
 | 59 | Opponent Can't Attack |  | keep |  | drop |
-| 60 | Skip Trainer Battles |  | keep |  | keep: Battle: Skip trainer battles |
+| 60 | Skip Trainer Battles |  | keep |  | keep: Battle: No trainer challenges |
 | 61 | 1-Hit Kill (libretro) |  | decide | overlap: pick one or two | replaced: Battle: One-hit KO (AnyGBA) |
 
 ## 7 EXP
@@ -98,7 +98,7 @@ Every cheat we have (GameHacking, plus libretro's three of its own), grouped. "P
 | # | Cheat | Buttons | Proposal | Note | Decision |
 | --- | --- | --- | --- | --- | --- |
 | 62 | Battle: R = More EXP |  | decide | overlap: same addresses | replaced: Battle: EXP x2-x255 (AnyGBA) |
-| 63 | Exp Share |  | decide | overlap: same addresses | keep: Battle: EXP for the whole party |
+| 63 | Exp Share |  | decide | overlap: same addresses | keep: Battle: EXP shared with the party |
 | 64 | Gain 5000 Exp | A+R | decide | overlap: same addresses | replaced: Battle: EXP x2-x255 (AnyGBA) |
 | 65 | Max EXP Gain After Battle |  | decide | overlap: same addresses | replaced: Battle: EXP x2-x255 (AnyGBA) |
 | 66 | Medium EXP Gain After Battle |  | decide | overlap: same addresses | replaced: Battle: EXP x2-x255 (AnyGBA) |
@@ -209,19 +209,19 @@ Every cheat we have (GameHacking, plus libretro's three of its own), grouped. "P
 
 | # | Cheat | Buttons | Proposal | Note | Decision |
 | --- | --- | --- | --- | --- | --- |
-| 139 | Champion Wallace | Select (any) | keep |  | replaced: Overworld: Gym leaders ready for a rematch |
-| 140 | Elite Four Drake | Select (any) | keep |  | replaced: Overworld: Gym leaders ready for a rematch |
-| 141 | Elite Four Glacia | Select (any) | keep |  | replaced: Overworld: Gym leaders ready for a rematch |
-| 142 | Elite Four Phoebe | Select (any) | keep |  | replaced: Overworld: Gym leaders ready for a rematch |
-| 143 | Elite Four Sidney | Select (any) | keep |  | replaced: Overworld: Gym leaders ready for a rematch |
-| 144 | Gym Leader Brawly | Select (any) | keep |  | replaced: Overworld: Gym leaders ready for a rematch |
-| 145 | Gym Leader Flannery | Select (any) | keep |  | replaced: Overworld: Gym leaders ready for a rematch |
-| 146 | Gym Leader Juan | Select (any) | keep |  | replaced: Overworld: Gym leaders ready for a rematch |
-| 147 | Gym Leader Norman | Select (any) | keep |  | replaced: Overworld: Gym leaders ready for a rematch |
-| 148 | Gym Leader Roxanne | Select (any) | keep |  | replaced: Overworld: Gym leaders ready for a rematch |
-| 149 | Gym Leader Tate&Liza | Select (any) | keep |  | replaced: Overworld: Gym leaders ready for a rematch |
-| 150 | Gym Leader Watson | Select (any) | keep |  | replaced: Overworld: Gym leaders ready for a rematch |
-| 151 | Gym Leader Winona | Select (any) | keep |  | replaced: Overworld: Gym leaders ready for a rematch |
+| 139 | Champion Wallace | Select (any) | keep |  | replaced: Overworld: Gym leader rematches |
+| 140 | Elite Four Drake | Select (any) | keep |  | replaced: Overworld: Gym leader rematches |
+| 141 | Elite Four Glacia | Select (any) | keep |  | replaced: Overworld: Gym leader rematches |
+| 142 | Elite Four Phoebe | Select (any) | keep |  | replaced: Overworld: Gym leader rematches |
+| 143 | Elite Four Sidney | Select (any) | keep |  | replaced: Overworld: Gym leader rematches |
+| 144 | Gym Leader Brawly | Select (any) | keep |  | replaced: Overworld: Gym leader rematches |
+| 145 | Gym Leader Flannery | Select (any) | keep |  | replaced: Overworld: Gym leader rematches |
+| 146 | Gym Leader Juan | Select (any) | keep |  | replaced: Overworld: Gym leader rematches |
+| 147 | Gym Leader Norman | Select (any) | keep |  | replaced: Overworld: Gym leader rematches |
+| 148 | Gym Leader Roxanne | Select (any) | keep |  | replaced: Overworld: Gym leader rematches |
+| 149 | Gym Leader Tate&Liza | Select (any) | keep |  | replaced: Overworld: Gym leader rematches |
+| 150 | Gym Leader Watson | Select (any) | keep |  | replaced: Overworld: Gym leader rematches |
+| 151 | Gym Leader Winona | Select (any) | keep |  | replaced: Overworld: Gym leader rematches |
 | 152 | Re-Battle Activator | Select (any) | keep |  | drop |
 
 ## 15 Battle Frontier
@@ -229,8 +229,8 @@ Every cheat we have (GameHacking, plus libretro's three of its own), grouped. "P
 | # | Cheat | Buttons | Proposal | Note | Decision |
 | --- | --- | --- | --- | --- | --- |
 | 153 | Access Pyramid Chall [Press Select] | Select (any) | keep |  | drop |
-| 154 | Infinite BP |  | keep |  | replaced: Money: Max Battle Points (pointer write) |
-| 155 | No Species Restriction At Battle Tower |  | keep |  | keep: Overworld: No species limit at the Battle Tower |
+| 154 | Infinite BP |  | keep |  | replaced: Money: Max Battle Points (BP) (pointer write) |
+| 155 | No Species Restriction At Battle Tower |  | keep |  | keep: Overworld: Any Pokémon in the Battle Tower |
 | 156 | Receive BP [Hold Select] | Select (any) | keep |  | drop |
 | 157 | Receive Symbol | Select (any) | keep |  | replaced: field menu UNLOCK > ALL SYMBOLS |
 
@@ -238,8 +238,8 @@ Every cheat we have (GameHacking, plus libretro's three of its own), grouped. "P
 
 | # | Cheat | Buttons | Proposal | Note | Decision |
 | --- | --- | --- | --- | --- | --- |
-| 158 | Infinite Safari Balls |  | keep |  | keep: Minigames: Infinite Safari Zone |
-| 159 | Infinite Safari Time |  | keep |  | keep: Minigames: Infinite Safari Zone |
+| 158 | Infinite Safari Balls |  | keep |  | keep: Minigames: Endless Safari Zone |
+| 159 | Infinite Safari Time |  | keep |  | keep: Minigames: Endless Safari Zone |
 | 160 | Lvl 80 Pokeblock |  | keep |  | keep: Minigames: Level 80 Pokéblock (pointer, slot 40) |
 | 161 | Max Direct Hits |  | keep |  | drop |
 | 162 | Max Lvl Gold (Beauty) |  | keep |  | drop |
@@ -261,13 +261,13 @@ Every cheat we have (GameHacking, plus libretro's three of its own), grouped. "P
 
 | Folder | Cheats |
 | --- | --- |
-| Money | Max money, Max coins (Torii's keyed lines), Max Battle Points, Everything costs 1 |
 | Menus | Item shop (L+R+B): Marts of Medicine, Balls, Training, TMs & HMs, Held items, Berries, Valuables at game prices, and the four event tickets free with their ferry flags. Field menu (L+R+A): PC, Heal, Warp (16 towns, 17 dungeons, 5 islands), Legends (respawn 11), Gifts (Hoenn and Johto starters, Beldum, Castform, Lileep, Anorith, Wynaut egg), Moves (relearner), Unlock (badges, Frontier symbols, Pokédex); L+R+Up heals, +Down PC, +Left warp, +Right moves |
-| Pokémon | All new Pokémon shiny, Perfect IVs, Max friendship, Max EVs, Vitamins up to 255 EVs, Nature (25), Gender (2), Pokérus when caught, Eggs hatch fast |
-| Battle | One-hit KO, Infinite HP, Infinite PP, Skip trainer battles, EXP x2/x3/x5/x10/x255, EXP for the whole party, Every ball catches |
+| Money | Max money, Max coins (Torii's keyed lines), Max Battle Points, Shopping costs 1 |
+| Pokémon | Shiny, Perfect IVs, Max friendship, Max EVs, Vitamins up to 255, Nature (25), Gender (2), Pokérus when caught, Eggs hatch fast |
+| Battle | One-hit KO, Infinite HP, Infinite PP, No trainer challenges, EXP x2/x3/x5/x10/x255, EXP shared with the party, Every ball catches |
 | Wild | Species (386), Level 5-100 (20), No wild encounters, Encounter every step |
-| Overworld | Fly to any town, Free Day Care, Walk through walls (hold R), Field moves without badges, Gym leaders ready for a rematch, No species limit at the Battle Tower |
-| Minigames | Infinite Safari Zone, Level 80 Pokéblock, Quick contests, Max contest score, Full Soot Sack |
+| Overworld | Fly to any town, Free Day Care, Walk through walls (hold R), Field moves without badges, Gym leader rematches, Any Pokémon in the Battle Tower |
+| Minigames | Endless Safari Zone, Level 80 Pokéblock, Quick contests, Max contest score, Full Soot Sack |
 
 How they're built (D1, D7): CodeBreaker for RAM writes, Action Replay v3 raw for ROM patches and save-block pointer writes, Torii's raw lines only for money and coins (XORed with the save's key). No master codes, nothing encrypted. Nothing writes an item slot: items come from the game's own Mart and "Obtained" scripts, so nothing in the bag or PC is overwritten (D9, D10). The menus are game scripts, strings and menu tables written into the ROM's free space (from `0x08F00000`) at launch, on Emerald's unused multichoice menus, started by a RAM trigger only while the player is free to move; walk-through-walls, the Pokédex and the new Pokémon's personality are small Thumb routines (`tools/golden/walls.s` and `pid.s`, over the unused `Unused_AdjustBgMosaic`, and `dex.s`). Shiny, Nature and Gender share `pid.s`: each cheat carries the same routine and hook in `CreateBoxMon` (wild, gift and egg Pokémon, not trainers') and sets only its own switch in free ROM (`0x08F1F000`), so any of them work together; AnyGBA's shiny patch and the old nature and gender patches each set the personality alone and undid the others.
 
@@ -289,23 +289,23 @@ On the emulated cart with the real ROM (CRC32 `1F1C08FB`) and a 100% save (Proje
 | Max Battle Points, Eggs hatch fast, Full Soot Sack, Level 80 Pokéblock, Gym rematch flags, No wild encounters | the save bytes as intended (BP 9,999, Day Care byte FE, ash 9,999, slot 40 `0E FF FF FF FF FF 01 00`, rematch 65-72 = 1, immunity 0) |
 | Species, Level, shiny, Perfect IVs, Wild gender | a wild Ralts in Granite Cave: Lv 50, shiny, all IVs 31, female (male with Male) |
 | Shiny, Nature, Gender | one routine (`tools/golden/pid.s`) picks a personality with all three: shiny + Adamant + female + Perfect IVs gave a shiny female Adamant Ralts with IVs all 31; shiny + Modest and Jolly alone right too; the control a random Lonely one |
-| EXP x10, EXP for the whole party, Infinite PP, One-hit KO | against a control battle: the lead +50 EXP and 1 PP used; with them every party Pokémon +80 (50 shared by six, x10), no PP used, one hit |
+| EXP x10, EXP shared with the party, Infinite PP, One-hit KO | against a control battle: the lead +50 EXP and 1 PP used; with them every party Pokémon +80 (50 shared by six, x10), no PP used, one hit |
 | Max EVs | HP EVs 58 to 81: the 510 total filled |
 | Vitamins | Protein on 103 Attack EVs: "It won't have any effect" in the control; raised to 113 with it; four Proteins: 126, stopping at the game's 510 in all (the owner keeps the real limits: 255 a stat, 510 in all). `PokemonUseItemEffects`' two 100-a-stat checks patched |
 | Infinite HP | 209/209 through a Lv 100 Machamp's attacks; without it, fainted |
 | Every ball catches, Pokérus | a full-HP Lv 100 Ralts caught with one Great Ball, Pokérus set |
 | Walk through walls | blocked without R; through the Pokémon Center counter with R |
-| Item shop, Everything costs 1 | the 8 categories, the TM Mart; TM01 for "₽1", money 329,622 to 329,621, TM01 4 to 5 |
+| Item shop, Shopping costs 1 | the 8 categories, the TM Mart; TM01 for "₽1", money 329,622 to 329,621, TM01 4 to 5 |
 | Tickets | "Obtained the EON TICKET!"; the ferry flag set; a second pick says you have it |
 | Field menu | Heal, PC (and L+R+Down), Warp (Oldale, Sky Pillar, Southern Island's dock; L+R+Left), Legends (Regirock's defeated and hidden flags cleared, Regice's not), Gifts ("Jack received TREECKO!"), Moves (L+R+Right, the relearner), Unlock (badges, symbols; the Pokédex's bits restored from zero) |
 | Quick contests, Max contest score | a Normal Cool contest: results after the first round, first place with full stars; without them, still in the appeals |
 
-| Skip trainer battles | Route 102's Rick, his defeat flag cleared: he challenges in the control; with it the player walks past |
+| No trainer challenges | Route 102's Rick, his defeat flag cleared: he challenges in the control; with it the player walks past |
 | Fly to any town | GameHacking's RAM code didn't work on this ROM (the Fly map's state isn't where it writes); rebuilt as one ROM patch of `GetMapsecType` (a town not visited is "can fly"): with every visited flag cleared, Littleroot can be flown to, the control can't |
 | Free Day Care | taking a Pokémon back: ₽100 taken in the control, none with it (the lady still names the price; the guide says so) |
 | Field moves without badges | badges cleared: Fly from the party menu says "can't be used until a new BADGE" in the control, opens the Fly map with it |
-| No species limit at the Battle Tower | a Mewtwo in the party: "NOT ABLE" in the control, "ABLE" with it (Open Level) |
-| Infinite Safari Zone | entered by the gate: steps 494 after walking in the control, 500 with it, 30 balls |
+| Any Pokémon in the Battle Tower | a Mewtwo in the party: "NOT ABLE" in the control, "ABLE" with it (Open Level) |
+| Endless Safari Zone | entered by the gate: steps 494 after walking in the control, 500 with it, 30 balls |
 | Max friendship | a Treecko (70) walked: 72 in the control, 255 with it |
 | Eon Ticket from the shop | on a save without it (flag and ticket cleared): the Lilycove ferry accepts it ("a tiny spit of an island far in the south") |
 
@@ -320,3 +320,8 @@ Screenshots of all of these: `dist/eg/gallery-*.png` (not committed). Still for 
 ## The decisions (2026-10-31)
 
 D1 device formats where they do the same; Torii's raw lines only for XOR. D2 every group the owner's call. D3 a downloaded 100% save. D4 pickers as choice groups, and headings (D5 `cheatN_folder`, D6 built in its own session). D8 max money, coins, BP, ₽1 prices. D9 one shop on a combo, categories inside. D11 tickets with their flags. D12 no pocket fills. D14 game prices, the price cheat makes everything ₽1. D15 one combo per menu, game-native menus. D16 menu data as ROM patches. D17 L+R+B. D18-D19, D50 the kernel's limits lifted so each menu is one cheat. D20 the item menu holds items only; D21-D22 eight categories, no key items. D23 the field menu, L+R+A plus arrows (D44). D24 all new Pokémon shiny. D25 perfect IVs, friendship, nature, gender, Pokérus, max EVs. D26 Pokédex (later the field menu's Unlock, D49), fast eggs. D27 no max stats or starter scripts; gifts in the field menu. D28 one-hit KO, infinite HP and PP, skip trainers. D29 the EXP multiplier and EXP for all. D30 every ball catches. D31 Safari. D32-D34 species, level, encounters. D35, D39 fly anywhere, free Day Care, walls on R. D36-D37 badges (later Unlock), field moves without badges. D38, D45 legends and gifts (with the Johto starters) in the field menu. D40, D46 warps there, paged. D41, D47 rematches: the gym leaders' rematch flags. D42 no species limit at the Tower, symbols (later Unlock). D43 Pokéblock, contests, Soot Sack. D48 the `raw_line` fix.
+
+
+## Names and guides (2026-10-31)
+
+Folders in this order: Menus, Money, Pokémon, Battle, Wild, Overworld, Minigames. Names are short and say what the cheat does; a menu's names carry its buttons. Guides say what happens and how to use it in one or two sentences, without repeating what Torii shows above them: a launch cheat's "Set when the game starts" comes from its buttons line. Run-once cheats say "Run it once" (SELECT on it in the in-game menu).
