@@ -3,3 +3,8 @@ target-version = "py311"
 
 [lint]
 extend-select = ["B", "BLE", "EXE", "I", "PLW", "SIM", "UP"]
+
+[lint.isort]
+# tools/cheats.py, imported by the tests: the repo's cheats/ folder (curated
+# cheat files) would otherwise make it first-party where that folder exists
+known-third-party = ["cheats"]
