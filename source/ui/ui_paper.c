@@ -587,6 +587,12 @@ struct hints_state {
 	const char *text;  // in place of the chips, NULL none
 	u8 count;
 	struct ui_hint_note note;  // the text's look
+	// A line too long for its room scrolls, as the title's heading does
+	// (TQ_*): the line's hash, its width and room as last drawn, px
+	// scrolled, frames to wait
+	u32 seen;
+	u16 mq_width, mq_room, mq_px, mq_wait;
+	u8 mq, mq_acc;
 };
 
 static int hints_measure(u8 node, struct engine_budget *need)
@@ -646,7 +652,13 @@ static void hints_draw(u8 node)
 			struct text_line line;
 			u32 room = chips + 2 * margin < w ? w - 2 * margin - chips : 8u;
 			u32 bar = nt->bar_w ? nt->bar_w + nt->bar_gap : 0u;
-			text_layout(font, st->text, strlen(st->text), room > bar + 8 ? room - bar : 8, &line);
+			u32 clip = room > bar + 8 ? room - bar : 8, lead = 0;
+			st->mq_room = (u16)clip;
+			st->mq_width = (u16)text_width(font, st->text, strlen(st->text));
+			if (st->mq_px)  // scrolled: from mq_px on, whole glyphs, no "..."
+				text_layout_window(font, st->text, strlen(st->text), st->mq_px, clip, &line, &lead);
+			else
+				text_layout(font, st->text, strlen(st->text), clip, &line);
 			u32 total = bar + line.extent;
 			u32 x = margin + (total < room && !chips ? (room - total) / 2 : 0);
 			if (nt->bar_w) {
@@ -658,7 +670,7 @@ static void hints_draw(u8 node)
 						  x + (nt->fill < nt->bar_w ? nt->fill : nt->bar_w));
 				x += bar;
 			}
-			text_draw_line(&win, font, x, text_top(font, top, l->hint_chip_h),
+			text_draw_line(&win, font, x + lead, text_top(font, top, l->hint_chip_h),
 				       nt->ink ? nt->ink : UI_ROLE_DIM, &line);
 		} else {
 			// From the right edge in: the hints' widths first
@@ -704,9 +716,61 @@ void ui_hints_text(u8 node, const char *text)
 	ui_hints_note(node, text, 0);
 }
 
+// The line's marquee step (as title_marquee): only a line cut in its room
+static void hints_update(u8 node, u32 dt)
+{
+	struct hints_state *st = ui_node_state(node);
+	const struct ui_theme *t = ui_theme();
+	if (!st->text || st->mq == TQ_OFF || !st->mq_room || (ui_node(node)->flags & UI_N_HIDDEN) ||
+	    ui_node_view(node) != ui_top())
+		return;
+	if (st->mq_wait > dt) {
+		st->mq_wait = (u16)(st->mq_wait - dt);
+		ui_wake();
+		return;
+	}
+	st->mq_wait = 0;
+	if (st->mq == TQ_WAIT) {
+		if (st->mq_width <= st->mq_room) {
+			st->mq = TQ_OFF;
+			return;
+		}
+		st->mq = TQ_RUN;
+		st->mq_px = 0;
+		st->mq_acc = 0;
+	} else if (st->mq == TQ_RUN) {
+		u32 speed = t->marquee_speed > 60 ? 60 : t->marquee_speed ? t->marquee_speed : 1;
+		u32 acc = st->mq_acc + speed * dt;
+		if (acc >= 60) {
+			st->mq_px = (u16)(st->mq_px + acc / 60);
+			ui_dirty(node, 0xFF);
+		}
+		st->mq_acc = (u8)(acc % 60);
+		if (st->mq_px + st->mq_room >= (u32)st->mq_width + t->marquee_gap) {
+			st->mq = TQ_END;
+			st->mq_wait = t->marquee_pause;
+		}
+	} else {
+		st->mq = TQ_WAIT;
+		st->mq_px = 0;
+		st->mq_wait = t->marquee_delay;
+		ui_dirty(node, 0xFF);
+	}
+	ui_wake();
+}
+
 void ui_hints_note(u8 node, const char *text, const struct ui_hint_note *note)
 {
 	struct hints_state *st = ui_node_state(node);
+	u32 h = 5381;
+	for (const char *p = text ? text : ""; *p; p++)
+		h = h * 33 ^ (u8)*p;
+	if (h != st->seen || text != st->text) {
+		st->seen = h;  // a new line starts at its place
+		st->mq = TQ_WAIT;
+		st->mq_px = 0;
+		st->mq_wait = ui_theme()->marquee_delay;
+	}
 	st->text = text;
 	if (note)
 		st->note = *note;
@@ -724,7 +788,7 @@ void ui_hints_get(u8 node, const struct ui_hint **hints, u32 *count, const char 
 	*note = st->note;
 }
 
-const struct ui_ops ui_hints_ops = {sizeof(struct hints_state), hints_measure, hints_init, 0, 0, hints_draw};
+const struct ui_ops ui_hints_ops = {sizeof(struct hints_state), hints_measure, hints_init, 0, hints_update, hints_draw};
 
 // --- Path pills -------------------------------------------------------------------
 

@@ -2034,8 +2034,10 @@ void cheats_run(const char *rom_path, const char *title, u16 icon)
 	for (u32 r = 0; r < cs.shown; r++)
 		greyed += s->cheats[s->rows[r]].status != CHEATFILE_NEW &&
 			  cheatfile_why(&s->file, s->rows[r]) != CHEATFILE_PICKABLE;
-	while (row < cs.shown && !cs_actable(s->rows[row]))
-		row++;
+	u32 start, end;
+	while (row < cs.shown && !row_folder(row, &start, &end) && !row_group(row, &start, &end) &&
+	       !cs_actable(s->rows[row]))
+		row++;  // a folder's or a run's row opens: A does something there
 	if (row == cs.shown)
 		row = 0;
 	tlog("cheats: %s: %lu cheats, %lu greyed, %lu picked (%lu bytes)%s", s->path, (unsigned long)cs.shown,
