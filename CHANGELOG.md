@@ -4,6 +4,26 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Changed:** ROM patches cost nothing in game: a cheat with conditionals
+  kept each as a step that does nothing, so many ROM patches and a key test
+  were refused as too big; now a conditional's counts leave them out and it
+  covers the same ops as on the device (626763b1).
+- **Changed:** the picked cheats' ROM patches together go from 256 to 2,048
+  halfwords (4 KB), kept in cart SRAM between a launch's passes rather than
+  EWRAM, which gains 2.8 KB; a cheat still has 256 at most (f1128143).
+- **Changed:** a cheat may have 2,048 ROM patches (4 KB) and a code of up
+  to 128 KB, and the picked cheats 4,096 (8 KB): patch lines are decoded
+  straight into the cheat's patches, kept in PSRAM, instead of one 32-byte
+  op each, so a menu written into free ROM fits one cheat (a2ddcac5).
+- **Fixed:** a cheat whose raw line ORs or writes through a pointer without
+  a key (`[03005D8C]+137C|80`) no longer reads as unreadable on the cart:
+  the line took the last line's key, or stack garbage (790188dd).
+- **Changed:** the cheat toggle's frame budget is re-recorded at 176,348
+  cycles: folders and the rows' icons took it to 174,730 before this, and
+  the ROM-patch split adds about 1,600 (ebca8c3a).
+
 ## v0.9.11
 
 - **Added:** cheat folders: a file's `cheatN_folder = "Items"` folds
