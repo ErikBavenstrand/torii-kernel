@@ -28,6 +28,10 @@ git log, not here.
 - **Changed:** the picked cheats' ROM patches together go from 256 to 2,048
   halfwords (4 KB), kept in cart SRAM between a launch's passes rather than
   EWRAM, which gains 2.8 KB; a cheat still has 256 at most (bc724f0c).
+- **Changed:** a cheat may have 2,048 ROM patches (4 KB) and a code of up
+  to 128 KB, and the picked cheats 4,096 (8 KB): patch lines are decoded
+  straight into the cheat's patches, kept in PSRAM, instead of one 32-byte
+  op each, so a menu written into free ROM fits one cheat (cbd4aa71).
 
 ## v0.9.10
 
