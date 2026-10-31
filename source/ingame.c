@@ -130,23 +130,28 @@ static u32 line_draw(struct ingame_line *l, const char *s, u32 len, u32 max_w)
 // thousands separator, in the body font
 static void glyphs_draw(struct ingame_glyph *g)
 {
-	static const char hex[] = "0123456789ABCDEF";
+	static const char chars[] = "0123456789ABCDEF -+";  // the space: the thousands separator's place
 	memset(g, 0, INGAME_GLYPHS * sizeof(*g));
 	for (u32 i = 0; i < INGAME_GLYPHS; i++) {
-		const char *s = i < 16 ? &hex[i] : S(STR_FORMAT_THOUSANDS);
-		u32 cut, len = i < 16 ? 1 : (u32)strlen(s);
+		const char *s = i == INGAME_GLYPH_THOUSANDS ? S(STR_FORMAT_THOUSANDS) : &chars[i];
+		u32 cut, len = i == INGAME_GLYPH_THOUSANDS ? (u32)strlen(s) : 1;
 		g[i].width = (u8)bits_draw((vu8 *)g[i].rows, 1, s, len, 8, &cut);
 	}
 }
 
-// A text with "{1}" in it, as the text before it and after it (each cut to
-// size bytes); one without has it all before
-static void text_split(const char *t, char *before, char *after, u32 size)
+// A text with "{1}" (and "{2}") in it, as its parts around them (each cut
+// to size bytes): before {1}, between them, after the last; a part that
+// isn't there is empty
+static void text_split(const char *t, char (*part)[48], u32 size)
 {
-	const char *at = strstr(t, "{1}");
-	u32 n = at ? (u32)(at - t) : (u32)strlen(t);
-	snprintf(before, size, "%.*s", (int)n, t);
-	snprintf(after, size, "%s", at ? at + 3 : "");
+	const char *one = strstr(t, "{1}"), *two = one ? strstr(one, "{2}") : NULL;
+	u32 n = one ? (u32)(one - t) : (u32)strlen(t);
+	snprintf(part[0], size, "%.*s", (int)n, t);
+	if (two)
+		snprintf(part[1], size, "%.*s", (int)(two - one - 3), one + 3);
+	else
+		part[1][0] = 0;
+	snprintf(part[2], size, "%s", two ? two + 3 : one ? one + 3 : "");
 }
 
 void ingame_probe_prepare(const u8 *code)
@@ -467,6 +472,11 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 		[INGAME_TEXT_SEARCH_SHOW] = STR_INGAME_SEARCH_SHOW,
 		[INGAME_TEXT_SEARCH_NEW] = STR_INGAME_SEARCH_NEW,
 		[INGAME_TEXT_SEARCH_UNDO] = STR_INGAME_SEARCH_UNDO,
+		[INGAME_TEXT_SEARCH_AGAINST] = STR_INGAME_SEARCH_AGAINST_LAST,
+		[INGAME_TEXT_SEARCH_AGAINST_FIRST] = STR_INGAME_SEARCH_AGAINST_FIRST,
+		[INGAME_TEXT_SEARCH_SIGNED] = STR_INGAME_SEARCH_SIGNED_OFF,
+		[INGAME_TEXT_SEARCH_SIGNED_ON] = STR_INGAME_SEARCH_SIGNED_ON,
+		[INGAME_TEXT_SEARCH_FIRST_LOST] = STR_INGAME_SEARCH_FIRST_LOST,
 		[INGAME_TEXT_SEARCH_NONE] = STR_INGAME_SEARCH_NONE,
 		[INGAME_TEXT_SEARCH_BUSY] = STR_INGAME_SEARCH_BUSY,
 		[INGAME_TEXT_SEARCH_HINT] = STR_INGAME_SEARCH_HINT,
@@ -497,17 +507,25 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 		text[INGAME_TEXT_UNSAVED_SHOTS + i] = unsaved[0][i];
 		text[INGAME_TEXT_UNSAVED_BOTH + i] = unsaved[1][i];
 	}
-	// The search's lines with a number in them: the text before it and after
-	static const u16 split_ids[][2] = {
-		{STR_INGAME_SEARCH_EQUALS, INGAME_TEXT_SEARCH_EQUALS},
-		{STR_INGAME_SEARCH_LEFT, INGAME_TEXT_SEARCH_LEFT},
-		{STR_INGAME_SEARCH_VALUE, INGAME_TEXT_SEARCH_VALUE},
+	// The search's lines with numbers in them: the text before the number
+	// and after it (Between's: before, between and after its two)
+	static const u16 split_ids[][3] = {
+		{STR_INGAME_SEARCH_EQUALS, INGAME_TEXT_SEARCH_EQUALS, 1},
+		{STR_INGAME_SEARCH_UP_BY, INGAME_TEXT_SEARCH_UP_BY, 1},
+		{STR_INGAME_SEARCH_DOWN_BY, INGAME_TEXT_SEARCH_DOWN_BY, 1},
+		{STR_INGAME_SEARCH_MORE, INGAME_TEXT_SEARCH_MORE, 1},
+		{STR_INGAME_SEARCH_LESS, INGAME_TEXT_SEARCH_LESS, 1},
+		{STR_INGAME_SEARCH_BETWEEN, INGAME_TEXT_SEARCH_BETWEEN, 2},
+		{STR_INGAME_SEARCH_LEFT, INGAME_TEXT_SEARCH_LEFT, 1},
+		{STR_INGAME_SEARCH_VALUE, INGAME_TEXT_SEARCH_VALUE, 1},
 	};
-	char split[sizeof(split_ids) / sizeof(split_ids[0])][2][48];
+	static char split[sizeof(split_ids) / sizeof(split_ids[0])][3][48] EWRAM_BSS;  // 1 KB: off the stack
 	for (u32 i = 0; i < sizeof(split_ids) / sizeof(split_ids[0]); i++) {
-		text_split(S(split_ids[i][0]), split[i][0], split[i][1], sizeof(split[i][0]));
+		text_split(S(split_ids[i][0]), split[i], sizeof(split[i][0]));
 		text[split_ids[i][1]] = split[i][0];
-		text[split_ids[i][1] + 1] = split[i][1];
+		if (split_ids[i][2] == 2)
+			text[split_ids[i][1] + 1] = split[i][1];
+		text[split_ids[i][1] + split_ids[i][2]] = split[i][2];
 	}
 	for (u32 i = 0; i < INGAME_TEXTS; i++) {
 		struct ingame_line line;

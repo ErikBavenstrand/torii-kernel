@@ -4,9 +4,10 @@
 # on each press of A, end to end:
 #
 #   Start an 8-bit search, Equals 5; back in the game A loses a life; in
-#   the search again, Equals 4 leaves one candidate, the lives' byte; Undo
-#   puts back Equals 5's, and Equals 4 again leaves the one. Show them
-#   lists it; its page keeps it with the value 9, on now.
+#   the search again, Down by 1 leaves one candidate, the lives' byte; Undo
+#   puts back Equals 5's, and Equals 4 leaves the one. A again (lives 3),
+#   and Down by 2 compared with the first scan (5) leaves it still. Show
+#   them lists it; its page keeps it with the value 9, on now.
 #
 # live: the game has a cheat file (one picked cheat), so the launch puts
 #       the interpreter in, with the live block: the lives read 9 from the
@@ -96,27 +97,37 @@ to_search
 keys 10 A
 wait_for "search: started"
 wait_for "screen ready: ingame-search"
-keys 10 DOWN DOWN DOWN DOWN A UP UP UP UP UP A
+# The rows: Same, Changed, Up, Down, Up by, Down by (5), Equals (6), More,
+# Less, From, Show them (10), Undo (11), Compare with (12), Negative
+# numbers, New search
+keys 10 DOWN DOWN DOWN DOWN DOWN DOWN A UP UP UP UP UP A
 wait_for "search: pass in"
 wait_for " left"
 back_out 10
 keys 80 A
 args+=(-k @200:L+R+START -k @206:-)
 to_search
-keys 10 DOWN DOWN DOWN DOWN A DOWN A
+keys 10 DOWN DOWN DOWN DOWN DOWN A A
 wait_for "search: pass in"
 wait_for " left"
-# Undo the last (two rows down: past Show them), then Equals 4 again
-keys 10 DOWN DOWN A
+keys 10 DOWN DOWN DOWN DOWN DOWN DOWN A
 wait_for "search: undone"
-keys 10 UP UP A A
+keys 10 UP UP UP UP UP A DOWN A
 wait_for "search: pass in"
 wait_for " left"
-keys 10 DOWN A
+back_out 10
+keys 80 A
+args+=(-k @200:L+R+START -k @206:-)
+to_search
+keys 10 DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN A
+keys 120 UP UP UP UP UP UP UP A UP A
+wait_for "search: pass in"
+wait_for " left"
+keys 10 DOWN DOWN DOWN DOWN DOWN A
 wait_for "screen ready: ingame-search-list"
 keys 10 A
 wait_for "screen ready: ingame-search-pick"
-keys 10 UP A UP UP UP UP UP A DOWN DOWN A
+keys 10 UP A UP UP UP UP UP UP A DOWN DOWN A
 wait_for "search: kept a cheat"
 keys 10 B B B
 back_out 34
@@ -160,7 +171,9 @@ grep -q 'search: started' <<<"$log" || fail "the search didn't start: $(grep -E 
 # The candidates: after Equals 4, one
 lefts=$(grep -E '^kernel: search: [0-9]+ left' <<<"$log" | awk '{ print $3 }' | tr '\n' ' ')
 [ "$(awk '{ print $NF }' <<<"$lefts")" = 1 ] || fail "candidates left after each pass: $lefts"
-# Undo put back the candidates of before Equals 4: Equals 5's
+# Undo put back the candidates of before Down by 1: Equals 5's
+# (the last pass, Down by 2, keeps the lives only against the first scan:
+# against the last one they went down by 1)
 undone=$(sed -n 's/^kernel: search: undone, \([0-9]*\) left$/\1/p' <<<"$log")
 [ "$undone" = "$(awk '{ print $2 }' <<<"$lefts")" ] || fail "Undo left ${undone:-nothing}, after the passes $lefts"
 grep -q 'search: kept a cheat, on' <<<"$log" || fail "nothing kept: $(grep -E 'search' <<<"$log" | tail -3)"

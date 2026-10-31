@@ -46,6 +46,12 @@
 #define INGAME_SRAM_SEARCH_BITS 0x88000
 #define INGAME_SRAM_SEARCH 0x91000
 #define INGAME_SRAM_SEARCH_UNDO 0x92000  // the candidates before the last pass, for Undo
+// The first scan's values (v0.9.7), once the snapshot has the last scan's:
+// the candidates the first filter left (their bits), and their values at
+// the first scan, one after another in the bits' order, as many as fit
+#define INGAME_SRAM_SEARCH_BASE 0x9B000
+#define INGAME_SRAM_SEARCH_FIRST 0xA4000
+#define INGAME_SEARCH_FIRST_BYTES (INGAME_SRAM_STATE_INFO - INGAME_SRAM_SEARCH_FIRST)
 // The cheats the search found, for Back to Torii to file: struct
 // ingame_found, in the backups' page window after the screenshot's backup
 #define INGAME_SRAM_FOUND 0x2E000
@@ -66,16 +72,27 @@
 // --- The cheat search (v0.9)
 #define INGAME_SEARCH_MAGIC 0x31524553u  // "SER1"
 #define INGAME_SEARCH_LIST 32  // candidates the list shows: Show them is greyed above
+#define INGAME_SEARCH_VALUES 10  // the filters (enum cheatsearch_op): each one's number
+enum {
+	INGAME_FIRST_SNAPSHOT,  // no filter yet: the snapshot is the first scan
+	INGAME_FIRST_KEPT,  // INGAME_SRAM_SEARCH_BASE and _FIRST hold it
+	INGAME_FIRST_LOST,  // too many were left to keep it (or its filter was undone)
+};
 struct ingame_search {
 	uint32_t magic;  // INGAME_SEARCH_MAGIC once the snapshot is whole
 	uint8_t size;  // an element's bytes: 1, 2 or 4
 	uint8_t undo;  // 1: INGAME_SRAM_SEARCH_UNDO holds the candidates before the last pass
-	uint8_t reserved[2];
+	uint8_t sign;  // 1: numbers are signed (two's complement)
+	uint8_t against;  // 1: the relative filters compare with the first scan, 0 the last
 	uint32_t left;  // the candidates left
 	uint32_t passes;  // the filters applied since the start
-	uint32_t value;  // the Equals row's number, as last edited
+	uint32_t value[INGAME_SEARCH_VALUES];  // each filter's number, as last edited (Between: its lower)
+	uint32_t value_hi;  // Between's upper
 	uint32_t launch_id;  // the session's: a search of an earlier launch is none
 	uint32_t undo_left;  // with undo, the candidates left before the last pass
+	uint8_t first;  // INGAME_FIRST_*
+	uint8_t first_pass;  // the pass that kept it (its undo loses it)
+	uint16_t reserved;
 };
 
 #define INGAME_FOUND_MAGIC 0x31444E46u  // "FND1"
@@ -386,12 +403,28 @@ enum ingame_text {
 	INGAME_TEXT_SEARCH = INGAME_TEXT_UNSAVED_BOTH + INGAME_SHOTS_MAX,  // the menu's row and the page's title
 	INGAME_TEXT_SEARCH_SIZE,  // "Size: 8 bits", then 16 and 32
 	INGAME_TEXT_SEARCH_START = INGAME_TEXT_SEARCH_SIZE + 3,
-	INGAME_TEXT_SEARCH_SAME,  // the filters, in enum cheatsearch_op's order
+	INGAME_TEXT_SEARCH_SAME,  // the filters
 	INGAME_TEXT_SEARCH_CHANGED,
 	INGAME_TEXT_SEARCH_UP,
 	INGAME_TEXT_SEARCH_DOWN,
 	INGAME_TEXT_SEARCH_EQUALS,  // "Equals " before the number
 	INGAME_TEXT_SEARCH_EQUALS_AFTER,
+	INGAME_TEXT_SEARCH_UP_BY,  // v0.9.7: "Up by " and after it
+	INGAME_TEXT_SEARCH_UP_BY_AFTER,
+	INGAME_TEXT_SEARCH_DOWN_BY,
+	INGAME_TEXT_SEARCH_DOWN_BY_AFTER,
+	INGAME_TEXT_SEARCH_MORE,
+	INGAME_TEXT_SEARCH_MORE_AFTER,
+	INGAME_TEXT_SEARCH_LESS,
+	INGAME_TEXT_SEARCH_LESS_AFTER,
+	INGAME_TEXT_SEARCH_BETWEEN,  // "From ", " to " and after the second number
+	INGAME_TEXT_SEARCH_BETWEEN_MID,
+	INGAME_TEXT_SEARCH_BETWEEN_AFTER,
+	INGAME_TEXT_SEARCH_AGAINST,  // "Compare with: the last scan", then the first
+	INGAME_TEXT_SEARCH_AGAINST_FIRST,
+	INGAME_TEXT_SEARCH_SIGNED,  // "Negative numbers: off", then on
+	INGAME_TEXT_SEARCH_SIGNED_ON,
+	INGAME_TEXT_SEARCH_FIRST_LOST,  // the footer on Compare when the first scan wasn't kept
 	INGAME_TEXT_SEARCH_SHOW,
 	INGAME_TEXT_SEARCH_NEW,
 	INGAME_TEXT_SEARCH_UNDO,
@@ -417,12 +450,14 @@ enum ingame_text {
 	INGAME_TEXT_UNSAVED_FOUND,  // the menu's footer while found cheats wait
 	INGAME_TEXTS
 };
-_Static_assert(INGAME_TEXT_SEARCH_SAME + 4 == INGAME_TEXT_SEARCH_EQUALS, "the filters' rows in cheatsearch_op's order");
 
 // The glyphs the overlay draws numbers with (the kernel's body font): 0-9,
-// A-F, then the thousands separator (none: width 0), at INGAME_SRAM_GLYPHS
-#define INGAME_GLYPHS 17
+// A-F, then the thousands separator (none: width 0), minus and plus, at
+// INGAME_SRAM_GLYPHS
+#define INGAME_GLYPHS 19
 #define INGAME_GLYPH_THOUSANDS 16
+#define INGAME_GLYPH_MINUS 17
+#define INGAME_GLYPH_PLUS 18
 struct ingame_glyph {
 	uint8_t width;  // its advance, at most 8
 	uint8_t reserved[3];
@@ -587,7 +622,7 @@ struct ingame_session {
 // search's (v0.9) on, the block after the whole names, which the session
 // block has no room for
 #define INGAME_SRAM_TEXTS 0x3C400
-#define INGAME_SRAM_GLYPHS 0x3F000  // struct ingame_glyph[INGAME_GLYPHS]
+#define INGAME_SRAM_GLYPHS 0x3FC00  // struct ingame_glyph[INGAME_GLYPHS]
 #define INGAME_TEXT_SRAM(n) \
 	((n) < INGAME_TEXT_SEARCH ? INGAME_SRAM_SESSION + INGAME_SESSION_TEXT(n) \
 				  : INGAME_SRAM_TEXTS + ((n) - INGAME_TEXT_SEARCH) * sizeof(struct ingame_line))
@@ -648,7 +683,9 @@ _Static_assert(INGAME_SRAM_SEARCH_SNAP == INGAME_SRAM_STATE &&
 		       INGAME_SRAM_SEARCH_SNAP + 0x47E00 <= INGAME_SRAM_SEARCH_BITS &&
 		       INGAME_SRAM_SEARCH_BITS + 36800 <= INGAME_SRAM_SEARCH &&
 		       INGAME_SRAM_SEARCH + sizeof(struct ingame_search) <= INGAME_SRAM_SEARCH_UNDO &&
-		       INGAME_SRAM_SEARCH_UNDO + 36800 <= INGAME_SRAM_STATE_INFO,
+		       INGAME_SRAM_SEARCH_UNDO + 36800 <= INGAME_SRAM_SEARCH_BASE &&
+		       INGAME_SRAM_SEARCH_BASE + 36800 <= INGAME_SRAM_SEARCH_FIRST &&
+		       INGAME_SRAM_SEARCH_FIRST % 0x10000 + INGAME_SEARCH_FIRST_BYTES <= 0x10000,
 	       "the search in the save-state buffer, clear of its info, mark and tag");
 _Static_assert(INGAME_SRAM_FOUND >= INGAME_BACKUP_SHOT + INGAME_BACKUP_SHOT_BYTES &&
 		       INGAME_SRAM_FOUND + sizeof(struct ingame_found) <= INGAME_SRAM_WIDE,

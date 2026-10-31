@@ -37,6 +37,8 @@ screenshots. So the search **borrows the save-state buffer**:
 | `0x88000-0x90FBF` | the candidates: a bit per element (36,800 bytes at 8 bits, half at 16, a quarter at 32) |
 | `0x91000` | `struct ingame_search`, its magic last |
 | `0x92000-0x9AFBF` | the candidates before the last pass, for Undo |
+| `0x9B000-0xA3FBF` | the candidates the first filter left, for Compare with the first scan |
+| `0xA4000-0xAFF7F` | their values at the first scan, one after another (49,024 bytes) |
 
 The buffer's tag, mark and info (`0xAFF80-0xAFFFF`) are left alone except
 that starting a search zeroes the mark and the tag's magic: Load state then
@@ -117,6 +119,37 @@ has candidates.
 The EWRAM the overlay sits in is read from the stub's backup of it
 (`INGAME_BACKUP_EWRAM`), so the game's values are searched there too.
 Measured on the emulated cart: see the end.
+
+## More filters (v0.9.7)
+
+Cheat Engine's, where the GBA has use for them:
+
+- **Up by N, Down by N:** the value went up or down by an amount since the
+  scan compared with (lives down by 1). They wrap at the size, so they work
+  for signed values either way.
+- **More than N, Less than N, From A to B:** against numbers alone; From
+  edits its two numbers one after the other.
+- **Negative numbers** (a toggle): the compares are signed, two's
+  complement (0 to -1 is down), the numbers are shown and typed with a sign
+  (the editor's first place is plus or minus), and so are the list's values.
+- **Compare with the first scan** (a toggle): Same, Changed, Up, Down and
+  By compare with the values Start remembered rather than the last pass's.
+  Cart SRAM has no room for a second snapshot (the first is 288 KB), so the
+  first filter keeps its candidates' first-scan values as it goes (from the
+  snapshot it reads), one after another in the candidates' order, with a
+  copy of its candidates' bits; a later pass reads a chunk's values back by
+  counting the kept candidates before it. They fit for 49,024 bytes of
+  values (49,024 candidates at 8 bits, 24,512 at 16, 12,256 at 32): with
+  more left after the first filter, or once the first filter is undone, the
+  toggle is greyed and its footer says the first scan wasn't kept. Keeping
+  them makes the first filter read the snapshot (about 22 frames more for an
+  Equals).
+
+The compare is one function a chunk (`cheatsearch_chunk`): the relative
+filters against the earlier values (By against them shifted), the others
+against a chunk filled with the number, all through one narrow loop that
+keeps an outcome mask (equal, less, greater) with the sign bit flipped for
+a signed compare.
 
 ## The compare
 
@@ -227,7 +260,8 @@ Rename one on the Cheats page.
 ## Not done
 
 - Searching VRAM, palette or OAM (values are rarely kept there).
-- Signed compares, "changed by N", more than one level of Undo.
+- More than one level of Undo; BCD values; a pointer scan (data that
+  moves between sessions); a memory view around a candidate.
 - Naming a found cheat in game (no keyboard in the overlay): rename it in
   Torii.
 

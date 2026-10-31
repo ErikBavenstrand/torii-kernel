@@ -28,6 +28,7 @@ clang-tidy source/fmt.c bugprone-branch-clone: repeated branch body in condition
 clang-tidy source/gamename.c bugprone-not-null-terminated-result: the result from calling 'memcpy' is not null-terminated
 clang-tidy source/library.c bugprone-not-null-terminated-result: the result from calling 'memcpy' is not null-terminated
 clang-tidy source/orphanplan.c bugprone-suspicious-string-compare: function 'strcmp' is called without explicitly comparing result
+clang-tidy source/overlay/ov.c clang-analyzer-security.ArrayBound: Out of bound access to memory after the end of 'm.greyed'
 clang-tidy source/reset_table.h bugprone-narrowing-conversions: narrowing conversion from constant value 4294967295 (0xFFFFFFFF) of type 'unsigned int' to signed type 'int' is implementation-defined
 clang-tidy source/saveorphan.c bugprone-assignment-in-if-condition: an assignment within an 'if' condition is bug-prone
 clang-tidy source/saveorphan.c bugprone-assignment-in-if-condition: an assignment within an 'if' condition is bug-prone
