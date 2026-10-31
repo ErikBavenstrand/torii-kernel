@@ -4,6 +4,16 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## v0.9.13
+
+No kernel changes; this release updates the Emerald golden cheat file
+(`cheats/gba/Pokemon - Emerald Version (USA, Europe).cht`, copy it to
+`/torii/cheats/` on the card). It adds 7 cheats (Instant text, Run and bike
+anywhere, Mirage Island always there, Safari Pokémon never flee, Everstone
+always passes nature, Day Care eggs fast, Pokémon always obey), a
+Decorations category in the item shop, and fixes the field menu's HEAL,
+which healed nothing, and MOVES, which opened the Move Deleter (a9e37aa6).
+
 ## v0.9.12
 
 - **Changed:** ROM patches cost nothing in game: a cheat with conditionals
