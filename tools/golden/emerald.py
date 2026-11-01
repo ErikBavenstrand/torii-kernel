@@ -456,11 +456,14 @@ MART = {
     ],
 }
 NUM_DECORATIONS = 120  # DECOR_SMALL_DESK (1) to DECOR_REGISTEEL_DOLL
-TICKETS = [  # name, item, the ferry flag its event sets (FLAG_ENABLE_SHIP_*)
-    ("EON TICKET", "EON_TICKET", 0x8B3),
-    ("AURORA TICKET", "AURORA_TICKET", 0x8D5),
-    ("OLD SEA MAP", "OLD_SEA_MAP", 0x8D6),
-    ("MYSTIC TICKET", "MYSTIC_TICKET", 0x8E0),
+TICKETS = [  # name, item, the flags its Mystery Gift sets: the ferry's (FLAG_ENABLE_SHIP_*),
+    # and its FLAG_RECEIVED_* (the Eon Ticket's gift sets none). Lilycove's
+    # ferry takes you with the ticket in the bag and its ferry flag set,
+    # once the game is clear.
+    ("EON TICKET", "EON_TICKET", [0x8B3]),
+    ("AURORA TICKET", "AURORA_TICKET", [0x8D5, 0x13A]),
+    ("OLD SEA MAP", "OLD_SEA_MAP", [0x8D6, 0x13C]),
+    ("MYSTIC TICKET", "MYSTIC_TICKET", [0x8E0, 0x13B]),
 ]
 
 
@@ -1150,7 +1153,8 @@ def legends_section(m, back):
 
 @section(
     "Tickets",
-    "The event tickets: Eon, Aurora, Mystic and Old Sea Map. The ferry in Lilycove takes you.",
+    "The event tickets: Eon, Aurora, Mystic and Old Sea Map. The ferry in Lilycove takes you once "
+    "you are the Champion; before that, Menu: Warp's ISLANDS does.",
 )
 def tickets_section(m, back):
     s = m.s
@@ -1159,17 +1163,18 @@ def tickets_section(m, back):
         [(item_name(it), f"tk{i}") for i, (_, it, _) in enumerate(TICKETS)],
         back,
     )
-    for i, (_, item, flag) in enumerate(TICKETS):
+    for i, (_, item, flags) in enumerate(TICKETS):
         s.label(f"tk{i}")
-        s.cmd("setflag", ("h", flag))
+        for flag in flags:
+            s.cmd("setflag", ("h", flag))
         s.cmd("checkitem", ("h", ITEM[item]), ("h", 1))
-        s.when(VAR_RESULT, 1, "have")  # one is enough: the flag is what opens the ferry
+        s.when(VAR_RESULT, 1, "have")  # one is enough
         s.cmd("setorcopyvar", ("h", VAR_8000), ("h", ITEM[item]))
         s.cmd("setorcopyvar", ("h", VAR_8001), ("h", 1))
         s.cmd("callstd", ("b", 0))  # STD_OBTAIN_ITEM: "Obtained the EON TICKET!"
         s.goto("tickets")
     s.label("have")
-    s.say(m.t("You have it, and the ferry will take you."))
+    s.say(m.t("You have it: the ferry in\nLILYCOVE will take you."))
     s.goto("tickets")
     return "TICKETS", "tickets"
 
