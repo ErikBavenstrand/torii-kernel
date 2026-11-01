@@ -20,8 +20,7 @@ static int is_sep(char c)
 
 // AnyGBA's characters in a raw line ('+' within one is a pointer's offset's)
 // Torii code's characters but ':' (source/cheatcode.h's CHEAT_FMT_TORII):
-// AnyGBA's, and Torii's writes, tests and blocks. Its switch, '$', isn't
-// typed: it goes with ROM code made on a PC.
+// AnyGBA's, and Torii's writes, tests and blocks
 static int is_raw(char c)
 {
 	switch (c) {
@@ -351,6 +350,33 @@ void keypad_check(const struct keypad_edit *e, u8 format, const struct cheat_dec
 			out->line = (u8)i;
 			return;
 		}
+	}
+	// Torii code's blocks, which the decoder only finds unreadable whole
+	u32 depth = 0, open[KEYPAD_BLOCKS];
+	for (u32 i = 0; i < e->lines; i++) {
+		const char *t = e->text[i];
+		u32 n = e->len[i];
+		int closes = n && t[0] == '}', opens = n && t[n - 1] == '{';
+		if (closes && !depth) {
+			out->status = KEYPAD_BLOCK_EXTRA;
+			out->line = (u8)i;
+			return;
+		}
+		if (closes && !(n == 2 && opens))
+			depth--;  // "}" ends the block; "}{" stays in it
+		else if (opens && !closes) {
+			if (depth == KEYPAD_BLOCKS) {
+				out->status = KEYPAD_BLOCK_DEEP;
+				out->line = (u8)i;
+				return;
+			}
+			open[depth++] = i;
+		}
+	}
+	if (depth) {
+		out->status = KEYPAD_BLOCK_OPEN;
+		out->line = (u8)open[depth - 1];
+		return;
 	}
 	struct cheat_decoder dec;
 	if (format != CHEAT_FMT_AUTO)

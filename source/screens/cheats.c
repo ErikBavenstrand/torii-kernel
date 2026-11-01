@@ -953,10 +953,18 @@ static void detail_line(u32 *n, const char *s)
 
 // A code line: AnyGBA's '^' and '|' spaced out, which the font's '|' needs
 // to read apart from '1', and kept with what follows (a no-break space), so
-// a long line wraps before its key and the wrapped part starts with '^'
-static void code_line(u32 *n, const char *s, u32 len)
+// a long line wraps before its key and the wrapped part starts with '^'.
+// Torii code's blocks indent their lines (*depth: the blocks open), two
+// no-break spaces a block: a '}' line at its block's '{' line's.
+static void code_line(u32 *n, const char *s, u32 len, u32 *depth)
 {
 	u32 from = 0;
+	if (len && s[0] == '}' && *depth)
+		(*depth)--;
+	for (u32 k = 0; k < *depth && k < CHEAT_TORII_BLOCKS; k++)
+		detail_add(n, "\xC2\xA0\xC2\xA0", 4);
+	if (len && s[len - 1] == '{')
+		(*depth)++;
 	for (u32 i = 0; i < len; i++)
 		if (s[i] == '^' || s[i] == '|') {
 			detail_add(n, s + from, i - from);
@@ -1086,10 +1094,10 @@ static void detail_text(u32 at)
 	detail_add(&n, "\n# ", 3);
 	detail_line(&n, S(STR_CHEATS_SECTION_CODE));
 	const char *code = f->text + c->code;
-	u32 code_len = cheatfile_code_len(c);
+	u32 code_len = cheatfile_code_len(c), depth = 0;
 	for (u32 i = 0, from = 0; i <= code_len; i++)
 		if (i == code_len || (code[i] == '+' && !cheat_plus_joins(code + from, code_len - from, i - from))) {
-			code_line(&n, code + from, i - from);
+			code_line(&n, code + from, i - from, &depth);
 			from = i + 1;
 		}
 }

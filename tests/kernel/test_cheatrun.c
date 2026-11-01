@@ -460,55 +460,60 @@ void test_cheatrun_off(void)
 	CHECK(took <= model);
 }
 
-// Torii code's switch (CHEAT_OP_SWITCH): its byte holds its value while
-// the cheat is on and 0 while it's off, whatever the cheat's ops; a plain
-// cheat, one with a test and one of the switch alone
-void test_cheatrun_switch(void)
+// Torii code end to end: its text decoded, laid out in the table and run
+// by the interpreter itself, as a launch does
+// $0 to $3 in text: the tests' bytes at T_DATA + 0x380 and + 0x381, the
+// writes' at + 0x390 and + 0x391
+static u8 torii_run(const char *text)
 {
-	const u32 sw = T_DATA + 0x300;
-	struct cheat_op ops[3][3] = {
-		{OP(sw, 4, 1, 0, 0, 0, CHEAT_OP_SWITCH, 1), OP(T_DATA + 0x10, 0x11, 1, 0, 0, 0, CHEAT_OP_WRITE, 1)},
-		{OP(sw + 1, 1, 1, 0, 0, 0, CHEAT_OP_SWITCH, 1)},
-		{OP(sw + 2, 2, 1, 0, 0, 0, CHEAT_OP_SWITCH, 1), OP(T_DATA + 0x20, 1, 1, 0, 0, 0, CHEAT_OP_IF_EQ, 1),
-		 OP(T_DATA + 0x30, 0x33, 1, 0, 0, 0, CHEAT_OP_WRITE, 1)},
-	};
-	const u32 n[3] = {2, 1, 3};
-	u32 pos = 0, n_patches;
-	set_memory();
-	for (u32 c = 0; c < 3; c++) {
-		u32 got, cost;
-		CHECK_EQ(cheat_lower(ops[c], n[c], T_PROG + pos, T_PROG_MAX - 1 - pos, &got, &cost, T_PATCHES, 1,
-				     &n_patches),
-			 CHEAT_LOWER_OK);
-		CHECK(T_PROG[pos] & CHEAT_PROG_SWITCH);
-		pos += got;
+	static const char hexd[] = "0123456789ABCDEF";
+	static const u32 at[4] = {0x380, 0x381, 0x390, 0x391};
+	static char code[256];
+	static struct cheat_op ops[32];
+	struct cheat_decoder d;
+	u32 n = 0, words = 0, cost = 0, n_patches = 0, len = 0;
+	for (const char *p = text; *p && len < sizeof(code) - 9; p++) {
+		if (*p != '$') {
+			code[len++] = *p;
+			continue;
+		}
+		u32 a = T_DATA + at[*++p - '0'];
+		for (int k = 28; k >= 0; k -= 4)
+			code[len++] = hexd[a >> k & 15];
 	}
-	T_PROG[pos] = 0;
-	*(vu32 *)sw = 0xFFFFFFFF;
-	*(vu8 *)(T_DATA + 0x10) = *(vu8 *)(T_DATA + 0x30) = 0;
-	*(vu8 *)(T_DATA + 0x20) = 1;
+	code[len] = 0;
+	cheat_decoder_init(&d);
+	if (cheat_decode(&d, code, (u32)strlen(code), ops, 32, &n) != CHEAT_OK ||
+	    cheat_lower(ops, n, T_PROG, T_PROG_MAX - 1, &words, &cost, T_PATCHES, 1, &n_patches) != CHEAT_LOWER_OK)
+		return 0xEE;
+	T_PROG[words] = 0;
 	Cheat_run(T_PROG, 0, 0, 0);
-	CHECK_EQ(*(vu8 *)sw, 4);
-	CHECK_EQ(*(vu8 *)(sw + 1), 1);
-	CHECK_EQ(*(vu8 *)(sw + 2), 2);
-	CHECK_EQ(*(vu8 *)(sw + 3), 0xFF);  // no more than its byte
-	CHECK_EQ(*(vu8 *)(T_DATA + 0x10), 0x11);
-	CHECK_EQ(*(vu8 *)(T_DATA + 0x30), 0x33);
-	// Cheats 0 and 2 off: their bytes 0, their ops not run
-	*(vu8 *)(T_DATA + 0x10) = *(vu8 *)(T_DATA + 0x30) = 0;
-	Cheat_run(T_PROG, 1u << 0 | 1u << 2, 0, 0);
-	CHECK_EQ(*(vu8 *)sw, 0);
-	CHECK_EQ(*(vu8 *)(sw + 1), 1);
-	CHECK_EQ(*(vu8 *)(sw + 2), 0);
-	CHECK_EQ(*(vu8 *)(T_DATA + 0x10), 0);
-	CHECK_EQ(*(vu8 *)(T_DATA + 0x30), 0);
-	// Every one off, as while cheats are off (cheatrun.s's blob start)
-	Cheat_run(T_PROG, ~0u, ~0u, 0);
-	CHECK_EQ(*(vu8 *)(sw + 1), 0);
-	// On again
-	Cheat_run(T_PROG, 0, 0, 0);
-	CHECK_EQ(*(vu8 *)sw, 4);
-	CHECK_EQ(*(vu8 *)(sw + 2), 2);
+	return 1;
+}
+
+void test_cheatrun_torii(void)
+{
+	vu8 *b = (vu8 *)(T_DATA + 0x380);
+	set_memory();
+	// A test, a block and its ELSE
+	static const char *const block = "$0=01{+$1=01{+$2:AA+$3#01+}+}{+$2:55+}";
+	static const struct {
+		u8 a, b, want10, want11;
+	} cases[] = {{1, 1, 0xAA, 0x08}, {1, 0, 0x00, 0x07}, {0, 1, 0x55, 0x07}};
+	for (u32 i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+		b[0] = cases[i].a, b[1] = cases[i].b, b[0x10] = 0, b[0x11] = 7;
+		CHECK_EQ(torii_run(block), 1);
+		CHECK_EQ(b[0x10], cases[i].want10);
+		CHECK_EQ(b[0x11], cases[i].want11);
+	}
+	// A test before a test covers both, signed tests, clears
+	b[0] = 0xFF, b[1] = 0x01, b[0x10] = 0, b[0x11] = 0xF5;
+	CHECK_EQ(torii_run("$0<<00+$1>>FF+$2:AA+$3&0F"), 1);
+	CHECK_EQ(b[0x10], 0xAA);
+	CHECK_EQ(b[0x11], 0x05);
+	b[1] = 0x80, b[0x10] = 0;  // -128 isn't above -1
+	CHECK_EQ(torii_run("$0<<00+$1>>FF+$2:AA+$3&0F"), 1);
+	CHECK_EQ(b[0x10], 0);
 }
 
 // Run once (the in-game menu's SELECT): the cheat runs whatever its off bit,

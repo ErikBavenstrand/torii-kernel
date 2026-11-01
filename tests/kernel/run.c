@@ -26,7 +26,7 @@ static const struct {
 	{"cheatrun_rom_patches", test_cheatrun_rom_patches},
 	{"cheatrun_cycles", test_cheatrun_cycles},
 	{"cheatrun_off", test_cheatrun_off},
-	{"cheatrun_switch", test_cheatrun_switch},
+	{"cheatrun_torii", test_cheatrun_torii},
 	{"cheatrun_once", test_cheatrun_once},
 	{"game_hardware", test_game_hardware},
 	{"clock_and_rumble_are_separate", test_clock_and_rumble_are_separate},

@@ -201,6 +201,8 @@ static const char *verb_of(u32 type)
 _Static_assert(STR_KEYPAD_VERB_AND - STR_KEYPAD_VERB_WRITE == CHEAT_OP_AND - CHEAT_OP_WRITE, "keypad's verbs in order");
 _Static_assert(STR_KEYPAD_FORMAT_TORII - STR_KEYPAD_FORMAT_NONE == CHEAT_FMT_TORII, "keypad's formats in order");
 _Static_assert(STR_KEYPAD_TAG_TORII - STR_KEYPAD_TAG_NONE == CHEAT_FMT_TORII, "keypad's tags in order");
+_Static_assert(STR_KEYPAD_BLOCK_DEEP - STR_KEYPAD_BLOCK_OPEN == KEYPAD_BLOCK_DEEP - KEYPAD_BLOCK_OPEN,
+	       "the blocks' messages in order");
 _Static_assert(STR_KEYPAD_STATUS_CANT_RUN - STR_KEYPAD_STATUS_ADDRESS == KEYPAD_CANT_RUN - KEYPAD_ADDRESS,
 	       "keypad's results in order");
 
@@ -273,6 +275,11 @@ static u32 result_text(char *out, u32 size)
 	case KEYPAD_SHAPE:
 		SF(out, size, STR_KEYPAD_SHAPE, LN(c->line + 1), LN(kp.e.len[c->line]));
 		return c->line == kp.e.line ? UI_ROLE_DIM : UI_ROLE_DANGER;  // the line being typed: not done yet
+	case KEYPAD_BLOCK_OPEN:
+	case KEYPAD_BLOCK_EXTRA:
+	case KEYPAD_BLOCK_DEEP:
+		SF(out, size, STR_KEYPAD_BLOCK_OPEN + (c->status - KEYPAD_BLOCK_OPEN), LN(c->line + 1));
+		return c->line == kp.e.line ? UI_ROLE_DIM : UI_ROLE_DANGER;  // being typed: not done yet
 	case KEYPAD_FILL:
 		SF(out, size, STR_KEYPAD_FILL_IN, LN(keypad_edit_marks(&kp.e)));
 		return UI_ROLE_DIM;

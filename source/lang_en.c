@@ -705,6 +705,9 @@ const char *const lang_en[STR_COUNT] = {
 	"{1} {2} {3} {4}",  // keypad.if
 	"{1}, +{2} more",  // keypad.more
 	"Line {1}: {2} digits; a code line has 12 or 16",  // keypad.shape
+	"Line {1}: its { has no } after it",  // keypad.block_open
+	"Line {1}: no { before this }",  // keypad.block_extra
+	"Line {1}: blocks nest 4 deep at most",  // keypad.block_deep
 	"Fill in the {1} marked digits",  // keypad.fill_in
 	"Doesn't read as {1}",  // keypad.wrong
 	"Rename",  // rename.title

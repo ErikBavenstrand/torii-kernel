@@ -15,6 +15,7 @@
 #include "cheatfile.h"
 
 #define KEYPAD_LINES 32  // code lines in a cheat typed here
+#define KEYPAD_BLOCKS CHEAT_TORII_BLOCKS
 // Characters of a line: [PPPPPPPP]+OOOOOOOO:VVVVVVVV^[KKKKKKKK]+OOOOOOOO
 #define KEYPAD_LINE_MAX 48
 // A code as a file stores it, at most: lines, a '+' between them, and "+0"
@@ -85,6 +86,9 @@ enum keypad_status {
 	KEYPAD_SHAPE,     // a line is no code line's shape (its digits so far: check.line)
 	KEYPAD_FILL,      // stand-ins left
 	KEYPAD_WRONG,     // it doesn't decode in this format
+	KEYPAD_BLOCK_OPEN,   // a Torii block's { (on check.line) has no } after it
+	KEYPAD_BLOCK_EXTRA,  // a } (on check.line) has no { before it
+	KEYPAD_BLOCK_DEEP,   // a { (on check.line) past KEYPAD_BLOCKS deep
 	KEYPAD_ADDRESS,   // it decodes, but to an address off the GBA's map (a wrong format or key)
 	KEYPAD_MASTER,    // master codes only: Torii hooks the game itself
 	KEYPAD_BIG,       // past a cheat's budget
@@ -95,7 +99,7 @@ enum keypad_status {
 struct keypad_check {
 	u8 status;  // enum keypad_status
 	u8 format;  // the format it reads in: the forced one, else as decoded (or detected)
-	u8 line;    // KEYPAD_SHAPE's line
+	u8 line;    // KEYPAD_SHAPE's and the blocks' line
 	s32 score;  // the first line's plausibility as a GameShark format (cheat_detect)
 	u32 ops;    // ops decoded; the first is w->ops[0]
 	u32 patches;  // ROM patches decoded beside them (w->patches)

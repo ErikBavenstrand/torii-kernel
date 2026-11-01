@@ -114,7 +114,6 @@ static const struct {
 	{"keypad_raw_ext", test_keypad_raw_ext},
 	{"cheatcode_lower_keyed", test_cheatcode_lower_keyed},
 	{"cheatcode_torii", test_cheatcode_torii},
-	{"cheatcode_lower_switch", test_cheatcode_lower_switch},
 	{"cheatcode_shapes", test_cheatcode_shapes},
 	{"cheatcode_too_big", test_cheatcode_too_big},
 	{"cheatcode_detect", test_cheatcode_detect},

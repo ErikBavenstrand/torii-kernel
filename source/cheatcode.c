@@ -115,7 +115,6 @@ static const u32 par3_seeds[4] = {0x7AA9648F, 0x7FAE6994, 0xC0EFAAD5, 0x42712C57
 
 #define NONE 0xFFFFFFFFu
 #define MAX_PENDING 8
-#define MAX_BLOCKS 4  // Torii code's { } blocks open at once
 #define DEADFACE 0xDEADFACEu
 #define MARKER 0x001DC0DEu
 
@@ -574,7 +573,10 @@ struct line {
 // Torii code's operators (source/cheatcode.h's CHEAT_FMT_TORII has the
 // syntax): the character after a line's target, or before it for keys and a
 // switch; '}' and '{' alone end a block and start its ELSE
-#define TORII_ELSE 'E'  // "}{"
+#define TORII_ELSE 'E'     // "}{"
+#define TORII_SLT 'L'      // "<<": below, signed
+#define TORII_SGT 'G'      // ">>": above, signed
+#define TORII_PRESSED 'P'  // "@@": the buttons pressed this frame
 
 struct token {
 	const char *p;
@@ -663,7 +665,6 @@ static int is_torii_char(char c)
 	case '*':
 	case '~':
 	case '@':
-	case '$':
 	case '{':
 	case '}':
 		return 1;
@@ -757,9 +758,9 @@ static u32 raw_ref(const char *p, u32 len, u32 *address, u32 *off, int *ptr, u8 
 // A Torii line (CHEAT_FMT_TORII): VBA's AAAAAAAA:VALUE (2, 4 or 8 digits),
 // with AnyGBA's extensions (the target a pointer, [P]+O; VALUE^KEY, the key
 // an address or a pointer; TARGET|VALUE) and Torii's: TARGET&VALUE and
-// TARGET#VALUE, the tests = ! < > * ~ (a '{' after one opens a block),
-// @MASK, $ADDRESS[:VV], and the block lines } and }{. Sets l's fields; 0 if
-// malformed.
+// TARGET#VALUE, the tests = ! < > << >> * ~ (a '{' after one opens a
+// block), @MASK and @@MASK, and the block lines } and }{. Sets l's fields;
+// 0 if malformed.
 static int raw_line(const char *p, u32 len, struct line *l)
 {
 	u32 at, vlen, k;
@@ -780,36 +781,27 @@ static int raw_line(const char *p, u32 len, struct line *l)
 		--len;
 	}
 	l->op = p[0];
-	if (p[0] == '@') {  // every key of the mask held (KEYINPUT reads 0 for one)
-		vlen = len - 1;
-		if (vlen < 1 || vlen > 4 || digits(p + 1, vlen, &l->marks) < 0)
+	if (p[0] == '@') {  // every key of the mask held (KEYINPUT reads 0 for one); @@ pressed
+		u32 from = len > 1 && p[1] == '@' ? 2 : 1;
+		vlen = len - from;
+		if (vlen < 1 || vlen > 4 || digits(p + from, vlen, &l->marks) < 0)
 			return 0;
+		if (from == 2)
+			l->op = TORII_PRESSED;
 		l->op1 = CHEAT_KEYINPUT;
-		l->op2 = hex_value(p + 1, vlen);
+		l->op2 = hex_value(p + from, vlen);
 		l->width = 2;
 		return l->op2 && l->op2 <= 0x3FF;
-	}
-	if (p[0] == '$') {  // the cheat's switch: the byte at the address, VV (01) while on
-		if (l->open)
-			return 0;
-		at = raw_ref(p + 1, len - 1, &l->op1, &l->off, &ptr, &l->marks);
-		if (!at || ptr)
-			return 0;
-		at += 1;
-		l->width = 1;
-		l->op2 = 1;
-		if (at == len)
-			return 1;
-		if (p[at] != ':' || len - at != 3 || digits(p + at + 1, 2, &l->marks) < 0)
-			return 0;
-		l->op2 = hex_value(p + at + 1, 2);
-		return l->op2 != 0;
 	}
 	at = raw_ref(p, len, &l->op1, &l->off, &ptr, &l->marks);
 	if (!at || at >= len || (!torii_writes(p[at]) && !torii_tests(p[at])))
 		return 0;
 	l->op = p[at];
-	if (l->open && !torii_tests(l->op))
+	if ((l->op == '<' || l->op == '>') && at + 1 < len && p[at + 1] == l->op) {
+		l->op = l->op == '<' ? TORII_SLT : TORII_SGT;
+		++at;  // the second of the pair
+	}
+	if (l->open && !torii_tests(p[at]))
 		return 0;
 	if (ptr) {
 		if (l->op != ':' && l->op != '|')
@@ -928,9 +920,9 @@ struct dec {
 	u32 block;  // the open PARv3 block's conditional, or NONE
 	u32 else_at;  // its ELSE block's first op, or NONE
 	u8 depth;   // Torii blocks open
-	u8 switched;  // a Torii switch read
-	u32 tblock[MAX_BLOCKS];  // each open Torii block's conditional
-	u32 telse[MAX_BLOCKS];   // its ELSE's first op, or NONE
+	u32 tblock[CHEAT_TORII_BLOCKS];  // each open Torii block's conditional
+	u32 telse[CHEAT_TORII_BLOCKS];   // its ELSE's first op, or NONE
+	u8 tinner[CHEAT_TORII_BLOCKS];   // a block inside it had an ELSE
 	struct pending pend[MAX_PENDING];
 	u32 n_pend;
 
@@ -1043,6 +1035,22 @@ static void cover(struct dec *s, u32 codes, int by_line)
 static void cover_next(struct dec *s, u32 codes)
 {
 	cover(s, codes, 0);
+}
+
+// A Torii test just emitted covers the next line, and when that is a test
+// too, what it covers: unlike a device's conditional, the test itself is no
+// code of the tests before it
+static void torii_cover(struct dec *s)
+{
+	if (s->n_pend == MAX_PENDING) {
+		s->bad = 1;
+		return;
+	}
+	s->pend[s->n_pend].op = s->n - 1;
+	s->pend[s->n_pend].codes = 1;
+	s->pend[s->n_pend].line = NONE;
+	s->pend[s->n_pend].depth = s->depth;
+	++s->n_pend;
 }
 
 static void cont_start(struct dec *s, u8 kind, u8 width)
@@ -1589,6 +1597,12 @@ static void torii_block_end(struct dec *s)
 	u32 at = s->tblock[--s->depth], else_at = s->telse[s->depth];
 	struct cheat_op *op = op_at(s, at);
 	u32 size = s->n - at - 1;
+	// The interpreter keeps one ELSE at a time (mGBA's, the devices'): a
+	// block with one holds none
+	if (else_at != NONE && s->tinner[s->depth])
+		s->bad = 1;
+	if (s->depth)
+		s->tinner[s->depth - 1] |= else_at != NONE || s->tinner[s->depth];
 	if (else_at != NONE) {
 		op->count = else_at - at - 1;
 		if (size - op->count > 0xFFFF)
@@ -1607,8 +1621,11 @@ static void torii_line(struct dec *s, const struct line *l)
 		char c;
 		u8 type;
 	} tests[] = {
-		{'=', CHEAT_OP_IF_EQ},  {'!', CHEAT_OP_IF_NE},   {'<', CHEAT_OP_IF_ULT},  {'>', CHEAT_OP_IF_UGT},
-		{'*', CHEAT_OP_IF_AND}, {'~', CHEAT_OP_IF_NAND}, {'@', CHEAT_OP_IF_NAND},
+		{'=', CHEAT_OP_IF_EQ},       {'!', CHEAT_OP_IF_NE},
+		{'<', CHEAT_OP_IF_ULT},      {'>', CHEAT_OP_IF_UGT},
+		{TORII_SLT, CHEAT_OP_IF_LT}, {TORII_SGT, CHEAT_OP_IF_GT},
+		{'*', CHEAT_OP_IF_AND},      {'~', CHEAT_OP_IF_NAND},
+		{'@', CHEAT_OP_IF_NAND},     {TORII_PRESSED, CHEAT_OP_IF_AND},
 	};
 	struct cheat_decoder *d = s->d;
 	raw_add(CHEAT_FMT_TORII, 0, 0);  // never encrypted: a cheat with one stays as written
@@ -1626,16 +1643,27 @@ static void torii_line(struct dec *s, const struct line *l)
 		if (tests[i].c != l->op)
 			continue;
 		u32 at = s->n;
-		emit(s, tests[i].type, l->width, l->op1, l->op2);
+		if (l->op == TORII_PRESSED) {
+			// As a cheat's "press" activation (cheatfile.c's gate): held at
+			// this frame's snapshot, covering the test that they weren't all
+			// at the one before, which covers the line or block
+			emit(s, CHEAT_OP_IF_NAND, 2, CHEAT_KEYS_NOW, l->op2);
+			torii_cover(s);
+			at = s->n;
+			emit(s, CHEAT_OP_IF_AND, 2, CHEAT_KEYS_BEFORE, l->op2);
+		} else {
+			emit(s, tests[i].type, l->width, l->op1, l->op2);
+		}
 		if (!l->open) {
-			cover_next(s, 1);
+			torii_cover(s);
 			return;
 		}
-		if (s->depth == MAX_BLOCKS) {
+		if (s->depth == CHEAT_TORII_BLOCKS) {
 			s->bad = 1;
 			return;
 		}
 		s->tblock[s->depth] = at;
+		s->tinner[s->depth] = 0;
 		s->telse[s->depth++] = NONE;
 		return;
 	}
@@ -1645,9 +1673,10 @@ static void torii_line(struct dec *s, const struct line *l)
 			s->bad = 1;
 			return;
 		}
-		if (s->n == s->tblock[s->depth - 1] + 1)
-			emit(s, CHEAT_OP_WRITE, 1, 0, 0)->count =
-				0;  // an empty THEN: a step that does nothing, as PARv3's
+		// The THEN ends on a step that does nothing (as PARv3's empty one):
+		// the interpreter jumps past the ELSE at the THEN's last op, which a
+		// test inside it that fails would skip
+		emit(s, CHEAT_OP_WRITE, 1, 0, 0)->count = 0;
 		s->telse[s->depth - 1] = s->n;
 		return;
 	case '}':
@@ -1656,16 +1685,6 @@ static void torii_line(struct dec *s, const struct line *l)
 			return;
 		}
 		torii_block_end(s);
-		return;
-	case '$':
-		// One a cheat, outside any conditional: it says whether the cheat is on
-		if (s->switched || s->depth || s->n_pend) {
-			s->bad = 1;
-			return;
-		}
-		s->switched = 1;
-		emit(s, CHEAT_OP_SWITCH, 1, l->op1, l->op2);
-		code_done(s);
 		return;
 	case '&':
 		emit(s, CHEAT_OP_AND, l->width, l->op1, l->op2);

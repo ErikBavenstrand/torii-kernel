@@ -127,6 +127,7 @@ jobs=(
   "tests/cheats_ingame.sh toggle"
   "tests/cheats_ingame.sh cut"
   "tests/cheats_ingame.sh once"
+  "tests/torii_code.sh"
   "tests/search.sh live"
   "tests/search.sh set"
   "tests/search.sh ptr"

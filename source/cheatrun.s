@@ -31,16 +31,10 @@
 @ The table's layout (cheatcode.h has the C side, cheat_lower writes it):
 @ cheats one after another, each a header word, then its ops; a 0 word ends
 @ the table.
-@   header: bits 0-11 the ops (n), bit 12 a switch, bits 13-14 the gate's
-@           ops at its start (a Hold or Press line's conditions, which a run
-@           once skips), bit 15 "plain" (no conditionals), bits 16-31 the
-@           bytes after the header
-@   switch (v0.10, Torii code's $AAAAAAAA:VV, CHEAT_OP_SWITCH): two words
-@           after the header, the byte's address and its value; each run
-@           writes the value there while the cheat is on, 0 while it's off.
-@           While cheats are off (CheatONOFF 1) the hook still calls the
-@           blob, and every cheat counts as off, so ROM code that reads the
-@           byte stops with them.
+@   header: bits 0-12 the ops (n), bits 13-14 the gate's ops at its start
+@           (a Hold or Press line's conditions, which a run once skips),
+@           bit 15 "plain" (no conditionals), bits 16-31 the bytes of ops
+@           after the header
 @   op word 0: bits 0-27 the address, bits 28-31 the kind K:
 @     K 0, 1, 2  a write of 1, 2 or 4 bytes; word 1 the value (8 bytes)
 @     K 3, 4, 5  an op of K words: word 1 the info (bits 0-3 the type, 4-5
@@ -91,16 +85,6 @@
 @ The hook's entry: the table follows the code. IWRAM's words are reached
 @ through its mirror below 0x4000000, as the hook reaches 0x3007FFC.
 Cheat_blob_start:
-	mov	r3, #0x4000000
-	ldrb	r12, [r3, #-0x20]	@ 0x3007FE0: CheatONOFF, 1 while cheats are off
-	cmp	r12, #1
-	bne	cheats_on
-	mvn	r1, #0			@ off: every cheat off, which sets their switches to 0
-	mvn	r2, #0
-	mov	r3, #0
-	adrl	r0, Cheat_blob_end
-	b	Cheat_run
-cheats_on:
 	ldr	r12, Cheat_live
 	cmp	r12, #0
 	beq	live_done
@@ -172,10 +156,9 @@ Cheat_run:
 
 cheat_next:
 	ldr	r1, [r0], #4
+	movs	r10, r1, lsl #16	@ n << 16, the plain bit in bit 31
+	beq	cheat_done
 	add	r11, r0, r1, lsr #16
-	movs	r10, r1, lsl #20	@ C: a switch (CHEAT_PROG_SWITCH), its own path; Z: n 0
-	bcs	cheat_switched
-	beq	cheat_done		@ n 0 and no switch: the end word
 	ldmia	sp, {r2, r3, r12}	@ this cheat's bit out of the mask's bottom
 	movs	r3, r3, lsr #1
 	movs	r2, r2, rrx
@@ -183,12 +166,11 @@ cheat_next:
 	stmia	sp, {r2, r3, r12}
 	movcs	r0, r11			@ off: past it
 	bcs	cheat_next
-cheat_on:
 	movs	r10, r1, lsl #16
 	movmi	r10, #0
 	bmi	plain
-	mov	r10, r1, lsl #20	@ n, without the switch's and the gate's bits
-	mov	r10, r10, lsr #20
+	mov	r10, r1, lsl #19	@ n, without the gate's bits
+	mov	r10, r10, lsr #19
 	mov	r6, #0
 	mov	r7, #0
 	mov	r8, #0
@@ -483,21 +465,6 @@ keyed:	tst	r2, #0x40		@ the target through a pointer
 	strneh	r4, [r1]
 	streqb	r4, [r1]
 	b	ext_done
-
-@ A cheat with a switch: the same, and its byte written first, its value
-@ while the cheat is on and 0 while it's off
-cheat_switched:
-	ldmia	sp, {r2, r3, r12}
-	movs	r3, r3, lsr #1
-	movs	r2, r2, rrx
-	sub	r12, r12, #1
-	stmia	sp, {r2, r3, r12}
-	ldmia	r0!, {r4, r5}		@ its address and value (no flags change)
-	movcs	r5, #0
-	strb	r5, [r4]
-	movcs	r0, r11
-	bcs	cheat_next
-	b	cheat_on
 
 cheat_done:
 	add	sp, sp, #12

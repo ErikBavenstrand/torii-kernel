@@ -36,7 +36,7 @@ enum cheatkeys_mode {
 	CHEATKEYS_NONE,    // not set, or unknown: nothing shown
 	CHEATKEYS_ALWAYS,  // on whenever the game runs
 	CHEATKEYS_HOLD,    // works while its buttons are held
-	CHEATKEYS_PRESS,   // a press of its buttons does it (from the file or the cart only, never derived)
+	CHEATKEYS_PRESS,   // a press of its buttons does it (from the file or the cart, or Torii code's @@)
 	CHEATKEYS_LAUNCH,  // ROM patches only: set when the game starts
 	CHEATKEYS_MODES
 };
@@ -111,6 +111,9 @@ u32 cheatkeys_format(u16 v, char *out, u32 size);
 //   whatever else is; IF_BUTTON needs CHEAT_BUTTON_KEYS. One combination
 //   across the cheat: Hold it. Different combinations, any other condition
 //   on KEYINPUT, one with an ELSE, or one that needs nothing held: 0.
+// - a press (Torii code's @@MASK): an IF_NAND of MASK on CHEAT_KEYS_NOW and
+//   an IF_AND of it on CHEAT_KEYS_BEFORE, width 2: Press MASK; with a hold
+//   or another press too, or only one of the two: 0.
 // - no condition on KEYINPUT, and it runs in game: Always (other conditions
 //   test the game's state, which needs no buttons);
 // - only ROM patches: Launch;

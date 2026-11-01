@@ -143,10 +143,10 @@ void test_keypad_edit(void)
 	CHECK(keypad_edit_typable("[03005D8C]+0490:0063", 20));
 	CHECK(keypad_edit_typable("02001000:12^02001004", 20));
 	CHECK(keypad_edit_typable("02001000|80", 11));
-	// Torii code's own lines too, but its switch
+	// Torii code's own lines too
 	CHECK(keypad_edit_typable("@0300{+02001000#01+}{+02001000&0F+}", 34));
 	CHECK(keypad_edit_typable("02001000=01+02001001!02+02001002<03+02001003>04+02001004*05+02001005~06", 71));
-	CHECK(!keypad_edit_typable("$0203FA00", 9));
+	CHECK(!keypad_edit_typable("02001000:12%02001004", 20));
 	CHECK_EQ(e.lines, 1);
 	CHECK_EQ(e.len[0], 0);
 }
@@ -208,6 +208,20 @@ void test_keypad_check(void)
 	CHECK_EQ(c.status, KEYPAD_OK);
 	CHECK_EQ(c.format, CHEAT_FMT_TORII);
 	CHECK_EQ(work.ops[0].width, 1);
+	// Torii code's blocks: each unbalanced one named with its line
+	c = check("@0300{+02001000:01+}", CHEAT_FMT_AUTO);
+	CHECK_EQ(c.status, KEYPAD_OK);
+	c = check("02000000=01{+02001000:01+}{+02001000:02+}", CHEAT_FMT_AUTO);
+	CHECK_EQ(c.status, KEYPAD_OK);
+	c = check("@0300{+02001000:01", CHEAT_FMT_AUTO);
+	CHECK_EQ(c.status, KEYPAD_BLOCK_OPEN);
+	CHECK_EQ(c.line, 0);
+	c = check("02001000:01+}", CHEAT_FMT_AUTO);
+	CHECK_EQ(c.status, KEYPAD_BLOCK_EXTRA);
+	CHECK_EQ(c.line, 1);
+	c = check("02000000=01{+02000000=01{+02000000=01{+02000000=01{+02000000=01{+}+}+}+}+}", CHEAT_FMT_AUTO);
+	CHECK_EQ(c.status, KEYPAD_BLOCK_DEEP);
+	CHECK_EQ(c.line, 4);
 	// GameShark v1, encrypted, by the plausibility score
 	c = check("A9873144 203A53CE", CHEAT_FMT_AUTO);
 	CHECK_EQ(c.status, KEYPAD_OK);
@@ -296,7 +310,7 @@ void test_keypad_raw_ext(void)
 	for (const char *p = "02001000:34"; *p; p++)
 		CHECK(keypad_edit_type(&e, *p));
 	CHECK(!keypad_edit_type(&e, '+'));  // after a digit
-	CHECK(!keypad_edit_type(&e, '$'));
+	CHECK(!keypad_edit_type(&e, '%'));
 	// The key's pointer ends line 1: "+0", so the next line stays its own
 	keypad_edit_code(&e, out, sizeof(out));
 	CHECK(!strcmp(out, "[03005D8C]+0490:0063^[03005D90]+0+02001000:34"));

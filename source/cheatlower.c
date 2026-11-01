@@ -47,9 +47,6 @@ int cheat_op_address_ok(const struct cheat_op *op)
 		return 1;
 	case CHEAT_OP_ROM_PATCH:
 		return is_rom(op->address) && range_ok(op->address, (unsigned long long)op->address + op->width - 1);
-	case CHEAT_OP_SWITCH:  // a byte of the game's RAM, which code it patches in reads
-		return (op->address >= 0x02000000 && op->address < 0x02040000) ||
-		       (op->address >= 0x03000000 && op->address < 0x03008000);
 	case CHEAT_OP_WRITE_PTR:  // the pointer is read; where it points is known only in game
 		return range_ok(op->address, (unsigned long long)op->address + 3);
 	case CHEAT_OP_KEYED:
@@ -91,7 +88,6 @@ int cheat_has_effect(const struct cheat_op *ops, u32 n_ops)
 	for (u32 i = 0; i < n_ops; ++i)
 		switch (ops[i].type) {
 		case CHEAT_OP_ROM_PATCH:
-		case CHEAT_OP_SWITCH:
 			return 1;
 		case CHEAT_OP_WRITE:
 		case CHEAT_OP_WRITE_PTR:
@@ -136,7 +132,6 @@ static int runs(const struct cheat_op *op)
 	switch (op->type) {
 	case CHEAT_OP_ROM_PATCH:
 	case CHEAT_OP_SLOWDOWN:
-	case CHEAT_OP_SWITCH:  // the header's (CHEAT_PROG_SWITCH)
 		return 0;
 	case CHEAT_OP_WRITE:
 		return op->count && !is_rom(op->address);
@@ -329,8 +324,6 @@ static int kept(const struct cheat_op *ops, u32 n_ops, u32 i)
 {
 	const struct cheat_op *cond = i ? &ops[i - 1] : NULL;
 	u32 j;
-	if (ops[i].type == CHEAT_OP_SWITCH)
-		return 0;  // in the header, outside every conditional (the decoder sees to it)
 	if (ops[i].type != CHEAT_OP_ROM_PATCH)
 		return 1;
 	if (!cond || !is_cond(cond->type) || !cond->count || !cond->else_count)
@@ -365,7 +358,6 @@ u8 cheat_lower_onto(const struct cheat_op *ops, u32 n_ops, u32 *prog, u32 prog_m
 	struct out o = {ps, prog, prog_max, 0, 0, CHEAT_LOWER_OK};
 	u32 i, j, n = 0, guarded = 0, walked = 0, until = 0;
 	int plain = 1, any = 0;
-	const struct cheat_op *sw = NULL;
 
 	*prog_words = *cost = 0;
 	for (i = 0; i < n_ops; ++i)
@@ -389,12 +381,6 @@ u8 cheat_lower_onto(const struct cheat_op *ops, u32 n_ops, u32 *prog, u32 prog_m
 		patches_of(&o, &ops[i]);
 		if (runs(&ops[i]))
 			any = 1;
-		if (ops[i].type == CHEAT_OP_SWITCH) {
-			if (sw)
-				o.status = CHEAT_LOWER_TOO_BIG;  // one a cheat (never from the decoder)
-			sw = &ops[i];
-			any = 1;
-		}
 	}
 	if (o.status != CHEAT_LOWER_OK) {
 		ps->n = 0;
@@ -404,11 +390,6 @@ u8 cheat_lower_onto(const struct cheat_op *ops, u32 n_ops, u32 *prog, u32 prog_m
 	if (any) {
 		word(&o, 0);  // the header, filled in below
 		o.cost += CHEAT_COST_CHEAT;
-		if (sw) {
-			word(&o, sw->address);
-			word(&o, sw->value & 0xFF);
-			o.cost += CHEAT_COST_RUN_WRITE;
-		}
 		for (i = 0; i < n_ops && o.status == CHEAT_LOWER_OK; ++i) {
 			const struct cheat_op *op = &ops[i];
 			if (!plain) {
@@ -455,8 +436,7 @@ u8 cheat_lower_onto(const struct cheat_op *ops, u32 n_ops, u32 *prog, u32 prog_m
 		if (o.status == CHEAT_LOWER_OK && (o.n - 1) * 4 > 0xFFFF)
 			o.status = CHEAT_LOWER_TOO_BIG;  // past the header's byte count
 		if (o.status == CHEAT_LOWER_OK)
-			prog[0] = n | (plain ? CHEAT_PROG_PLAIN : 0) | (sw ? CHEAT_PROG_SWITCH : 0) |
-				  ((o.n - 1) * 4) << 16;
+			prog[0] = n | (plain ? CHEAT_PROG_PLAIN : 0) | ((o.n - 1) * 4) << 16;
 	}
 	if (o.status == CHEAT_LOWER_OK) {
 		// Its load, past which it can't run beside the call alone

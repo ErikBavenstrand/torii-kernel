@@ -809,6 +809,14 @@ static int key_condition(const struct cheat_op *op, u32 *held)
 	}
 	if (op->type < CHEAT_OP_IF_EQ || op->type > CHEAT_OP_IF_NEVER || !op->width)
 		return 0;
+	// A press (Torii code's @@, as a "press" line's gate): held at this
+	// frame's snapshot (2), not all at the one before (3)
+	if (op->width == 2 && !op->else_count &&
+	    ((op->type == CHEAT_OP_IF_NAND && op->address == CHEAT_KEYS_NOW) ||
+	     (op->type == CHEAT_OP_IF_AND && op->address == CHEAT_KEYS_BEFORE))) {
+		*held = op->value & CHEATKEYS_BUTTONS;
+		return *held ? (op->address == CHEAT_KEYS_NOW ? 2 : 3) : -1;
+	}
 	u32 lo = op->address, hi = op->address + op->width;
 	if (hi <= CHEAT_KEYINPUT || lo >= CHEAT_KEYINPUT + 2)
 		return 0;
@@ -827,14 +835,20 @@ static int key_condition(const struct cheat_op *op, u32 *held)
 
 u16 cheatkeys_derive(const struct cheat_op *ops, u32 n, int has_patches, int runs_in_game)
 {
-	u32 combo = 0;
+	u32 combo = 0, now = 0, before = 0;
 	for (u32 i = 0; i < n; i++) {
 		u32 held = 0;
 		int k = key_condition(&ops[i], &held);
-		if (k < 0 || (k > 0 && combo && held != combo))
+		u32 *was = k == 2 ? &now : k == 3 ? &before : &combo;
+		if (k < 0 || (k > 0 && *was && held != *was))
 			return 0;
 		if (k > 0)
-			combo = held;
+			*was = held;
+	}
+	if (now || before) {
+		if (combo || now != before)
+			return 0;  // a hold and a press, or half a press: no one combination
+		return CHEATKEYS(CHEATKEYS_PRESS, now);
 	}
 	if (combo)
 		return CHEATKEYS(CHEATKEYS_HOLD, combo);

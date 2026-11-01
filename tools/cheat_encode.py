@@ -617,7 +617,8 @@ class Torii(VBA):
         """value added, wrapping at the width"""
         return [f"{address:08X}#{Torii._value(width, value)}"]
 
-    TESTS = "=!<>*~"  # equal, not equal, below, above, any bit, no bit
+    # equal, not equal, below, above (unsigned, then signed), any bit, no bit
+    TESTS = ("=", "!", "<", ">", "<<", ">>", "*", "~")
 
     @staticmethod
     def test(op, width, address, value, block=False):
@@ -629,10 +630,10 @@ class Torii(VBA):
         ]
 
     @staticmethod
-    def keys(mask, block=False):
-        """every button of mask (KEYINPUT's bits) held"""
+    def keys(mask, block=False, pressed=False):
+        """every button of mask (KEYINPUT's bits) held, or pressed this frame"""
         assert 0 < mask <= 0x3FF
-        return [f"@{mask:04X}" + ("{" if block else "")]
+        return [("@@" if pressed else "@") + f"{mask:04X}" + ("{" if block else "")]
 
     @staticmethod
     def else_():
@@ -641,13 +642,6 @@ class Torii(VBA):
     @staticmethod
     def end():
         return ["}"]
-
-    @staticmethod
-    def switch(address, value=1):
-        """the cheat's switch: Torii keeps the byte at address at value while
-        the cheat is on and 0 while it's off (one a cheat, outside tests)"""
-        assert 0 < value <= 0xFF
-        return [f"${address:08X}" + (f":{value:02X}" if value != 1 else "")]
 
 
 class Code:

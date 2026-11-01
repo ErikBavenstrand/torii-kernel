@@ -2106,12 +2106,8 @@ static int launch_pass(const char *rom_path, int quick)
 					     (unsigned long)cs->work.n_patches, (unsigned long)kept.n);
 					flags = INGAME_WHY_ROOM;
 				} else {
-					// ROM patches stay in until Back to Torii, but those a
-					// switch turns on and off (Torii code's $): the code
-					// they put in reads it, so the cheat toggles in game
-					int switched = bytes && (cs->work.prog[0] & CHEAT_PROG_SWITCH);
 					flags = INGAME_CHEAT_ON |
-						(cs->work.n_patches && !switched ? INGAME_WHY_LOCKED : INGAME_WHY_NONE);
+						(cs->work.n_patches ? INGAME_WHY_LOCKED : INGAME_WHY_NONE);
 					if (bytes) {
 						memcpy((u8 *)gl_cheat_table + gl_cheat_bytes, cs->work.prog, bytes);
 						gl_cheat_bytes += bytes;

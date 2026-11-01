@@ -122,7 +122,6 @@ static void run(void)
 			break;
 		case CHEAT_OP_ROM_PATCH:
 		case CHEAT_OP_SLOWDOWN:
-		case CHEAT_OP_SWITCH:  // the interpreter's, from the header
 			conditional = 0;
 			break;
 		default:
@@ -1061,7 +1060,7 @@ void test_cheatcode_lower_keyed(void)
 	CHECK_EQ(cheat_lower(ops, n_ops, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_BAD_ADDRESS);
 }
 
-// Torii code (CHEAT_FMT_TORII): its writes, tests, blocks and switch, read
+// Torii code (CHEAT_FMT_TORII): its writes, tests and blocks, read
 // and run as the interpreter runs them (run above, mCheatRefresh's loop)
 static void torii(const char *code, const char *pre, const char *want)
 {
@@ -1091,6 +1090,16 @@ void test_cheatcode_torii(void)
 	torii("03000000*06+03000010:AA", "0:09", "10:00");
 	torii("03000000~06+03000010:AA", "0:09", "10:AA");
 	torii("03000000~06+03000010:AA", "0:04", "10:00");
+	// A test before a test covers it and what it covers: both must hold
+	torii("03000000=01+03000001=01+03000010:AA+03000011:BB", "0:01 1:01", "10:AA 11:BB");
+	torii("03000000=01+03000001=01+03000010:AA+03000011:BB", "0:00 1:01", "10:00 11:BB");
+	torii("03000000=01+03000001=01+03000010:AA+03000011:BB", "0:01 1:00", "10:00 11:BB");
+	torii("03000000=01+03000001=01{+03000010:AA+03000011:BB+}", "0:00 1:01", "10:00 11:00");
+	// Signed: << and >>
+	torii("03000000<<00+03000010:AA", "0:FF", "10:AA");  // -1 < 0
+	torii("03000000<00+03000010:AA", "0:FF", "10:00");   // 255 isn't below 0
+	torii("03000000>>FF+03000010:AA", "0:01", "10:AA");  // 1 > -1
+	torii("03000000<<0000{+03000010:AA+}", "0:00 1:90", "10:AA");  // -28672 < 0
 	// Keys: every button of the mask held (KEYINPUT reads 0 for one)
 	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "@0300+03000010:AA"), CHEAT_OK);
 	CHECK_OP(0, CHEAT_OP_IF_NAND, 2, CHEAT_KEYINPUT, 0x300, 1);
@@ -1099,11 +1108,17 @@ void test_cheatcode_torii(void)
 	keyinput = 0x3FF & ~0x100;
 	torii("@300+03000010:AA", "", "10:00");
 	keyinput = 0x3FF;
+	// Pressed: held at this frame's snapshot (CHEAT_KEYS_NOW), not all at the one before
+	torii("@@0300+03000010:AA+03000011:BB", "7FE2:FF 7FE3:00 7FE6:FF 7FE7:03", "10:AA 11:BB");
+	torii("@@0300+03000010:AA+03000011:BB", "7FE2:FF 7FE3:00 7FE6:FF 7FE7:00", "10:00 11:BB");
+	torii("@@0300+03000010:AA+03000011:BB", "7FE2:FF 7FE3:01 7FE6:FF 7FE7:03", "10:00 11:BB");
+	torii("@@0300{+03000010:AA+03000011:BB+}", "7FE2:FF 7FE3:00 7FE6:FF 7FE7:03", "10:AA 11:BB");
+	torii("@@0300{+03000010:AA+03000011:BB+}", "7FE2:FF 7FE3:00 7FE6:FF 7FE7:00", "10:00 11:00");
 	// Blocks: every line to '}', and "}{" for when the test fails
 	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "03000000=01{+03000010:AA+03000011:BB+}{+03000012:CC+}+03000013:DD"),
 		 CHEAT_OK);
-	CHECK_EQ(n_ops, 5);
-	CHECK_EQ(ops[0].count, 2);
+	CHECK_EQ(n_ops, 6);
+	CHECK_EQ(ops[0].count, 3);  // the THEN, and its step that does nothing
 	CHECK_EQ(ops[0].else_count, 1);
 	torii("03000000=01{+03000010:AA+03000011:BB+}{+03000012:CC+}+03000013:DD", "0:01", "10:AA 11:BB 12:00 13:DD");
 	torii("03000000=01{+03000010:AA+03000011:BB+}{+03000012:CC+}+03000013:DD", "0:00", "10:00 11:00 12:CC 13:DD");
@@ -1112,16 +1127,13 @@ void test_cheatcode_torii(void)
 	torii("03000000=01{+03000001=01{+03000010:AA+}+03000011:BB+}", "0:01 1:01", "10:AA 11:BB");
 	torii("03000002=01+03000000=01{+03000010:AA+03000011:BB+}+03000012:CC", "0:01 2:00", "10:00 11:00 12:CC");
 	torii("03000002=01+03000000=01{+03000010:AA+03000011:BB+}+03000012:CC", "0:01 2:01", "10:AA 11:BB 12:CC");
+	// A test inside the THEN that fails: the ELSE still doesn't run
+	torii("03000000=01{+03000001=01{+03000010:AA+}+}{+03000010:55+}", "0:01 1:00", "10:00");
+	torii("03000000=01{+03000001=01+03000010:AA+}{+03000010:55+}", "0:01 1:00", "10:00");
+	torii("03000000=01{+03000001=01+03000010:AA+}{+03000010:55+}", "0:00 1:01", "10:55");
 	// An empty THEN still tests
 	torii("03000000=01{+}{+03000010:AA+}", "0:01", "10:00");
 	torii("03000000=01{+}{+03000010:AA+}", "0:00", "10:AA");
-	// The switch: one a cheat, outside any test
-	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "$0203FA00+08001000:4770"), CHEAT_OK);
-	CHECK_OP(0, CHEAT_OP_SWITCH, 1, 0x0203FA00, 0x01, 1);
-	CHECK_OP(1, CHEAT_OP_ROM_PATCH, 2, 0x08001000, 0x4770, 1);
-	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "$0203FA00:04"), CHEAT_OK);
-	CHECK_OP(0, CHEAT_OP_SWITCH, 1, 0x0203FA00, 0x04, 1);
-	CHECK_EQ(decode_as(CHEAT_FMT_TORII, "02001000:01+$0203FA00"), CHEAT_OK);
 	// Malformed
 	static const char *const bad[] = {
 		"03000000=01{+03000010:AA",          // a block not ended
@@ -1134,12 +1146,12 @@ void test_cheatcode_torii(void)
 		"@0",                                 // no keys
 		"@0400",                              // past the ten buttons
 		"@12345",                             // four digits at most
-		"$0203FA00{",                         // a switch is no test
-		"$0203FA00:00",                       // on is never 0
-		"$[0203FA00]+10",                     // a switch is an address
-		"$0203FA00+$0203FA01",                // one a cheat
-		"03000000=01+$0203FA00",              // outside any test
-		"03000000=01{+$0203FA00+}",
+		"03000000=01{+03000001=01{+}{+}+}{+}",  // an ELSE inside a block with one
+		"03000000=01{+}{+03000001=01{+}{+}+}",
+		"@@",                                 // no keys
+		"@@@0300",
+		"03000000<<<01",
+		"03000000<>01",
 		"03000000=01{+03000000=01{+03000000=01{+03000000=01{+03000000=01{+}+}+}+}+}",  // five deep
 	};
 	for (u32 i = 0; i < sizeof(bad) / sizeof(bad[0]); i++)
@@ -1151,35 +1163,8 @@ void test_cheatcode_torii(void)
 	s32 score;
 	CHECK_EQ(cheat_detect("02001000=01", 11, &score), CHEAT_FMT_TORII);
 	CHECK_EQ(cheat_detect("@0300", 5, &score), CHEAT_FMT_TORII);
-	CHECK_EQ(cheat_detect("$0203FA00", 9, &score), CHEAT_FMT_TORII);
 	// Mixed with CodeBreaker lines, as one cheat may be
 	torii("03000000=01+33000010 00AA", "0:01", "10:AA");
-}
-
-// The switch's place in the table: the header's bit, its address and
-// value after it, no op; the ops' count and a test's leave it out
-void test_cheatcode_lower_switch(void)
-{
-	u32 nw = 0, np = 0, cost = 0;
-	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "$0203FA00:04+08001000:4770+08001002:46C0"), CHEAT_OK);
-	CHECK_EQ(cheat_lower(ops, n_ops, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_OK);
-	CHECK_EQ(np, 2);
-	CHECK_EQ(nw, 3);
-	CHECK_EQ(prog[0], 0 | CHEAT_PROG_PLAIN | CHEAT_PROG_SWITCH | 8u << 16);
-	CHECK_EQ(prog[1], 0x0203FA00);
-	CHECK_EQ(prog[2], 0x04);
-	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "$0203FA00+03000000=01+03000010:AA"), CHEAT_OK);
-	CHECK_EQ(cheat_lower(ops, n_ops, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_OK);
-	CHECK_EQ(prog[0] & (CHEAT_PROG_OPS_MAX | CHEAT_PROG_SWITCH | CHEAT_PROG_PLAIN), 2 | CHEAT_PROG_SWITCH);
-	CHECK_EQ(prog[1], 0x0203FA00);
-	CHECK_EQ(prog[2], 0x01);
-	CHECK_EQ(prog[3] >> 28, CHEAT_PROG_K_EXT);  // the test, its count 1
-	CHECK_EQ(prog[4] >> 16, 1);
-	// In the game's RAM only
-	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "$08001000"), CHEAT_OK);
-	CHECK_EQ(cheat_lower(ops, n_ops, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_BAD_ADDRESS);
-	CHECK_EQ(decode_as(CHEAT_FMT_AUTO, "$04000000"), CHEAT_OK);
-	CHECK_EQ(cheat_lower(ops, n_ops, prog, 64, &nw, &cost, patches, 8, &np), CHEAT_LOWER_BAD_ADDRESS);
 }
 
 // Where the devices (GBATEK, EnHacklopedia, VBA-M) and mGBA differ, Torii
@@ -1445,6 +1430,7 @@ void test_cheatcode_fuzz(void)
 		"72001000 0001+52001010 0003+0102A3B4 C5D6",
 		"00000000 84225990+00010153+01080001+92225990 00000000+00000000+40000000",
 		"820001A8:FFFF+02001000:12345678",
+		"@@0300{+03000000=01{+03000010:AA+}{+03000010#01+}+03000011<<80+[03000020]+10:12^[03000024]+4+}",
 	};
 	struct cheat_decoder d;
 	u32 i, k, n;
@@ -1471,6 +1457,41 @@ void test_cheatcode_fuzz(void)
 		if (i % 500 == 0)
 			cheat_decoder_init(&d);
 		if (cheat_decode(&d, copy, len, ops, MAX_OPS, &n) == CHEAT_OK) {
+			u32 nw = 0, np = 0, cost = 0;
+			cheat_lower(ops, n, prog, 64, &nw, &cost, patches, 8, &np);
+		}
+		free(copy);
+	}
+	// Torii code's lines, joined at random: whatever decodes keeps every
+	// conditional inside the cheat, and lowers
+	static const char *const parts[] = {
+		"03000000", "03000010", "[03000020]", "+4",       "+10", ":", "|",    "&",  "#", "=", "!",
+		"<",        ">",        "<<",         ">>",       "*",   "~", "@",    "@@", "{", "}", "}{",
+		"^",        "01",       "0001",       "00000001", "FF",  "8", "0300", "+",  "+", "+", " ",
+	};
+	for (i = 0; i < 20000; ++i) {
+		char text[96];
+		u32 len = 0, pieces = 1 + i % 24;
+		for (k = 0; k < pieces; ++k) {
+			seed = seed * 1103515245 + 12345;
+			const char *s = parts[(seed >> 16) % (sizeof(parts) / sizeof(parts[0]))];
+			u32 l = (u32)strlen(s);
+			if (len + l >= sizeof(text))
+				break;
+			memcpy(text + len, s, l);
+			len += l;
+		}
+		char *copy = malloc(len ? len : 1);
+		memcpy(copy, text, len);
+		u8 status = cheat_decode(&d, copy, len, ops, MAX_OPS, &n);
+		if (status == CHEAT_OK) {
+			for (k = 0; k < n; ++k)
+				if (ops[k].type >= CHEAT_OP_IF_EQ && ops[k].type <= CHEAT_OP_IF_NEVER &&
+				    k + ops[k].count + ops[k].else_count >= n + 1) {
+					tlog_error("FAIL fuzz: %.*s: op %u covers past the cheat", (int)len, text,
+						   (unsigned)k);
+					++torii_test_failures;
+				}
 			u32 nw = 0, np = 0, cost = 0;
 			cheat_lower(ops, n, prog, 64, &nw, &cost, patches, 8, &np);
 		}

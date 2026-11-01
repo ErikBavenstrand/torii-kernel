@@ -45,7 +45,6 @@ void test_cheatcode_raw_ext(void);
 void test_keypad_raw_ext(void);
 void test_cheatcode_lower_keyed(void);
 void test_cheatcode_torii(void);
-void test_cheatcode_lower_switch(void);
 void test_cheatcode_shapes(void);
 void test_cheatcode_too_big(void);
 void test_cheatcode_detect(void);
