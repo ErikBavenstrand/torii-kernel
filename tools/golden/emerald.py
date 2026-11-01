@@ -295,11 +295,10 @@ class Menu:
         ]
 
 
-def rom_code(patches, code=None):
-    code = code or Code(AR)
-    for k, (a, v) in enumerate(patches):
-        code += AR.rom_patch(k % 4 + 1, a, v)
-    return code
+def rom_code(patches):
+    """ROM patches, (address, halfword) pairs, as Torii lines: a word a line
+    where two halfwords pair up at a word's address"""
+    return vba(*Mixed(patches, None).lines)
 
 
 class Mixed:
@@ -1457,8 +1456,11 @@ def cheats():
     add(
         "Pokémon",
         "Max EVs from battles",
-        rom_code([(0x0806DBC6, 0x24FF)]),
-        "Each battle that gives EVs fills HP and Attack up to the 510 total. Stats update at the next level.",
+        # MonGainEVs' multiplier (1, or 2 with Pokérus) is 255: each stat the
+        # foe yields fills to 255, within the 510 total
+        rom_code([(0x0806DB1E, 0x22FF), (0x0806DB24, 0x22FF)]),
+        "Each battle maxes the EVs its foe gives (a ZUBAT: Speed): 255 a stat, 510 in all. Stats update "
+        "at the next level.",
         "launch",
     )
     for n, nature in enumerate(NATURES):
@@ -1501,7 +1503,9 @@ def cheats():
     add(
         "Pokémon",
         "Eggs hatch fast",
-        ar(AR.write_ptr(1, SB1, 0xFE, 0x314C)),
+        vba(
+            "[03005D8C]+314C:FE"
+        ),  # the Day Care's stepCounter: every step counts as its 255th
         "Eggs hatch after a few dozen steps.",
     )
     add(
@@ -1515,7 +1519,7 @@ def cheats():
     )
     add(
         "Pokémon",
-        "Day Care eggs fast",
+        "Day Care makes eggs fast",
         rom_code(
             [(0x08070B0C, 0x46C0)]
         ),  # TryProduceOrHatchEgg: roll every step, not every 256th
