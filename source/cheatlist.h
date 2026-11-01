@@ -23,11 +23,25 @@
 // calls that copy to or from it. Its headings and counts are in struct
 // cheatstore (pReadCache).
 //
-// The cache file: a header (struct cheatlist_head), the headings (each
-// CHEATLIST_HEADING_BYTES: its length, then its bytes), the entries, then
-// the names, every part word-aligned; the header's crc is the CRC32 of
-// all that follows it. A cut write leaves a file whose CRC fails: it is
-// built again.
+// Decoding carries from cheat to cheat (a CodeBreaker key, GameShark
+// seeds, the format detected last: cheatcode.h), so a launch used to decode
+// every cheat up to its last pick. The list keeps the decoder as it stood
+// before every CHEATLIST_CKPT_EVERY-th entry (a checkpoint), noted as a
+// window is decoded in order (cheatlist_ckpt_note); a launch and Back to
+// Torii start each run of the cheats they need from the checkpoint before
+// it (cheatlist_launch_*, cheatstore_sparse_*). An edit decodes its window
+// again, renewing that window's checkpoints; the ones after it are unknown
+// until the list is built again (the decoder there may have changed). A
+// launch trusts a checkpoint only from a cache whose key and CRCs hold, and
+// checks every cheat it decodes so against the cache's entry: one that
+// differs decodes the file in full instead.
+//
+// The cache file: a header (struct cheatlist_head), the checkpoints, the
+// headings (each CHEATLIST_HEADING_BYTES: its length, then its bytes), the
+// entries, then the names, every part word-aligned; the header's crc is
+// the CRC32 of all that follows it, ckpt_crc that of the checkpoints alone
+// (a launch reads them without the rest). A cut write leaves a file whose
+// CRC fails: it is built again.
 #ifndef TORII_CHEATLIST_H
 #define TORII_CHEATLIST_H
 
@@ -36,7 +50,7 @@
 #include "cheatfile.h"
 
 #define CHEATLIST_EXT ".cdc"
-#define CHEATLIST_MAGIC 0x31434443u  // "CDC1"
+#define CHEATLIST_MAGIC 0x32434443u  // "CDC2": with checkpoints
 #define CHEATLIST_PAGE 0x3000
 #define CHEATLIST_MAX 16384          // entries: every window's cheats (CHEATSTORE_WINDOWS of CHEATINDEX_CHEATS)
 #define CHEATLIST_HEADINGS CHEATFILE_FOLDERS  // file-wide headings (cheatN_folder); past them a cheat is in none
@@ -76,9 +90,19 @@ struct cheatlist_head {
 	u32 magic;
 	u32 key_size, key_crc;  // the file's (cheatstore_key)
 	u32 count, n_headings, names_bytes;
-	u32 crc;  // of everything after the header
-	u32 pad;
+	u32 crc;       // of everything after the header
+	u32 ckpt_crc;  // of the checkpoints (CHEATLIST_CKPTS_OF(count) of them)
 };
+
+// The decoder before entry at - 1 (a multiple of CHEATLIST_CKPT_EVERY); at 0:
+// not known
+#define CHEATLIST_CKPT_EVERY 32
+#define CHEATLIST_CKPTS_OF(count) (((count) + CHEATLIST_CKPT_EVERY - 1) / CHEATLIST_CKPT_EVERY)
+struct cheatlist_ckpt {
+	u32 at;
+	struct cheat_decoder dec;
+};
+_Static_assert(sizeof(struct cheatlist_ckpt) % 4 == 0, "checkpoints keep the cache word-aligned");
 
 struct cheatlist_heading {
 	u8 len;
@@ -129,6 +153,24 @@ void cheatlist_save(void);
 // The model read now (a window, or the whole small file) into entries from
 // start on, which held old of them before: decoded, its picks as they are
 void cheatlist_from_model(u32 start, u32 old);
+// The decoder d before entry g, as a window decoded in order has it: kept as
+// g's checkpoint if g is one's (the list being built, or up)
+void cheatlist_ckpt_note(u32 g, const struct cheat_decoder *d);
+
+// A launch's view of the cache of the file read now: 1 if it is that file's
+// (its key and count) and its checkpoints' CRC holds, the cache then open
+// until cheatlist_launch_end. The checkpoints known of entries start to
+// start + n (each one's at says which) into out, at most max; how many.
+// Entry g as the cache has it: 1 if read.
+int cheatlist_launch_begin(void);
+u32 cheatlist_launch_ckpts(u32 start, u32 n, struct cheatlist_ckpt *out, u32 max);
+int cheatlist_launch_entry(u32 g, struct cheatlist_entry *e);
+void cheatlist_launch_end(void);
+
+// For the cache's key: CRC32 of a line (len bytes, its end left out) on
+// from crc, and its bytes and end counted in *bytes, unless it is an enable line
+u32 cheatlist_key_line(u32 crc, const char *line, u32 len, u32 *bytes);
+
 // The model's decoded state from the entries from start on, if the list is
 // up and fits it (else nothing: the caller decodes); 1 if taken
 int cheatlist_apply(u32 start);
@@ -144,9 +186,5 @@ int cheatlist_build_end(void);
 // Why A wouldn't pick entry e (cheatfile_why's reasons, the picks' budget the
 // store's): for an entry of a window not read now
 u32 cheatlist_why(const struct cheatlist_entry *e);
-
-// For the cache's key: CRC32 of a line (len bytes, its end left out) on
-// from crc, and its bytes and end counted in *bytes, unless it is an enable line
-u32 cheatlist_key_line(u32 crc, const char *line, u32 len, u32 *bytes);
 
 #endif

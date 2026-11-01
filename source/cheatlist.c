@@ -11,14 +11,17 @@
 #include "tlog.h"
 #include "engine/psram.h"
 
-// Page 3's map: the entries, the names, the screen's rows
+// Page 3's map: the entries, the names, the screen's rows, the checkpoints
 #define LIST_BASE ((u8 *)PSRAM_WINDOW)
 #define ENTRIES ((struct cheatlist_entry *)LIST_BASE)
 #define NAMES (LIST_BASE + CHEATLIST_MAX * sizeof(struct cheatlist_entry))
 #define ROWS ((u32 *)(NAMES + CHEATLIST_NAMES_BYTES))
 #define ROWS_MAX (CHEATLIST_MAX + CHEATLIST_HEADINGS + 1)
 #define AUX (ROWS + ROWS_MAX)
-_Static_assert((u32)(CHEATLIST_MAX * sizeof(struct cheatlist_entry)) + CHEATLIST_NAMES_BYTES + 2 * ROWS_MAX * 4u <=
+#define CKPTS ((struct cheatlist_ckpt *)(AUX + ROWS_MAX))
+#define CKPTS_MAX CHEATLIST_CKPTS_OF(CHEATLIST_MAX)
+_Static_assert((u32)(CHEATLIST_MAX * sizeof(struct cheatlist_entry)) + CHEATLIST_NAMES_BYTES + 2 * ROWS_MAX * 4u +
+			       CKPTS_MAX * sizeof(struct cheatlist_ckpt) <=
 		       PSRAM_WINDOW_BYTES - 0x10000u,
 	       "the list fits page 3 below Diagnostics' PSRAM test");
 _Static_assert(CHEATSTORE_WINDOWS *CHEATINDEX_CHEATS <= CHEATLIST_MAX, "every window's cheats have an entry");
@@ -72,6 +75,36 @@ void cheatlist_read(u32 g, u32 n, struct cheatlist_entry *out)
 void cheatlist_put(u32 g, const struct cheatlist_entry *e)
 {
 	page_put(&ENTRIES[g], e, sizeof(*e));
+}
+
+// --- Checkpoints -------------------------------------------------------------------------
+
+void cheatlist_ckpt_note(u32 g, const struct cheat_decoder *d)
+{
+	struct cheatlist *l = list();
+	if (g % CHEATLIST_CKPT_EVERY || g / CHEATLIST_CKPT_EVERY >= CKPTS_MAX ||
+	    !(l->building == 1 || (l->valid && l->on)))
+		return;
+	struct cheatlist_ckpt c, was;
+	c.at = g + 1;
+	c.dec = *d;
+	page_get(&CKPTS[g / CHEATLIST_CKPT_EVERY], &was, sizeof(was));
+	if (memcmp(&was, &c, sizeof(c)) != 0) {
+		page_put(&CKPTS[g / CHEATLIST_CKPT_EVERY], &c, sizeof(c));
+		l->dirty |= l->valid;
+	}
+}
+
+// The checkpoints of entries g to end are not known
+static void ckpts_forget(u32 g, u32 end)
+{
+	u32 zero = 0;
+	for (u32 k = CHEATLIST_CKPTS_OF(g); k < CKPTS_MAX && k * CHEATLIST_CKPT_EVERY <= end; k++) {
+		u32 at;
+		page_get(&CKPTS[k].at, &at, 4);
+		if (at)
+			page_put(&CKPTS[k].at, &zero, 4);
+	}
 }
 
 void cheatlist_row_put(u32 r, u32 value)
@@ -286,6 +319,8 @@ void cheatlist_from_model(u32 start, u32 old)
 		return;
 	}
 	entries_move(start + old, start + f->count);
+	if (l->building != 1)
+		ckpts_forget(start + f->count, l->count);  // the decoder past an edit may be other now
 	for (u32 i = 0; i < f->count; i++) {
 		const struct cheatfile_cheat *c = &cs->cheats[i];
 		struct cheatlist_entry e;
@@ -422,6 +457,7 @@ void cheatlist_drop(void)
 void cheatlist_build_begin(void)
 {
 	struct cheatlist *l = list();
+	ckpts_forget(0, CHEATLIST_MAX);  // each noted as the build decodes
 	l->count = l->names_bytes = l->n_headings = l->names_full = 0;
 	l->valid = l->dirty = 0;
 	l->building = 1;
@@ -497,10 +533,10 @@ static void cache_path(char *out)
 }
 
 // The cache's bytes after its header, made again from the start: the
-// headings, the entries (their names' offsets as written: one after
+// checkpoints, the headings, the entries (their names' offsets as written: one after
 // another, in entry order) and the names. A stream given in parts to *out.
 struct cache_out {
-	u32 part;  // 0 headings, 1 entries, 2 names, 3 done
+	u32 part;  // 0 checkpoints, 1 headings, 2 entries, 3 names, 4 done
 	u32 i;     // the item within the part
 	u32 names_at;  // the next name's offset as written
 	u32 total;     // bytes given so far
@@ -511,8 +547,24 @@ static u32 cache_fill(struct cache_out *o, u8 *buf, u32 max)
 {
 	struct cheatlist *l = list();
 	u32 n = 0;
-	while (o->part < 3) {
+	while (o->part < 4) {
 		if (o->part == 0) {
+			if (o->i == CHEATLIST_CKPTS_OF(l->count)) {
+				o->part++;
+				o->i = 0;
+				if (!n)
+					continue;
+				o->total += n;
+				return n;  // the checkpoints end a part of their own (their CRC's)
+			}
+			if (n + sizeof(struct cheatlist_ckpt) > max) {
+				o->total += n;
+				return n;
+			}
+			page_get(&CKPTS[o->i], buf + n, sizeof(struct cheatlist_ckpt));
+			n += sizeof(struct cheatlist_ckpt);
+			o->i++;
+		} else if (o->part == 1) {
 			if (o->i == l->n_headings) {
 				o->part++;
 				o->i = 0;
@@ -528,7 +580,7 @@ static u32 cache_fill(struct cache_out *o, u8 *buf, u32 max)
 			memcpy(h + 1, l->headings[o->i].name, l->headings[o->i].len);
 			n += CHEATLIST_HEADING_BYTES;
 			o->i++;
-		} else if (o->part == 1) {
+		} else if (o->part == 2) {
 			if (o->i == l->count) {
 				o->part++;
 				o->i = 0;
@@ -566,7 +618,7 @@ static u32 cache_fill(struct cache_out *o, u8 *buf, u32 max)
 		}
 	}
 	u32 pad = (o->total + n) & 3;
-	if (pad && o->part == 3) {
+	if (pad && o->part == 4) {
 		memset(buf + n, 0, 4 - pad);  // the file ends word-aligned
 		n += 4 - pad;
 	}
@@ -593,8 +645,11 @@ static int cache_write(void)
 	// The CRC first: the stream made twice, as safe files are
 	struct cheatlist_head h = {CHEATLIST_MAGIC, l->key_size, l->key_crc, l->count, l->n_headings, 0, 0, 0};
 	memset(&o, 0, sizeof(o));
-	while ((n = cache_fill(&o, buf, sizeof(cs->part))) > 0)
+	for (u32 was = 0; (n = cache_fill(&o, buf, sizeof(cs->part))) > 0; was = o.part) {
 		h.crc = crc32_update(h.crc, buf, n);
+		if (!was)
+			h.ckpt_crc = crc32_update(h.ckpt_crc, buf, n);  // a part from the checkpoints is only theirs
+	}
 	names = o.names_at;
 	h.names_bytes = names;
 	FIL *fil = &cs->fil;
@@ -641,15 +696,19 @@ static int cache_read(void)
 	ok = ok && h.magic == CHEATLIST_MAGIC && h.key_size == l->key_size && h.key_crc == l->key_crc &&
 	     h.count == want && h.count <= CHEATLIST_MAX && h.n_headings <= CHEATLIST_HEADINGS &&
 	     h.names_bytes <= CHEATLIST_NAMES_BYTES &&
-	     f_size(fil) == sizeof(h) + h.n_headings * CHEATLIST_HEADING_BYTES +
-				    h.count * sizeof(struct cheatlist_entry) + ((h.names_bytes + 3) & ~3u);
+	     f_size(fil) == sizeof(h) + CHEATLIST_CKPTS_OF(h.count) * sizeof(struct cheatlist_ckpt) +
+				    h.n_headings * CHEATLIST_HEADING_BYTES + h.count * sizeof(struct cheatlist_entry) +
+				    ((h.names_bytes + 3) & ~3u);
 	// The rest a part at a time, each part's reads whole items: the headings
-	// into RAM, the entries and the names to page 3
+	// into RAM, the checkpoints, the entries and the names to page 3
 	u32 crc = 0;
-	const u32 parts[3] = {h.n_headings * CHEATLIST_HEADING_BYTES, h.count * sizeof(struct cheatlist_entry),
+	const u32 parts[4] = {CHEATLIST_CKPTS_OF(h.count) * sizeof(struct cheatlist_ckpt),
+			      h.n_headings * CHEATLIST_HEADING_BYTES, h.count * sizeof(struct cheatlist_entry),
 			      (h.names_bytes + 3) & ~3u};
-	const u32 units[3] = {CHEATLIST_HEADING_BYTES, sizeof(struct cheatlist_entry), 4};
-	for (u32 p = 0; ok && p < 3; p++) {
+	const u32 units[4] = {sizeof(struct cheatlist_ckpt), CHEATLIST_HEADING_BYTES, sizeof(struct cheatlist_entry),
+			      4};
+	u8 *const to[4] = {(u8 *)CKPTS, NULL, (u8 *)ENTRIES, NAMES};
+	for (u32 p = 0; ok && p < 4; p++) {
 		const u32 chunk = sizeof(cs->part) / units[p] * units[p];
 		for (u32 at = 0; ok && at < parts[p]; at += got) {
 			u32 n = parts[p] - at < chunk ? parts[p] - at : chunk;
@@ -658,14 +717,14 @@ static int cache_read(void)
 				break;
 			}
 			crc = crc32_update(crc, buf, got);
-			if (p == 0) {
+			if (p == 1) {
 				for (u32 k = 0; k < got; k += CHEATLIST_HEADING_BYTES) {
 					struct cheatlist_heading *hd = &l->headings[(at + k) / CHEATLIST_HEADING_BYTES];
 					hd->len = buf[k] <= CHEATFILE_FOLDER_MAX ? buf[k] : 0;
 					memcpy(hd->name, buf + k + 1, CHEATFILE_FOLDER_MAX);
 				}
 			} else {
-				page_put(p == 1 ? (u8 *)ENTRIES + at : NAMES + at, buf, got);
+				page_put(to[p] + at, buf, got);
 			}
 		}
 	}
@@ -681,6 +740,85 @@ static int cache_read(void)
 	l->valid = 1;
 	l->dirty = 0;
 	return 1;
+}
+
+// --- A launch's quick decode ---------------------------------------------------------
+//
+// The cache read without the rest of the list: its header, its checkpoints
+// (their CRC checked whole, then read a window's at a time) and an entry at
+// a time. Page 3 is never touched: at a launch it may hold the game.
+
+int cheatlist_launch_begin(void)
+{
+	struct cheatstore *cs = cheatstore();
+	char path[SAFEFILE_PATH_MAX];
+	u8 *buf = (u8 *)cs->part;
+	struct cheatlist_head h;
+	FIL *fil = &cs->quick.fil;
+	UINT got;
+	u32 size, crc, want = cheatstore_window_start(cs->windows ? cs->windows : 1u);
+	cheatlist_launch_end();
+	cache_path(path);
+	if (f_open(fil, path, FA_READ) != FR_OK)
+		return 0;
+	cs->quick_open = 1;
+	u32 t0 = torii_frames;
+	cheatstore_key(&size, &crc);
+	tlog_debug("cheats: the cache's key in %lu frames", (unsigned long)(torii_frames - t0));
+	int ok = f_read(fil, &h, sizeof(h), &got) == FR_OK && got == sizeof(h) && h.magic == CHEATLIST_MAGIC &&
+		 h.key_size == size && h.key_crc == crc && h.count == want && h.count <= CHEATLIST_MAX &&
+		 h.n_headings <= CHEATLIST_HEADINGS;
+	u32 ckpts = ok ? CHEATLIST_CKPTS_OF(h.count) * sizeof(struct cheatlist_ckpt) : 0, sum = 0;
+	for (u32 at = 0; ok && at < ckpts; at += got) {
+		u32 n = ckpts - at < sizeof(cs->part) ? ckpts - at : sizeof(cs->part);
+		ok = f_read(fil, buf, n, &got) == FR_OK && got == n;
+		sum = crc32_update(sum, buf, got);
+	}
+	if (!ok || sum != h.ckpt_crc) {
+		tlog("cheats: %s: no cache that fits: the launch decodes every cheat", path);
+		cheatlist_launch_end();
+		return 0;
+	}
+	cs->quick.entries_at = sizeof(h) + ckpts + h.n_headings * CHEATLIST_HEADING_BYTES;
+	return 1;
+}
+
+u32 cheatlist_launch_ckpts(u32 start, u32 n, struct cheatlist_ckpt *out, u32 max)
+{
+	struct cheatstore *cs = cheatstore();
+	UINT got;
+	u32 first = CHEATLIST_CKPTS_OF(start), last = (start + n) / CHEATLIST_CKPT_EVERY, k = 0;
+	if (!cs->quick_open || first > last)
+		return 0;
+	if (last - first + 1 > max)
+		last = first + max - 1;
+	u32 bytes = (last - first + 1) * sizeof(struct cheatlist_ckpt);
+	if (last >= CHEATLIST_CKPTS_OF(cheatstore_window_start(cs->windows ? cs->windows : 1u)))
+		return 0;  // past the cache's (an edit's count): none
+	if (f_lseek(&cs->quick.fil, sizeof(struct cheatlist_head) + first * sizeof(struct cheatlist_ckpt)) != FR_OK ||
+	    f_read(&cs->quick.fil, out, bytes, &got) != FR_OK || got != bytes)
+		return 0;
+	// Only those it knows, each where it says (at past entry start + n: not this window's)
+	for (u32 i = 0; i <= last - first; i++)
+		if (out[i].at == (first + i) * CHEATLIST_CKPT_EVERY + 1 && out[i].at - 1 <= start + n)
+			out[k++] = out[i];
+	return k;
+}
+
+int cheatlist_launch_entry(u32 g, struct cheatlist_entry *e)
+{
+	struct cheatstore *cs = cheatstore();
+	UINT got;
+	return cs->quick_open && f_lseek(&cs->quick.fil, cs->quick.entries_at + g * sizeof(*e)) == FR_OK &&
+	       f_read(&cs->quick.fil, e, sizeof(*e), &got) == FR_OK && got == sizeof(*e);
+}
+
+void cheatlist_launch_end(void)
+{
+	struct cheatstore *cs = cheatstore();
+	if (cs->quick_open)
+		f_close(&cs->quick.fil);
+	cs->quick_open = 0;
 }
 
 // --- Up ---------------------------------------------------------------------------------

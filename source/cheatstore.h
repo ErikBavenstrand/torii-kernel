@@ -71,6 +71,8 @@
 #define CHEATSTORE_INDEX_MAX 0x8000
 // A larger file's picks at most (the budget allows far fewer)
 #define CHEATSTORE_PICKS 512
+// The checkpoints a window (or a small file) holds at most
+#define CHEATSTORE_CKPTS (CHEATFILE_MAX / CHEATLIST_CKPT_EVERY + 1)
 
 // Settings' clean-up's walk of CHEATS_DIR: a folder open at each depth, and
 // the path it has got to
@@ -120,9 +122,29 @@ struct cheatstore {
 	struct cheatstore_pick picks[CHEATSTORE_PICKS];
 	struct cheatstore_ahead ahead;
 	FIL fil;  // a window read from the card
-	// cheatstore_clean's: each staying cheat's status and hash, as read before
-	u32 sig[CHEATFILE_MAX];
-	struct cheatstore_walk walk;  // cheatstore_clean_all's
+	u8 n_ckpt;
+	u8 sparse;  // the quick decode is on: the cache's checkpoints and entries fit the file
+	u8 quick_open;  // quick.fil is open (outside the union: never a stale byte of sig's)
+	union {
+		struct {
+			// cheatstore_clean's: each staying cheat's status and hash, as
+			// read before (and an old index's picks' hashes, as a file is
+			// indexed)
+			u32 sig[CHEATFILE_MAX];
+			struct cheatstore_walk walk;  // cheatstore_clean_all's
+		};
+		struct {
+			// A launch's quick decode (cheatstore_sparse_*), only once the
+			// file is read: the list's cache open (cheatlist_launch_begin)
+			// and where its entries start, and the window read now's
+			// checkpoints
+			struct {
+				FIL fil;
+				u32 entries_at;
+			} quick;
+			struct cheatlist_ckpt ckpt[CHEATSTORE_CKPTS];
+		};
+	};
 	// The cheat screen's Guide page (ui/ui_reading.h): a cheat's name, activation, guide, code
 	// and what decoding found
 	char detail[CHEATSTORE_DETAIL];
@@ -237,6 +259,15 @@ u32 cheatstore_rename(u32 i, const char *desc);
 u32 cheatstore_set_keys(u32 i, u16 keys);
 u32 cheatstore_set_guide(u32 i, const char *guide);
 u32 cheatstore_set_folder(u32 i, const char *folder);
+// The quick decode (cheatlist.h): on from the list cache, if it fits the
+// file read now, until cheatstore_sparse_end. cheatstore_decode_wanted
+// decodes the model read now (from where its decode stands) up to the last
+// cheat want says is needed, the others passed by from the checkpoints
+// while the quick decode is on; 0 if a cheat wasn't as the cache says (then
+// decoded in full, the quick decode off).
+void cheatstore_sparse_begin(void);
+void cheatstore_sparse_end(void);
+int cheatstore_decode_wanted(int (*want)(u32 i, void *ctx), void *ctx);
 u32 cheatstore_set_own(u32 i);
 u32 cheatstore_remove(u32 i);
 // cheatfile_can_add for the read file in its PSRAM room (CHEATFILE_EDIT_FAILED

@@ -21,6 +21,14 @@ static u8 sf_big EWRAM_BSS;     // and a copy was over its max (sf_failed too)
 static char sf_bak_path[SAFEFILE_PATH_MAX] EWRAM_BSS;
 static char sf_dir[SAFEFILE_PATH_MAX] EWRAM_BSS;
 static u8 sf_cuts EWRAM_BSS;  // safefile_write_cut: cutpoints between the steps
+// safefile_open_into's, for the main copy's scan only: the caller's buffer
+// (its reads) and where each part read goes
+static struct {
+	void *buf;
+	u32 size;
+	safefile_sink sink;
+	void *ctx;
+} sf_into EWRAM_BSS;
 
 static struct {
 	u32 limit;  // bytes of the copy to read: up to its CRC line
@@ -58,11 +66,19 @@ static int scan(const char *path, struct safefile_scan *s, u32 max)
 		sf_big = 1;
 		return 0;
 	}
+	// Through the caller's larger buffer when it takes the text too (fewer
+	// card commands), else the module's
+	u8 *buf = sf_into.sink ? sf_into.buf : sf_chunk;
+	u32 size = sf_into.sink ? sf_into.size : CHUNK, pos = 0;
 	UINT got = 0;
 	do {
-		res = f_read(&sf_file, sf_chunk, CHUNK, &got);
-		if (res == FR_OK)
-			safefile_scan_feed(s, sf_chunk, got);
+		res = f_read(&sf_file, buf, size, &got);
+		if (res == FR_OK) {
+			safefile_scan_feed(s, buf, got);
+			if (sf_into.sink && got)
+				sf_into.sink(sf_into.ctx, pos, buf, got);
+			pos += got;
+		}
 	} while (res == FR_OK && got);
 	f_close(&sf_file);
 	if (res != FR_OK) {
@@ -75,15 +91,42 @@ static int scan(const char *path, struct safefile_scan *s, u32 max)
 }
 
 // Scans path's copies and returns the one to read (safefile_pick); the scans
-// are left in sf_main and sf_bak
+// are left in sf_main and sf_bak. sf_into's sink, if any, takes the main
+// copy's text as it is scanned.
 static int pick(const char *path, const char *bak, u32 max)
 {
 	sf_failed = sf_big = 0;
 	int has_main = scan(path, &sf_main, max);
+	sf_into.sink = NULL;
 	if (has_main && sf_main.valid)
 		return SAFEFILE_MAIN;  // NAME.bak doesn't matter
 	int has_bak = scan(bak, &sf_bak, max);
 	return safefile_pick(has_main ? &sf_main : NULL, has_bak ? &sf_bak : NULL);
+}
+
+static int open_copy(const char *path, const char *bak, int from);
+
+int safefile_open_into(const char *path, u32 max, void *buf, u32 size, safefile_sink sink, void *ctx, u32 *len)
+{
+	TLOG_ASSERT(((u32)buf & 3) == 0 && size >= CHUNK);
+	char *bak = sf_bak_path;
+	*len = 0;
+	TLOG_ASSERT(!rd.open);
+	safefile_close();
+	if (!bak_name(bak, path))
+		return SAFEFILE_NONE;
+	sf_into.buf = buf;
+	sf_into.size = size;
+	sf_into.sink = sink;
+	sf_into.ctx = ctx;
+	int from = pick(path, bak, max);  // the main copy's scan feeds the sink
+	if (from != SAFEFILE_MAIN && from != SAFEFILE_HAND)
+		return open_copy(path, bak, from);  // nothing, or NAME.bak open to read
+	// NAME's text is the sink's already: up to its CRC line, or all of it
+	*len = sf_main.valid ? sf_main.body : sf_main.size;
+	if (from == SAFEFILE_HAND)
+		tlog("safefile: %s: edited by hand: read as it is", path);
+	return from;
 }
 
 int safefile_reads_bak(const char *path, u32 max)
@@ -93,14 +136,9 @@ int safefile_reads_bak(const char *path, u32 max)
 	return bak_name(bak, path) && pick(path, bak, max) == SAFEFILE_BAK;
 }
 
-int safefile_open(const char *path, u32 max)
+// Opens the copy pick chose (from) to read
+static int open_copy(const char *path, const char *bak, int from)
 {
-	char *bak = sf_bak_path;
-	TLOG_ASSERT(!rd.open);
-	safefile_close();
-	if (!bak_name(bak, path))
-		return SAFEFILE_NONE;
-	int from = pick(path, bak, max);
 	if (from == SAFEFILE_NONE) {
 		if (sf_main.size || sf_bak.size)
 			tlog_error("safefile: %s: neither copy holds up: read as empty", path);
@@ -121,6 +159,16 @@ int safefile_open(const char *path, u32 max)
 		tlog("safefile: %s: %s", path,
 		     from == SAFEFILE_BAK ? "read the backup copy" : "edited by hand: read as it is");
 	return from;
+}
+
+int safefile_open(const char *path, u32 max)
+{
+	char *bak = sf_bak_path;
+	TLOG_ASSERT(!rd.open);
+	safefile_close();
+	if (!bak_name(bak, path))
+		return SAFEFILE_NONE;
+	return open_copy(path, bak, pick(path, bak, max));
 }
 
 int safefile_line(char *buf, u32 size)

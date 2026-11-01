@@ -613,13 +613,20 @@ static void states_after_game(const struct ingame_session *h, const char *path)
 	dialog_close();
 }
 
+// The cheats Back to Torii needs decoded: a bit each (cheats_keep's)
+static int keep_wants(u32 i, void *ctx)
+{
+	const u32 *bits = ctx;
+	return i < CHEATFILE_MAX && (bits[i >> 5] >> (i & 31) & 1);
+}
+
 // cheats_keep for a larger file (cheatstore.h): each window that has listed
 // cheats in turn, its index the cheat's place in the whole file
 static void cheats_keep_windows(const struct ingame_session *h, const char *path, const struct ingame_out *out)
 {
 	struct cheatstore *cs = cheatstore();
 	struct cheatfile *f = &cs->file;
-	u32 changed = 0;
+	u32 changed = 0, wants[CHEATFILE_MAX / 32];
 	for (u32 pass = 0; pass < 2; pass++)  // drops first, so the picks after them fit
 		for (u32 k = 0; k < cheatstore_windows(); k++) {
 			u32 start = cheatstore_window_start(k), went = 0;
@@ -632,7 +639,17 @@ static void cheats_keep_windows(const struct ingame_session *h, const char *path
 				if (!went) {
 					if (!cheatstore_window_go(k))
 						return;
-					cheatstore_decode(0);
+					// The window's listed cheats decoded (the quick decode's)
+					memset(wants, 0, sizeof(wants));
+					for (u32 j = 0; j < h->cheat_count; j++) {
+						struct cheat_meta o;
+						sram_get(CHEAT_META(j), (u8 *)&o, sizeof(o));
+						SetRampage(0);
+						if (o.index >= start && o.index - start < f->count &&
+						    o.index - start < CHEATFILE_MAX)
+							wants[(o.index - start) >> 5] |= 1u << ((o.index - start) & 31);
+					}
+					cheatstore_decode_wanted(keep_wants, wants);
 					went = 1;
 				}
 				u32 i = m.index - start;
@@ -663,12 +680,13 @@ static void cheats_keep(const struct ingame_session *h, const char *path, const 
 		return;
 	}
 	if (cheatstore_windows()) {
+		cheatstore_sparse_begin();
 		cheats_keep_windows(h, path, out);
+		cheatstore_sparse_end();
 		return;
 	}
 	struct cheatstore *cs = cheatstore();
 	struct cheatfile *f = &cs->file;
-	u32 last = 0;
 	for (u32 n = 0; n < h->cheat_count; n++) {
 		struct cheat_meta m;
 		sram_get(CHEAT_META(n), (u8 *)&m, sizeof(m));
@@ -677,12 +695,20 @@ static void cheats_keep(const struct ingame_session *h, const char *path, const 
 			tlog_error("cheats: %s changed since the launch: the in-game picks are not kept", path);
 			return;
 		}
-		if (m.index + 1u > last)
-			last = m.index + 1u;
 	}
-	// Decoded up to the last listed: a pick has to fit as the cheat screen's do
-	while (cs->work.next < last && cheatfile_next(f, &cs->work) >= 0)
-		;
+	// The listed decoded (a pick has to fit as the cheat screen's do), the
+	// others passed by where the list cache's checkpoints allow
+	u32 wants[CHEATFILE_MAX / 32];
+	memset(wants, 0, sizeof(wants));
+	for (u32 n = 0; n < h->cheat_count; n++) {
+		struct cheat_meta m;
+		sram_get(CHEAT_META(n), (u8 *)&m, sizeof(m));
+		SetRampage(0);
+		wants[m.index >> 5] |= 1u << (m.index & 31);
+	}
+	cheatstore_sparse_begin();
+	cheatstore_decode_wanted(keep_wants, wants);
+	cheatstore_sparse_end();
 	u32 changed = 0;
 	for (u32 pass = 0; pass < 2; pass++)  // drops first, so the picks after them fit
 		for (u32 n = 0; n < h->cheat_count; n++) {

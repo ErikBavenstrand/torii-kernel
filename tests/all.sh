@@ -120,6 +120,7 @@ jobs=(
   "tests/library.sh 4/4"
   "tests/cheats.sh"
   "tests/cheats_big.sh"
+  "tests/cheats_quick.sh"
   "tests/cheat_safety.sh irq"
   "tests/cheat_safety.sh files"
   "tests/cheat_safety.sh rom"

@@ -848,6 +848,15 @@ static void index_build(s32 old_picks)
 	cheatlist_build_end();
 	index_write();
 }
+// safefile_open_into's sink: the main copy's text into PSRAM as it is
+// scanned, up to CHEATFILE_TEXT_MAX bytes (a longer one is refused whole)
+static void text_sink(void *ctx, u32 pos, const void *data, u32 n)
+{
+	(void)ctx;
+	if (pos + n <= CHEATFILE_TEXT_MAX)
+		cheatstore_put(CHEATS_TEXT + pos, data, n);
+}
+
 // The open copy's text into PSRAM, a part at a time (never f_read straight
 // into PSRAM: the card's DMA isn't known to reach it); its length in *len,
 // though only CHEATFILE_TEXT_MAX bytes of it go in. 0 if a read failed.
@@ -858,8 +867,7 @@ static int load_text(u32 *len)
 	*len = 0;
 	psram_begin();
 	while ((n = safefile_read_part(cs->part, sizeof(cs->part))) > 0) {
-		if (*len + (u32)n <= CHEATFILE_TEXT_MAX)
-			cheatstore_put(CHEATS_TEXT + *len, (const char *)cs->part, (u32)n);
+		text_sink(NULL, *len, cs->part, (u32)n);
 		*len += (u32)n;
 	}
 	return n == 0;
@@ -1053,10 +1061,15 @@ static int open_read(const char *rom_path)
 	cs->ahead.busy = 0;
 	cs->listed_decode = 0;
 	cs->list.valid = cs->list.on = cs->list.building = cs->list.names_full = 0;
+	cs->sparse = cs->n_ckpt = cs->quick_open = 0;  // pReadCache held anything before
 	int indexed = open_index(rom_path);
 	if (indexed != CHEATSTORE_NONE)
 		return indexed;
-	int from = safefile_open(cs->path, CHEATSTORE_FILE_MAX);
+	// The text read once: into PSRAM as the copies are scanned (read again
+	// only from NAME.bak, a broken NAME's)
+	u32 len, t0 = torii_frames;
+	psram_begin();
+	int from = safefile_open_into(cs->path, CHEATSTORE_FILE_MAX, cs->part, sizeof(cs->part), text_sink, NULL, &len);
 	if (safefile_too_big()) {
 		// A copy over a small file's read: read in windows, else neither read
 		// nor ever written over (no new file made in its place)
@@ -1079,8 +1092,9 @@ static int open_read(const char *rom_path)
 		cheatfile_begin(&cs->work);
 		return CHEATSTORE_NEW;
 	}
-	u32 len;
-	int read = load_text(&len);
+	int read = 1;
+	if (from == SAFEFILE_BAK)
+		read = load_text(&len);
 	int failed = safefile_failed();
 	safefile_close();
 	if (!read || failed) {
@@ -1100,8 +1114,11 @@ static int open_read(const char *rom_path)
 	}
 	if (!for_this_dump(rom_path, CHEATS_TEXT, len))
 		return CHEATSTORE_OTHER_DUMP;
+	u32 t1 = torii_frames;
 	cheatfile_parse(&cs->file, CHEATS_TEXT, len, cs->cheats, CHEATFILE_MAX);
 	cheatfile_begin(&cs->work);
+	tlog_debug("cheats: %s: read in %lu frames, parsed in %lu", cs->path, (unsigned long)(t1 - t0),
+		   (unsigned long)(torii_frames - t1));
 	if (cs->file.dropped) {
 		// Cheats numbered past the table: in windows, or left out
 		tlog("cheats: %s: %lu cheats numbered past %u: read again in windows", cs->path,
@@ -1144,10 +1161,119 @@ void cheatstore_decode_to(u32 i)
 int cheatstore_decode(u32 budget)
 {
 	struct cheatstore *cs = cheatstore();
-	u32 start = cycles_now();
-	while (cheatfile_next(&cs->file, &cs->work) >= 0)
+	u32 start = cycles_now(), g0 = cheatstore_window_start(cs->window);
+	// In order from the window's start: the list notes its checkpoints (not
+	// after cheatlist_apply, whose decoder never ran)
+	for (;;) {
+		if (!cs->listed_decode)
+			cheatlist_ckpt_note(g0 + cs->work.next, &cs->work.dec);
+		if (cheatfile_next(&cs->file, &cs->work) < 0)
+			return 1;
 		if (budget && cycles_since(start) > budget)
 			return cs->work.next >= cs->file.count;
+	}
+}
+
+// --- The quick decode: only the cheats a launch needs ----------------------------
+//
+// cheatlist.h says how: from the checkpoint before each run of wanted
+// cheats, the cheats between passed by, each wanted one checked against
+// the cache's entry.
+
+// The window read now's checkpoints, while the quick decode is on
+static void sparse_window(void)
+{
+	struct cheatstore *cs = cheatstore();
+	cs->n_ckpt = cs->sparse ? (u8)cheatlist_launch_ckpts(cheatstore_window_start(cs->window), cs->file.count,
+							     cs->ckpt, CHEATSTORE_CKPTS)
+				: 0;
+}
+
+void cheatstore_sparse_begin(void)
+{
+	struct cheatstore *cs = cheatstore();
+	cs->sparse = (u8)cheatlist_launch_begin();
+	sparse_window();
+}
+
+void cheatstore_sparse_end(void)
+{
+	struct cheatstore *cs = cheatstore();
+	cheatlist_launch_end();
+	cs->sparse = 0;
+	cs->n_ckpt = 0;
+}
+
+// Before the next decode: on to the last checkpoint at or before the next
+// cheat want(i) says is needed, if it is past the next cheat
+static void sparse_skip(int (*want)(u32 i, void *ctx), void *ctx)
+{
+	struct cheatstore *cs = cheatstore();
+	struct cheatfile_work *w = &cs->work;
+	u32 to = w->next, start = cheatstore_window_start(cs->window);
+	if (!cs->n_ckpt)
+		return;
+	while (to < cs->file.count && !want(to, ctx))
+		to++;
+	const struct cheatlist_ckpt *best = NULL;
+	for (u32 k = 0; k < cs->n_ckpt; k++) {
+		u32 g = cs->ckpt[k].at - 1;
+		if (g > start + w->next && g <= start + to && (!best || g > best->at - 1))
+			best = &cs->ckpt[k];
+	}
+	if (best) {
+		w->next = best->at - 1 - start;
+		w->dec = best->dec;
+	}
+}
+
+// After a quick decode of cheat i: 1 if it is what the cache says (its
+// number, status and program), as a full decode would make it; a cheat a
+// full decode finds the same as one before it (one passed by here) is made
+// so. 0 if it differs: the file is decoded in full instead.
+static int sparse_check(u32 i)
+{
+	struct cheatstore *cs = cheatstore();
+	struct cheatfile *f = &cs->file;
+	struct cheatfile_cheat *c = &cs->cheats[i];
+	struct cheatlist_entry e;
+	if (!cheatlist_launch_entry(cheatstore_window_start(cs->window) + i, &e) || e.number != c->number)
+		return 0;
+	if (c->status == CHEATFILE_OK && e.status == CHEATFILE_SAME && e.hash == c->hash) {
+		if (c->picked) {
+			f->bytes -= c->bytes;
+			f->cost -= c->cost;
+			f->patches -= c->patches;
+		}
+		c->status = CHEATFILE_SAME;
+	}
+	return e.status == c->status && (c->status != CHEATFILE_OK || e.hash == c->hash);
+}
+
+int cheatstore_decode_wanted(int (*want)(u32 i, void *ctx), void *ctx)
+{
+	struct cheatstore *cs = cheatstore();
+	u32 last = 0;
+	s32 i;
+	for (u32 n = 0; n < cs->file.count; n++)
+		if (want(n, ctx))
+			last = n + 1;
+	sparse_window();
+	while (cs->work.next < last) {
+		if (cs->sparse)
+			sparse_skip(want, ctx);
+		if ((i = cheatfile_next(&cs->file, &cs->work)) < 0)
+			break;
+		if (cs->sparse && want((u32)i, ctx) && !sparse_check((u32)i)) {
+			tlog_error("cheats: %s: cheat %lu isn't as its cache says: decoded in full", cs->path,
+				   (unsigned long)i);
+			cheatstore_sparse_end();
+			cheatstore_begin();
+			while (cs->work.next < last && cheatfile_next(&cs->file, &cs->work) >= 0)
+				;
+			return 0;
+		}
+	}
 	return 1;
 }
 
@@ -1874,20 +2000,28 @@ void cheatstore_launch_none(void)
 	ingame_cheats_clear();
 }
 
-void cheatstore_launch(const char *rom_path, u32 psram_bytes)
+// A launch decodes the picked cheats
+static int launch_wants(u32 i, void *ctx)
 {
-	if (psram_bytes) {
-		write_patches(rom_path, psram_bytes);
-		return;
-	}
-	u32 cost = CHEAT_LOAD(CHEAT_COST_CALL);
+	(void)ctx;
+	return cheatstore()->cheats[i].picked;
+}
+
+// cheatstore_launch's work: quick, from the list cache's checkpoints, or
+// every cheat up to the last pick. 0 if a quick one found a cheat that
+// isn't as the cache says (nothing kept: the caller goes again, in full).
+static int launch_pass(const char *rom_path, int quick)
+{
+	u32 cost = CHEAT_LOAD(CHEAT_COST_CALL), decoded = 0, began = torii_frames;
 	cheatstore_launch_none();
 	kept.rom = path_crc(rom_path);
 	kept.n = kept.names_used = 0;
 	if (!cheatstore_read(rom_path))
-		return;
+		return 1;
 	struct cheatstore *cs = cheatstore();
 	struct cheatfile *f = &cs->file;
+	if (quick)
+		cheatstore_sparse_begin();
 	u32 picks = cheatstore_picks(), last_window = 0;
 	for (u32 j = 0; j < cs->n_picks && cs->windows; j++)
 		if (window_of(cs->picks[j].number) > last_window)
@@ -1905,8 +2039,19 @@ void cheatstore_launch(const char *rom_path, u32 psram_bytes)
 			if (cs->cheats[n].picked)
 				last = n + 1;
 		int done = 0;
-		while ((i = cheatfile_next(f, &cs->work)) >= 0) {
+		for (;;) {
+			if (cs->sparse)
+				sparse_skip(launch_wants, NULL);
+			if ((i = cheatfile_next(f, &cs->work)) < 0)
+				break;
+			decoded++;
 			const struct cheatfile_cheat *c = &cs->cheats[i];
+			if (cs->sparse && c->picked && !sparse_check((u32)i)) {
+				tlog_error("cheats: %s: cheat %u isn't as its cache says: the launch decodes in full",
+					   cs->path, c->number);
+				cheatstore_sparse_end();
+				return 0;
+			}
 			int show = c->picked && cheatfile_shown(c) && listed < INGAME_CHEATS;
 			u8 flags = INGAME_WHY_CANT;
 			u32 bit = 0, bytes = cs->work.n_prog * 4;
@@ -1979,7 +2124,10 @@ void cheatstore_launch(const char *rom_path, u32 psram_bytes)
 				   (unsigned long)k + 1);
 			break;
 		}
+		sparse_window();
 	}
+	int was_quick = cs->sparse;
+	cheatstore_sparse_end();
 	if (cs->work.next >= f->count)
 		cheatstore_listed();  // decoded whole: the game popup's count, should the launch come back
 	u32 pick_bytes = gl_cheat_bytes;
@@ -1993,4 +2141,17 @@ void cheatstore_launch(const char *rom_path, u32 psram_bytes)
 	     cs->path, (unsigned long)picks, (unsigned long)gl_cheat_count, (unsigned long)pick_bytes,
 	     (unsigned long)(gl_cheat_count ? cost : 0), CHEAT_LOAD_MAX, (unsigned long)gl_cheat_patches,
 	     (unsigned long)listed);
+	tlog("cheats: %s: launch decoded %lu cheats%s in %lu frames", cs->path, (unsigned long)decoded,
+	     was_quick ? " (from the cache's checkpoints)" : "", (unsigned long)(torii_frames - began));
+	return 1;
+}
+
+void cheatstore_launch(const char *rom_path, u32 psram_bytes)
+{
+	if (psram_bytes) {
+		write_patches(rom_path, psram_bytes);
+		return;
+	}
+	if (!launch_pass(rom_path, 1))
+		launch_pass(rom_path, 0);
 }

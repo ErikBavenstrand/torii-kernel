@@ -36,6 +36,16 @@
 // larger than max bytes counts as missing: the file's caller knows how large
 // its text can be, and a huge hand edit would stall the menu.
 int safefile_open(const char *path, u32 max);
+// safefile_open for a caller that keeps the text whole (a cheat file into
+// PSRAM): the main copy's bytes go to sink(ctx, pos, data, n) as its scan
+// reads them, through buf (size bytes, word-aligned, at least 512), so they
+// are read from the card once, not scanned and then read again. When NAME
+// is the copy to read (SAFEFILE_MAIN, _HAND), nothing is left open and its
+// text is the first *len bytes the sink had (its CRC line came after them);
+// else (SAFEFILE_BAK open as safefile_open leaves it, or SAFEFILE_NONE) *len
+// is 0 and what the sink had is not the text.
+typedef void (*safefile_sink)(void *ctx, u32 pos, const void *data, u32 n);
+int safefile_open_into(const char *path, u32 max, void *buf, u32 size, safefile_sink sink, void *ctx, u32 *len);
 // The next line of the open copy into buf (size bytes), without its '\r' and
 // '\n', or a UTF-8 BOM before the first; the CRC line is left out. Returns its length, SAFEFILE_END after the
 // last line, or SAFEFILE_LONG for a line that doesn't fit (skipped whole).
