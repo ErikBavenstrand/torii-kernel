@@ -111,11 +111,11 @@ static u32 line_draw(struct ingame_line *l, const char *s, u32 len, u32 max_w)
 	return cut;
 }
 
-// The cheat search's number glyphs (struct ingame_glyph): 0-9, A-F and the
-// thousands separator, in the body font
+// The overlay's number glyphs (struct ingame_glyph): 0-9, A-F, the
+// thousands separator and the rest INGAME_GLYPHS lists, in the body font
 static void glyphs_draw(struct ingame_glyph *g)
 {
-	static const char chars[] = "0123456789ABCDEF -+[]";  // the space: the thousands separator's place
+	static const char chars[] = "0123456789ABCDEF -+[]/";  // the space: the thousands separator's place
 	memset(g, 0, INGAME_GLYPHS * sizeof(*g));
 	for (u32 i = 0; i < INGAME_GLYPHS; i++) {
 		const char *s = i == INGAME_GLYPH_THOUSANDS ? S(STR_FORMAT_THOUSANDS) : &chars[i];

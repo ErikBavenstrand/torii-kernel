@@ -90,7 +90,7 @@ extern uint32_t __ov_bss_start[], __ov_bss_end[];
 #define SCREEN_H 160
 #define PANEL_PAD 8
 #define ROW_H 16
-#define TITLE_GAP 4
+#define TITLE_GAP 8  // the title and the gap after it fill the panel's top 32 px (column)
 #define TEXT_TOP 2  // a line's 12 rows in a 16 px row
 #define TEXT_INSET 14  // the text's left edge in the panel
 #define PILL_INSET 4
@@ -110,17 +110,37 @@ _Static_assert(WIDE_SPRITES * 32 >= INGAME_TEXT_W, "the wide lines' sprites");
 // The cheat list: 6 rows between its title and its footer
 #define LIST_W 224
 #define LIST_ROWS 6
+// The scroll bar of a page with more rows than it shows: its sprite's left
+// edge from the panel's right (the bar's 3 px from 2 px into it), the room
+// the pill gives it, the thumb's shortest (its two ends, which can't
+// overlap their rounded rows) and the 8x16 fills between its ends
+#define BAR_RIGHT 12
+#define BAR_ROOM 10
+#define BAR_MIN 18
+#define BAR_FILLS 4
+#define BAR_TRACKS 3  // 8x32: a page's rows' height, less 2 px at each end
+#define BAR_SPRITES (2 + BAR_FILLS + BAR_TRACKS)
+_Static_assert(BAR_TRACKS * 32 >= LIST_ROWS * ROW_H - 4 && BAR_FILLS * 16 + 32 >= LIST_ROWS * ROW_H - 4,
+	       "the scroll bar's sprites");
+// The cover's strips beside the panel are 32 px wide; the panel's top 32 px
+// hold no row
+_Static_assert(PANEL_PAD + ROW_H + TITLE_GAP >= 32 && (SCREEN_W - MENU_W) / 2 <= 32 && (SCREEN_W - LIST_W) / 2 <= 32,
+	       "the cover's strips");
 
 // OBJ tiles from INGAME_OBJ_TILE: one block of solid tiles that every
 // filled shape shares (a 64x32 sprite's 32), the panel's corner, the pill's
-// end cap (8x16), the check mark, then the lines of text:
+// end cap (8x16), the check mark, the scroll bar's track (8x32), thumb and
+// thumb's rounded end (8x16 each), then the lines of text:
 // as many as each needs on the menu, SLOT_TILES each on the cheat list,
 // whose rows scroll
 #define TILE_SOLID 0
 #define TILE_CORNER 32
 #define TILE_CAP 33
 #define TILE_CHECK 35
-#define TILE_TEXT 36
+#define TILE_TRACK 36
+#define TILE_BAR 40
+#define TILE_BAR_END 42
+#define TILE_TEXT 44
 #define SLOTS_MAX 11  // the menu's title, 9 rows and footer; the list's 8
 _Static_assert(TILE_TEXT + 2 * WIDE_SPRITES * 8 + (SLOTS_MAX - 2) * SLOT_TILES <= INGAME_OBJ_MAX / 32,
 	       "the lines' tiles");
@@ -145,6 +165,18 @@ _Static_assert(TILE_TEXT + 2 * WIDE_SPRITES * 8 + (SLOTS_MAX - 2) * SLOT_TILES <
 #define SHAPE_TALL 2
 #define A1_HFLIP (1u << 12)
 #define A1_VFLIP (1u << 13)
+
+// Most of the search, and the lists' scrolling, are an extension the
+// overlay loads itself as a search page or a list that scrolls opens
+// (ext_load), after the window, so the stub's copies at every opening stay
+// as they were: each byte in the window costs the menu's opening time (the
+// search's slowed it by two frames, the scroll bar's by one). EXT code and
+// data are linked there (ov.ld's .ext); the rest may call it only while it
+// is loaded (m.ext).
+#define EXT __attribute__((section(".ext.text"), noinline))
+#define EXT_DATA __attribute__((section(".ext.data"), aligned(4)))  // sram_copy takes words
+extern uint32_t __ov_ext_start[], __ov_ext_end[];
+extern const uint32_t __ov_ext_load[];
 
 // --- State --------------------------------------------------------------------
 
@@ -236,9 +268,15 @@ enum {
 	PR_ROWS
 };
 
-// The cheat list: the kernel's entries (but their lines) and what is on
-#define LIST_FIXED 3  // "All off", "Back to my picks" and "Cheat search" before the cheats
-#define LIST_SEARCH 2
+// The cheat list: the kernel's entries (but their lines) and what is on.
+// Its rows are the entries, then its actions, in the accent as the
+// kernel's list's "+ Add code" is: the cheats show as the page opens.
+enum {
+	LIST_ALL_OFF,
+	LIST_AS_LAUNCHED,  // "Back to my picks"
+	LIST_SEARCH,
+	LIST_ACTIONS
+};
 struct cheat {
 	uint16_t cost;
 	uint8_t flags, bit;
@@ -273,6 +311,7 @@ static struct {
 	uint32_t cursor;  // a row, from 0
 	uint32_t pill_oam;
 	int pill_y, pill_to;
+	uint32_t bar_oam;  // the scroll bar's first sprite; 0: the page has none
 	int x0;  // the panel's left edge and width
 	uint32_t panel_w;
 	uint32_t oam_next;
@@ -418,6 +457,12 @@ static void obj_bank(uint32_t i, uint32_t bank)
 	*o = (uint16_t)((*o & 0x0FFF) | bank << 12);
 }
 
+static void obj_y(uint32_t i, int y)
+{
+	volatile uint16_t *o = OAM + i * 4;
+	*o = (uint16_t)((*o & ~0xFFu) | ((uint32_t)y & 0xFF));
+}
+
 static void obj_shown(uint32_t i, int shown)
 {
 	volatile uint16_t *o = OAM + i * 4;
@@ -476,25 +521,52 @@ static const uint32_t shapes[] = {
 	0x00000100u,
 	0x00000000u,
 };
-_Static_assert(sizeof(shapes) == (TILE_TEXT - TILE_CORNER) * 32, "a tile each, the cap two");
+_Static_assert(sizeof(shapes) == (TILE_TRACK - TILE_CORNER) * 32, "a tile each, the cap two");
 
-// A rectangle of solid sw x sh sprites, the last ones overlapping
-static void obj_rect(int x0, int y0, int w, int h, int sw, int sh, uint32_t shape, uint32_t size, uint32_t bank,
-		     uint32_t a0)
+// A column of solid sprites sh px tall from bottom up to top, the last
+// overlapping the one below it at the top. Where two overlap the lines cost
+// twice the sprite time (954 cycles a line with the game's H-blank free
+// set: past it the hardware drops the last sprites, the cover's, and the
+// game showed through bright), so every column overlaps at its top: the
+// panel's in its top 32 px, which hold its title and no row (TITLE_GAP).
+static void column(int x, int top, int bottom, uint32_t shape, uint32_t size, int sh, uint32_t bank, uint32_t a0)
 {
-	for (int y = y0;; y += sh) {
-		if (y > y0 + h - sh)
-			y = y0 + h - sh;
-		for (int x = x0;; x += sw) {
-			if (x > x0 + w - sw)
-				x = x0 + w - sw;
-			obj(x, y, shape, size, TILE_SOLID, bank, a0, 0);
-			if (x == x0 + w - sw)
-				break;
-		}
-		if (y == y0 + h - sh)
+	int y = bottom - sh;
+	for (; y > top; y -= sh)
+		obj(x, y, shape, size, TILE_SOLID, bank, a0, 0);
+	obj(x, top, shape, size, TILE_SOLID, bank, a0, 0);
+}
+
+// Columns of 64x32 sprites across x0..x1, the last overlapping the one
+// before it
+static void columns(int x0, int x1, int top, int bottom, uint32_t bank, uint32_t a0)
+{
+	for (int x = x0;; x += 64) {
+		x = x > x1 - 64 ? x1 - 64 : x;
+		column(x, top, bottom, SHAPE_WIDE, 3, 32, bank, a0);
+		if (x == x1 - 64)
 			break;
 	}
+}
+
+// The panel x0..x1, y0..y1: its rounded corners, its 8 px sides between
+// them and its body between those; then the cover over the game around it:
+// bands above and below it, down to and from the corners' rows, which show
+// it, and 32 px strips beside it. Never behind the panel, where it only
+// took the lines' sprite time.
+static void panel(int x0, int y0, int x1, int y1)
+{
+	obj(x0, y0, SHAPE_SQUARE, 0, TILE_CORNER, BANK_PANEL, 0, 0);
+	obj(x1 - 8, y0, SHAPE_SQUARE, 0, TILE_CORNER, BANK_PANEL, 0, A1_HFLIP);
+	obj(x0, y1 - 8, SHAPE_SQUARE, 0, TILE_CORNER, BANK_PANEL, 0, A1_VFLIP);
+	obj(x1 - 8, y1 - 8, SHAPE_SQUARE, 0, TILE_CORNER, BANK_PANEL, 0, A1_HFLIP | A1_VFLIP);
+	column(x0, y0 + 8, y1 - 8, SHAPE_TALL, 1, 32, BANK_PANEL, 0);
+	column(x1 - 8, y0 + 8, y1 - 8, SHAPE_TALL, 1, 32, BANK_PANEL, 0);
+	columns(x0 + 8, x1 - 8, y0, y1, BANK_PANEL, 0);
+	columns(0, SCREEN_W, -31, y0 + 8, BANK_DIM, A0_SEMI);
+	columns(0, SCREEN_W, y1 - 8, SCREEN_H, BANK_DIM, A0_SEMI);
+	column(x0 - 32, y0 + 8, y1 - 8, SHAPE_TALL, 3, 64, BANK_DIM, A0_SEMI);
+	column(x1, y0 + 8, y1 - 8, SHAPE_TALL, 3, 64, BANK_DIM, A0_SEMI);
 }
 
 // --- Text ---------------------------------------------------------------------
@@ -533,6 +605,52 @@ static void line_tiles(const struct slot *s, const struct ingame_line *line, uin
 	}
 }
 
+// Row bits v (bit 0 the leftmost) into l's row from pixel x on
+static void row_or(struct ingame_line *l, uint32_t row, uint32_t x, uint32_t v)
+{
+	uint32_t at = x >> 3;
+	v <<= x & 7;
+	for (; v && at < INGAME_TEXT_W / 8; at++, v >>= 8)
+		l->bits[row][at] |= (uint8_t)v;
+}
+
+static void width_to(struct ingame_line *l, uint32_t x)
+{
+	x = x < INGAME_TEXT_W ? x : INGAME_TEXT_W;
+	if (x > l->width)
+		l->width = (uint16_t)x;
+}
+
+// The check mark (shapes' TILE_CHECK) as rows of a line, bit 0 leftmost
+EXT_DATA static uint8_t check_bits[8] =  // not const: .ext.data holds writable data too
+	{0x00, 0x40, 0x60, 0x31, 0x1B, 0x0E, 0x04, 0x00};
+
+// How many of the cheats are on, as the check mark and "on/all" after l's
+// text: the cheat list's title. The extension's, as all the cheat list's
+// own code is (the list loads it)
+EXT static void count_put(struct ingame_line *l)
+{
+	uint32_t on = 0;
+	for (uint32_t e = 0; e < m.cheats; e++)
+		on += (uint32_t)bit_of(m.on, e);
+	uint32_t x = l->width + 8;
+	for (uint32_t y = 0; y < 8; y++)  // in the line's rows as the rows' marks sit in theirs
+		row_or(l, y + 4 - TEXT_TOP, x, check_bits[y]);
+	x += 11;
+	// on, the slash, all: each a digit or two (INGAME_CHEATS is 64)
+	const uint32_t g[5] = {on / 10, on % 10, INGAME_GLYPH_SLASH, m.cheats / 10, m.cheats % 10};
+	for (uint32_t i = 0; i < 5; i++) {
+		struct ingame_glyph gl;
+		if ((i == 0 || i == 3) && !g[i])
+			continue;  // no leading zero
+		sram_in(INGAME_SRAM_GLYPHS + g[i] * sizeof(gl), &gl, sizeof(gl));
+		for (uint32_t row = 0; row < INGAME_TEXT_ROWS; row++)
+			row_or(l, row, x, gl.rows[row]);
+		x += gl.width;
+	}
+	width_to(l, x);
+}
+
 // The line at sram (its place in cart SRAM; 0: none) into line
 static void line_load(uint32_t sram, struct ingame_line *line)
 {
@@ -552,7 +670,7 @@ _Static_assert(MQ_ROW_WORDS * 4 >= 3 + INGAME_TEXT_W / 8 + 1, "a step's row: a l
 // cart SRAM a step at a time: the window the stub backs up has no room to
 // spare for a copy (the menu showed a frame later with one).
 // Kept out of slot_update: the window's stack has room for one line a call
-__attribute__((noinline)) static void slot_draw_wide(const struct slot *s, uint32_t e, uint32_t px, uint32_t bank)
+EXT static void slot_draw_wide(const struct slot *s, uint32_t e, uint32_t px, uint32_t bank)
 {
 	struct ingame_line line;
 	uint32_t from = (px >> 3) & ~3u, n = INGAME_WIDE_W / 8 - from, at = (px >> 3) - from;
@@ -664,6 +782,7 @@ static void cheats_store(void)
 }
 
 // The cheat search's side of the pages (below)
+static int ext_load(void);
 static int slot_compose(uint32_t k, struct ingame_line *l);
 static int search_greyed(uint32_t r);
 static uint32_t search_row_text(uint32_t r);
@@ -688,7 +807,7 @@ static int row_greyed(uint32_t r)
 		return r + 1 != m.buffer_slot;  // only the buffer's slot loads in game
 	if (m.page >= PAGE_SEARCH)
 		return search_greyed(r);
-	return r >= LIST_FIXED && cheat_why_now(r - LIST_FIXED) != INGAME_WHY_NONE;
+	return r < m.cheats && cheat_why_now(r) != INGAME_WHY_NONE;
 }
 
 // The buffer holds a state saved in game that the card hasn't
@@ -715,10 +834,10 @@ static uint32_t row_text(uint32_t r)
 	if (m.page >= PAGE_SEARCH)
 		return search_row_text(r);
 	if (m.page == PAGE_CHEATS)
-		return r == 0             ? text_at(INGAME_TEXT_ALL_OFF)
-		       : r == 1           ? text_at(INGAME_TEXT_AS_LAUNCHED)
-		       : r == LIST_SEARCH ? text_at(INGAME_TEXT_SEARCH)
-					  : INGAME_SRAM_SESSION + INGAME_SESSION_CHEAT(r - LIST_FIXED);
+		return r < m.cheats                       ? INGAME_SRAM_SESSION + INGAME_SESSION_CHEAT(r)
+		       : r == m.cheats + LIST_ALL_OFF     ? text_at(INGAME_TEXT_ALL_OFF)
+		       : r == m.cheats + LIST_AS_LAUNCHED ? text_at(INGAME_TEXT_AS_LAUNCHED)
+							  : text_at(INGAME_TEXT_SEARCH);
 	uint32_t kind = m.kinds[r];
 	if (kind == ROW_TORII && unsaved_text())
 		return text_at(INGAME_TEXT_TORII_SAVE);
@@ -748,8 +867,8 @@ static uint32_t footer_text(void)
 									    : INGAME_TEXT_STATE_EMPTY);
 	// A cheat's reason it can't change, else its activation's sentence
 	uint32_t why = INGAME_WHY_NONE;
-	if (m.cursor >= LIST_FIXED) {
-		uint32_t e = m.cursor - LIST_FIXED;
+	if (m.cursor < m.cheats) {
+		uint32_t e = m.cursor;
 		if (m.once == e + 1)
 			return text_at(INGAME_TEXT_ONCE_QUEUED);
 		if (cheat_once_ok(e))
@@ -822,6 +941,8 @@ __attribute__((noinline)) static void slot_draw(uint32_t k, uint32_t bank)
 	struct ingame_line line;
 	if (m.page < PAGE_SEARCH || !slot_compose(k, &line))  // the extension only on its pages
 		line_load(slot_text(k), &line);
+	if (m.page == PAGE_CHEATS && k == 0)
+		count_put(&line);
 	line_tiles(&m.slots[k], &line, bank);
 }
 
@@ -832,18 +953,20 @@ static void slot_update(uint32_t k)
 	// The Save state page's row for the slot in the buffer (the one Load
 	// state gives back) in the accent
 	int current = m.page == PAGE_SAVE && r >= 0 && (uint32_t)r + 1 == m.buffer_slot;
+	// and the cheat list's actions
+	current |= m.page == PAGE_CHEATS && r >= (int)m.cheats;
 	uint32_t bank = (m.title && k == 0) || current         ? BANK_TITLE
 			: m.footer && k == m.title + m.visible ? BANK_FAINT
 			: r >= 0 && row_greyed((uint32_t)r)    ? BANK_FAINT
 							       : BANK_TEXT;
 	if ((m.mq == MQ_RUN || m.mq == MQ_END) && r >= 0 && (uint32_t)r == m.cursor) {
-		slot_draw_wide(s, m.cursor - LIST_FIXED, m.mq_px, bank);
+		slot_draw_wide(s, m.cursor, m.mq_px, bank);
 	} else {
 		slot_draw(k, bank);
 	}
 	if (s->check) {
 		uint32_t o = s->check - 1u;
-		int on = r >= (int)LIST_FIXED && bit_of(m.on, (uint32_t)r - LIST_FIXED);
+		int on = r >= 0 && (uint32_t)r < m.cheats && bit_of(m.on, (uint32_t)r);
 		obj_shown(o, on && m.text_shown);
 		if (on)
 			obj_bank(o, row_greyed((uint32_t)r) ? BANK_FAINT : BANK_TITLE);
@@ -863,10 +986,29 @@ static int row_y(uint32_t r)
 
 static void pill_place(int y)
 {
-	for (uint32_t i = 0; i < 2 + PILL_FILLS; i++) {
-		volatile uint16_t *o = OAM + (m.pill_oam + i) * 4;
-		*o = (uint16_t)((*o & ~0xFFu) | ((uint32_t)y & 0xFF));
-	}
+	for (uint32_t i = 0; i < 2 + PILL_FILLS; i++)
+		obj_y(m.pill_oam + i, y);
+}
+
+// The scroll bar's sprites in their places for the rows shown: the thumb
+// as long as the page is of the rows, where the top row is among them, on
+// a track the rows' height. An extension's (EXT): a page has a bar only with it loaded
+EXT static void bar_place(void)
+{
+	uint32_t next = m.oam_next;
+	uint32_t len = m.visible * ROW_H - 4, t = len * m.visible / m.rows;  // unsigned: no signed division linked
+	t = t < BAR_MIN ? BAR_MIN : t;
+	int top = m.slots[m.title].y + 2, x = m.x0 + (int)m.panel_w - BAR_RIGHT;
+	int y = top + (int)((len - t) * m.top / (m.rows - m.visible));
+	m.oam_next = m.bar_oam;
+	obj(x, y, SHAPE_TALL, 0, TILE_BAR_END, BANK_TITLE, 0, 0);
+	obj(x, y + (int)t - 16, SHAPE_TALL, 0, TILE_BAR_END, BANK_TITLE, 0, A1_VFLIP);
+	for (int k = 0, at = y + 16; k < BAR_FILLS; k++, at += 16)
+		obj(x, at < y + (int)t - 32 ? at : y + (int)t - 32, SHAPE_TALL, 0, TILE_BAR, BANK_TITLE,
+		    at < y + (int)t - 16 ? 0 : A0_HIDE, 0);
+	for (uint32_t k = 0; k < BAR_TRACKS; k++)
+		obj(x, top + (int)(k * 32 < len - 32 ? k * 32 : len - 32), SHAPE_TALL, 1, TILE_TRACK, BANK_PILL, 0, 0);
+	m.oam_next = next;
 }
 
 static int state_saved(void)
@@ -953,17 +1095,21 @@ static void build_page(enum page_id page, uint32_t cursor)
 		m.footer = 1;
 		panel_w = LIST_W;
 	} else {
-		m.rows = LIST_FIXED + m.cheats;
+		m.rows = m.cheats + LIST_ACTIONS;
 		m.visible = m.rows < LIST_ROWS ? m.rows : LIST_ROWS;
 		m.title = 1;
 		m.footer = 1;
 		panel_w = LIST_W;
 	}
+	uint32_t bar = page != PAGE_MENU && m.rows > m.visible && ext_load();  // its code is the extension's
 	uint32_t h = PANEL_PAD * 2 + (m.title ? ROW_H + TITLE_GAP : 0) + (m.visible + m.footer) * ROW_H;
 	int x0 = (SCREEN_W - (int)panel_w) / 2, y0 = (SCREEN_H - (int)h) / 2;
 	uint32_t slots = m.title + m.visible + m.footer;
 
-	tiles_need(TILE_TEXT);
+	// The lines' tiles from the scroll bar's, or in their place when the
+	// page has none: the menu, whose opening has no time to back up more
+	uint32_t base = bar ? TILE_TEXT : TILE_TRACK;
+	tiles_need(base);
 	uint16_t colour[BANKS];
 	for (uint32_t i = 0; i < BANKS; i++)
 		colour[i] = fallback_colours[i];
@@ -981,13 +1127,19 @@ static void build_page(enum page_id page, uint32_t cursor)
 		t[i] = 0x11111111u;
 	for (uint32_t i = 0; i < sizeof(shapes) / 4; i++)
 		t[TILE_CORNER * 8 + i] = shapes[i];
+	// The scroll bar's, as the kernel's lists' (ui_widgets.c): the track a
+	// 1 px line, the thumb 3 px around it, its end's first row that line's
+	for (uint32_t i = (TILE_TRACK - TILE_CORNER) * 8; i < (base - TILE_CORNER) * 8; i++)
+		t[TILE_CORNER * 8 + i] = i < (TILE_BAR - TILE_CORNER) * 8 || i == (TILE_BAR_END - TILE_CORNER) * 8
+						 ? 0x00001000u
+						 : 0x00011100u;
 
 	// Sprites, front to back: text and check marks (hidden until drawn),
-	// the pill, the panel, the cover
+	// the scroll bar, the pill, the panel, the cover
 	hide_all();
 	m.oam_next = 0;
 	int y = y0 + PANEL_PAD;
-	uint32_t tile = TILE_TEXT;
+	uint32_t tile = base;
 	for (uint32_t k = 0; k < slots; k++) {
 		struct slot *sl = &m.slots[k];
 		sl->y = (uint8_t)y;
@@ -1012,8 +1164,8 @@ static void build_page(enum page_id page, uint32_t cursor)
 			uint32_t most = wide ? WIDE_SPRITES : SLOT_SPRITES;
 			max = (w + 31) / 32;
 			max = max < 1 ? 1 : max > most ? most : max;
-		} else if (m.footer && k == m.title + m.visible)
-			max = WIDE_SPRITES;  // the list's footer: a line of the menu's width (an activation's sentence)
+		} else if ((m.footer && k == m.title + m.visible) || (page == PAGE_CHEATS && k == 0))
+			max = WIDE_SPRITES;  // the list's footer: a line of the menu's width (an activation's sentence); the cheat list's title with its count
 		sl->max = (uint8_t)max;
 		tile += max * 8;
 		// Its sprites' places in OAM, kept for build_text: the panel
@@ -1028,14 +1180,18 @@ static void build_page(enum page_id page, uint32_t cursor)
 	}
 	m.x0 = x0;
 	m.panel_w = panel_w;
+	m.bar_oam = bar * m.oam_next;
+	m.oam_next += bar * BAR_SPRITES;
 	m.cursor = cursor < m.rows ? cursor : 0;
 	if (page == PAGE_MENU && row_greyed(m.cursor))
 		m.cursor = next_row(m.cursor, 1);
 	if (m.cursor >= m.top + m.visible)
 		m.top = m.cursor - m.visible + 1;
 	m.pill_y = m.pill_to = row_y(m.cursor);
+	if (bar)
+		bar_place();
 	m.pill_oam = m.oam_next;
-	int pill_x = x0 + PILL_INSET, pill_w = (int)panel_w - 2 * PILL_INSET;
+	int pill_x = x0 + PILL_INSET, pill_w = (int)panel_w - 2 * PILL_INSET - (int)bar * BAR_ROOM;
 	obj(pill_x, m.pill_y, SHAPE_TALL, 0, TILE_CAP, BANK_PILL, 0, 0);
 	obj(pill_x + pill_w - 8, m.pill_y, SHAPE_TALL, 0, TILE_CAP, BANK_PILL, 0, A1_HFLIP);
 	// The widest pill's fills, those this one doesn't need hidden
@@ -1044,15 +1200,7 @@ static void build_page(enum page_id page, uint32_t cursor)
 		int at = x > pill_x + pill_w - 8 - 32 ? pill_x + pill_w - 8 - 32 : x;
 		obj(at, m.pill_y, SHAPE_WIDE, 2, TILE_SOLID, BANK_PILL, k < fills ? 0 : A0_HIDE, 0);
 	}
-	int x1 = x0 + (int)panel_w, y1 = y0 + (int)h;
-	obj(x0, y0, SHAPE_SQUARE, 0, TILE_CORNER, BANK_PANEL, 0, 0);
-	obj(x1 - 8, y0, SHAPE_SQUARE, 0, TILE_CORNER, BANK_PANEL, 0, A1_HFLIP);
-	obj(x0, y1 - 8, SHAPE_SQUARE, 0, TILE_CORNER, BANK_PANEL, 0, A1_VFLIP);
-	obj(x1 - 8, y1 - 8, SHAPE_SQUARE, 0, TILE_CORNER, BANK_PANEL, 0, A1_HFLIP | A1_VFLIP);
-	obj_rect(x0 + 8, y0, (int)panel_w - 16, 8, 32, 8, SHAPE_WIDE, 1, BANK_PANEL, 0);
-	obj_rect(x0 + 8, y1 - 8, (int)panel_w - 16, 8, 32, 8, SHAPE_WIDE, 1, BANK_PANEL, 0);
-	obj_rect(x0, y0 + 8, (int)panel_w, (int)h - 16, 64, 32, SHAPE_WIDE, 3, BANK_PANEL, 0);
-	obj_rect(0, 0, SCREEN_W, SCREEN_H, 64, 32, SHAPE_WIDE, 3, BANK_DIM, A0_SEMI);
+	panel(x0, y0, x0 + (int)panel_w, y0 + (int)h);
 	m.text_shown = 0;
 	m.tiles_end = tile;
 }
@@ -1089,6 +1237,25 @@ static void wait_release(uint32_t mask)
 
 static void marquee_start(void);
 
+// Logs that page is drawn, as "screen ready: ingame-cheats" (the goldens
+// wait for it): one prefix, and the pages' ends in enum page_id's order
+static void screen_ready(enum page_id page)
+{
+	static const char ends[] = "\0-cheats\0-save\0-load\0-search\0-search-list\0-search-pick\0-search-pointers";
+	const char *end = ends, *head = "screen ready: ingame";
+	for (uint32_t i = 0; i < page; i++)
+		while (*end++)
+			;
+	char line[40];
+	uint32_t n = 0;
+	while (*head)
+		line[n++] = *head++;
+	while (*end)
+		line[n++] = *end++;
+	line[n] = 0;
+	debug_print(line);
+}
+
 // Opens page at row cursor: the panel this frame, its text the next
 static void page_open(enum page_id page, uint32_t cursor)
 {
@@ -1099,20 +1266,8 @@ static void page_open(enum page_id page, uint32_t cursor)
 	build_page(page, cursor);
 	build_text(0, m.title + m.visible + m.footer);
 	marquee_start();
-	if (page == PAGE_CHEATS)
-		debug_print("screen ready: ingame-cheats");
-	else if (page == PAGE_SAVE)
-		debug_print("screen ready: ingame-save");
-	else if (page == PAGE_LOAD)
-		debug_print("screen ready: ingame-load");
-	else if (page == PAGE_SEARCH)
-		debug_print("screen ready: ingame-search");
-	else if (page == PAGE_LIST)
-		debug_print("screen ready: ingame-search-list");
-	else if (page == PAGE_PICK)
-		debug_print("screen ready: ingame-search-pick");
-	else if (page == PAGE_PTRS)
-		debug_print("screen ready: ingame-search-pointers");
+	if (page != PAGE_MENU)  // the menu's callers log it once its notices are in
+		screen_ready(page);
 }
 
 // The cursor's row's slot, or -1 when it isn't shown
@@ -1136,15 +1291,15 @@ static void marquee_start(void)
 	m.mq = MQ_OFF;
 	m.mq_px = 0;
 	m.mq_wait = MQ_DELAY;
-	if (m.page == PAGE_CHEATS && m.cursor >= LIST_FIXED &&
-	    (m.cheat[m.cursor - LIST_FIXED].flags & INGAME_CHEAT_CUT))
+	if (m.page == PAGE_CHEATS && m.cursor < m.cheats && (m.cheat[m.cursor].flags & INGAME_CHEAT_CUT))
 		m.mq = MQ_WAIT;
 }
 
-// A frame of the marquee
-static void marquee_tick(void)
+// A frame of the marquee (the cheat list's: the extension's; called only
+// while it runs)
+EXT static void marquee_tick(void)
 {
-	if (m.mq == MQ_OFF || !m.text_shown)
+	if (!m.text_shown)
 		return;
 	if (m.mq_wait) {
 		m.mq_wait--;
@@ -1162,7 +1317,7 @@ static void marquee_tick(void)
 	}
 	if (m.mq == MQ_WAIT) {
 		uint32_t head = 0;
-		sram_in(INGAME_SRAM_WIDE + (m.cursor - LIST_FIXED) * sizeof(struct ingame_wide), &head, 4);
+		sram_in(INGAME_SRAM_WIDE + m.cursor * sizeof(struct ingame_wide), &head, 4);
 		m.mq_width = head & 0xFFFF;
 		if (m.mq_width <= INGAME_ROW_W || m.mq_width > INGAME_WIDE_W) {
 			m.mq = MQ_OFF;
@@ -1180,6 +1335,46 @@ static void marquee_tick(void)
 	slot_update((uint32_t)k);
 }
 
+// Scrolls the rows to top. Drawing every row's line takes longer than a
+// VBlank, and the footer, drawn last, showed half drawn: a step of less
+// than a page moves the rows' slots (sprites and tiles) with their lines
+// and draws only the rows that come in; a longer one draws them all.
+// Either way a row's sprites are hidden until its line is drawn, so it
+// shows a frame late at worst, never half drawn. An extension's: without it
+// (it didn't load) every row is drawn again.
+EXT static void rows_scroll(uint32_t top)
+{
+	uint32_t n = m.visible, down = top > m.top, step = down ? top - m.top : m.top - top;
+	struct slot *row = &m.slots[m.title], was[LIST_ROWS];
+	m.top = top;
+	if (step < n && n <= LIST_ROWS) {  // only the lists scroll
+		// Each place takes the slot of the row now in it, keeping its y;
+		// the rows that left give theirs to the rows that come in
+		memcpy(was, row, n * sizeof(*row));
+		for (uint32_t j = 0; j < n; j++) {
+			row[j] = was[(j + (down ? step : n - step)) % n];
+			row[j].y = was[j].y;
+		}
+	}
+	for (uint32_t j = 0; j < n; j++) {
+		const struct slot *sl = &row[j];
+		int in = step >= n || (down ? j >= n - step : j < step);
+		for (uint32_t k = 0; k < sl->max; k++) {
+			obj_y(sl->oam + k, sl->y);
+			if (in)
+				obj_shown(sl->oam + k, 0);
+		}
+		if (sl->check) {
+			obj_y(sl->check - 1u, sl->y + 4);
+			if (in)
+				obj_shown(sl->check - 1u, 0);
+		}
+	}
+	for (uint32_t j = 0; j < n; j++)
+		if (step >= n || (down ? j >= n - step : j < step))
+			slot_update(m.title + j);
+}
+
 // Moves the cursor to row r, scrolling the list to show it
 static void cursor_to(uint32_t r)
 {
@@ -1194,27 +1389,35 @@ static void cursor_to(uint32_t r)
 		top = r;
 	else if (r >= top + m.visible)
 		top = r - m.visible + 1;
+	// The footer first: it is lowest on screen, so drawn first it is done
+	// before the display reaches it
+	if (m.footer && (m.page != PAGE_MENU || menu_footer() != footer))
+		slot_update(m.title + m.visible);
 	if (top != m.top) {
-		m.top = top;
-		slots_update();  // the rows' lines in their slots again
+		if (m.ext) {
+			rows_scroll(top);
+		} else {
+			m.top = top;
+			slots_update();
+		}
+		if (m.bar_oam)
+			bar_place();
 		m.pill_y = row_y(r);  // the pill jumps with the scroll
 		pill_place(m.pill_y);
-	} else if (m.footer && (m.page != PAGE_MENU || menu_footer() != footer)) {
-		slot_update(m.title + m.visible);
 	}
 	m.pill_to = row_y(r);
 	marquee_start();
 }
 
-// A on the cheat list's row r
-static void list_pick(uint32_t r)
+// A on the cheat list's row r (the extension's)
+EXT static void list_pick(uint32_t r)
 {
-	if (r == 0 || r == 1) {
+	if (r >= m.cheats) {
 		for (uint32_t e = 0; e < m.cheats; e++)
 			if (cheat_why(e) == INGAME_WHY_NONE && (m.cheat[e].flags & INGAME_CHEAT_TABLE))
-				bit_set(m.on, e, r == 1 && bit_of(m.launched, e));
+				bit_set(m.on, e, r == m.cheats + LIST_AS_LAUNCHED && bit_of(m.launched, e));
 	} else {
-		uint32_t e = r - LIST_FIXED;
+		uint32_t e = r;
 		if (cheat_why_now(e) != INGAME_WHY_NONE || !(m.cheat[e].flags & INGAME_CHEAT_TABLE))
 			return;
 		bit_set(m.on, e, !bit_of(m.on, e));
@@ -1222,20 +1425,16 @@ static void list_pick(uint32_t r)
 	if (m.once && !cheat_once_ok(m.once - 1))
 		m.once = 0;  // on now: it runs anyway
 	cheats_store();
-	slots_update();  // the greyed rows change with what is on
+	// The footer first (see cursor_to), then the title's count and the
+	// rows, greyed with what is on: their lines are as they were
+	slot_update(m.title + m.visible);
+	for (uint32_t k = 0; k < m.title + m.visible; k++)
+		slot_update(k);
 }
 
 // --- The cheat search (v0.9) -------------------------------------------------
 
-// Most of the search is an extension the overlay loads itself as the search
-// page opens (ext_load), after the window, so the stub's copies at every
-// opening stay as they were: in the window it slowed the menu's opening by
-// two frames. EXT code and data are linked there (ov.ld's .ext); the rest
-// may call it only while it is loaded (a search page is open).
-#define EXT __attribute__((section(".ext.text"), noinline))
-#define EXT_DATA __attribute__((section(".ext.data"), aligned(4)))  // sram_copy takes words
-extern uint32_t __ov_ext_start[], __ov_ext_end[];
-extern const uint32_t __ov_ext_load[];
+// Most of the search is an extension (EXT, above).
 // The ARM code run from IWRAM (the screenshot's packer, the search's
 // compare), after the extension in the image: iwram_borrow reads it from
 // cart SRAM into the IWRAM it borrows
@@ -1303,22 +1502,6 @@ EXT static void line_read(uint32_t t, struct ingame_line *l)
 		sram_in(text_at(t), l, sizeof(*l));
 	else
 		memset(l, 0, sizeof(*l));
-}
-
-// Row bits v (bit 0 the leftmost) into l's row from pixel x on
-EXT static void row_or(struct ingame_line *l, uint32_t row, uint32_t x, uint32_t v)
-{
-	uint32_t at = x >> 3;
-	v <<= x & 7;
-	for (; v && at < INGAME_TEXT_W / 8; at++, v >>= 8)
-		l->bits[row][at] |= (uint8_t)v;
-}
-
-EXT static void width_to(struct ingame_line *l, uint32_t x)
-{
-	x = x < INGAME_TEXT_W ? x : INGAME_TEXT_W;
-	if (x > l->width)
-		l->width = (uint16_t)x;
 }
 
 // src's pixels ORed into l from pixel x on
@@ -2243,7 +2426,7 @@ EXT static void search_back(void)
 	} else if (m.page == PAGE_LIST) {
 		page_open(PAGE_SEARCH, SR_SHOW);
 	} else if (m.search_from == PAGE_CHEATS) {
-		page_open(PAGE_CHEATS, LIST_SEARCH);
+		page_open(PAGE_CHEATS, m.cheats + LIST_SEARCH);
 	} else {
 		uint32_t back = 0;
 		for (uint32_t r = 0; r < ROW_KINDS; r++)
@@ -2269,7 +2452,8 @@ static uint32_t run(uint32_t menu_key)
 			m.pill_y += step ? step : (m.pill_to > m.pill_y ? 1 : -1);
 			pill_place(m.pill_y);
 		}
-		marquee_tick();
+		if (m.mq != MQ_OFF)
+			marquee_tick();
 		uint32_t keys = keys_held(), down = keys & ~prev;
 		uint32_t move = keys & (KEY_UP | KEY_DOWN | KEY_LEFT | KEY_RIGHT);
 		held_for = move && (move & prev) ? held_for + 1 : 0;
@@ -2313,16 +2497,15 @@ static uint32_t run(uint32_t menu_key)
 				r = r + m.visible < m.rows ? r + m.visible : m.rows - 1;
 			cursor_to(r);
 		}
-		if ((down & KEY_SELECT) && m.page == PAGE_CHEATS && m.cursor >= LIST_FIXED &&
-		    cheat_once_ok(m.cursor - LIST_FIXED)) {
-			uint32_t e = m.cursor - LIST_FIXED;
+		if ((down & KEY_SELECT) && m.page == PAGE_CHEATS && m.cursor < m.cheats && cheat_once_ok(m.cursor)) {
+			uint32_t e = m.cursor;
 			m.once = m.once == e + 1 ? 0 : e + 1;
 			if (m.footer)
 				slot_update(m.title + m.visible);
 			continue;
 		}
 		if (down & KEY_A) {
-			if (m.page == PAGE_CHEATS && m.cursor == LIST_SEARCH) {
+			if (m.page == PAGE_CHEATS && m.cursor == m.cheats + LIST_SEARCH) {
 				search_open(PAGE_CHEATS);
 				continue;
 			}
@@ -2384,12 +2567,13 @@ static uint32_t run(uint32_t menu_key)
 					debug_take();
 				m.flags |= NOTICE_DEBUG;
 				page_open(PAGE_MENU, 0);
-				debug_print("screen ready: ingame");
+				screen_ready(PAGE_MENU);
 				continue;
 			}
 			if (kind == ROW_CHEATS) {
 				if (m.cheats) {
-					page_open(PAGE_CHEATS, LIST_FIXED);
+					if (ext_load())  // the list's code
+						page_open(PAGE_CHEATS, 0);
 				} else {
 					volatile uint8_t *onoff = (volatile uint8_t *)INGAME_CHEAT_ONOFF;
 					*onoff = *onoff == 1 ? 0 : 1;
@@ -2818,7 +3002,7 @@ uint32_t ov_entry(const struct ingame_call *call)
 	vsync();
 	ov_header.shown = 2;
 	build_text(first, rows + m.footer);
-	debug_print("screen ready: ingame");
+	screen_ready(PAGE_MENU);
 
 	wait_release(menu_key);
 	uint32_t act = run(menu_key);
