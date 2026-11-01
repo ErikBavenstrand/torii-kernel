@@ -30,6 +30,9 @@ git log, not here.
   Gifts, Legends, Tickets, Unlock), as the game's scrolling list with page
   jumps. The Shop opens the game's own marts; Moves is gone. B, not A,
   opens it, as A first talks to what is in front (0a00ed28, 12f49636).
+- **Changed:** Emerald's menu Tickets sets each Mystery Gift's received
+  flag too, and its guide says the ferry sails only after the credits
+  (872684c0).
 - **Fixed:** Emerald's menu Legends brings Deoxys back (its battled flag
   too), Groudon and Kyogre through their abnormal weather on a named route,
   and the roaming Latias or Latios; each says where it waits (3c4e5f3a).
