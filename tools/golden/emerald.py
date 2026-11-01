@@ -114,6 +114,10 @@ OP = {
     "checkitem": 0x47,
     "givemon": 0x79,
     "giveegg": 0x7A,
+    "setmonmove": 0x7B,
+    "setmodernfatefulencounter": 0xCD,
+    "setmonmetlocation": 0xD2,
+    "specialvar": 0x26,
     "bufferspeciesname": 0x7D,
     "pokemart": 0x86,
     "pokemartdecoration": 0x87,
@@ -128,6 +132,7 @@ SPECIAL = {  # indexes into gSpecials (0x081DBA64), counted from 0
     "AccessHallOfFamePC": 0x10A,
     "CallFrontierUtilFunc": 0xEA,
     "ExitSafariMode": 0xD1,
+    "CalculatePlayerPartyCount": 0x86,
 }
 HOW_MAY_I_SERVE_YOU = 0x08272A2A  # gText_HowMayIServeYou past its "Welcome!" page
 # The game's PC (data/scripts/pc.inc), for the menu's copy of it
@@ -526,19 +531,27 @@ def species(name):
     raise KeyError(name)
 
 
-GIFTS = [  # name, species, level (0: an egg)
-    ("TREECKO", "TREECKO", 5),
-    ("TORCHIC", "TORCHIC", 5),
-    ("MUDKIP", "MUDKIP", 5),
-    ("CHIKORITA", "CHIKORITA", 5),
-    ("CYNDAQUIL", "CYNDAQUIL", 5),
-    ("TOTODILE", "TOTODILE", 5),
-    ("BELDUM", "BELDUM", 5),
-    ("CASTFORM", "CASTFORM", 25),
-    ("LILEEP", "LILEEP", 20),
-    ("ANORITH", "ANORITH", 20),
-    ("WYNAUT EGG", "WYNAUT", 0),
+GIFTS = [  # name, species, level (0: an egg), held item: as the game's own gift scripts give them
+    ("TREECKO", "TREECKO", 5, None),
+    ("TORCHIC", "TORCHIC", 5, None),
+    ("MUDKIP", "MUDKIP", 5, None),
+    ("CHIKORITA", "CHIKORITA", 5, None),
+    ("CYNDAQUIL", "CYNDAQUIL", 5, None),
+    ("TOTODILE", "TOTODILE", 5, None),
+    ("BELDUM", "BELDUM", 5, None),
+    ("CASTFORM", "CASTFORM", 25, "MYSTIC_WATER"),
+    ("LILEEP", "LILEEP", 20, None),
+    ("ANORITH", "ANORITH", 20, None),
+    ("WYNAUT EGG", "WYNAUT", 0, None),
+    (
+        "PICHU EGG",
+        "PICHU",
+        0,
+        None,
+    ),  # the Pokémon Center's Mystery Gift: Surf, a fateful encounter
 ]
+MOVE_SURF = 57
+METLOC_FATEFUL_ENCOUNTER = 0xFF
 
 
 # The game's own names, which the menus' lists point at instead of copies
@@ -813,7 +826,7 @@ def warp_section(m, back):
 
 @section(
     "Gifts",
-    "The game's gift Pokémon and eggs, again: the starters, fossils, Castform, Beldum and more.",
+    "The game's gift Pokémon and eggs, again: the starters, fossils, Castform, Beldum, the Wynaut egg and the Mystery Gift's Surfing Pichu egg.",
 )
 def gifts_section(m, back):
     s = m.s
@@ -821,18 +834,33 @@ def gifts_section(m, back):
         "gifts",
         [
             (species_name(sp) if level else n, f"gf{i}")
-            for i, (n, sp, level) in enumerate(GIFTS)
+            for i, (n, sp, level, _) in enumerate(GIFTS)
         ],
         back,
     )
-    for i, (_, sp, level) in enumerate(GIFTS):
+    for i, (_, sp, level, item) in enumerate(GIFTS):
         s.label(f"gf{i}")
-        if level:
+        if sp == "PICHU":
+            # MysteryGiftScript_SurfPichu's egg: into the party only (its
+            # slot then takes Surf), as the gift asks for a free place
+            s.cmd(
+                "specialvar",
+                ("h", VAR_8000),
+                ("h", SPECIAL["CalculatePlayerPartyCount"]),
+            )
+            s.when(VAR_8000, 6, "party_full")
+            s.cmd("giveegg", ("h", species(sp)))
+            s.cmd("setmodernfatefulencounter", ("h", VAR_8000))
+            s.cmd("setmonmetlocation", ("h", VAR_8000), ("b", METLOC_FATEFUL_ENCOUNTER))
+            s.cmd(
+                "setmonmove", ("b", 7), ("b", 2), ("h", MOVE_SURF)
+            )  # past 6: the party's last
+        elif level:
             s.cmd(
                 "givemon",
                 ("h", species(sp)),
                 ("b", level),
-                ("h", 0),
+                ("h", ITEM[item] if item else 0),
                 ("w", 0),
                 ("w", 0),
                 ("b", 0),
@@ -841,6 +869,7 @@ def gifts_section(m, back):
             s.cmd("giveegg", ("h", species(sp)))
         s.when(VAR_RESULT, 2, "full")
         s.cmd("bufferspeciesname", ("b", 0), ("h", species(sp)))
+        s.when(VAR_RESULT, 1, "pc_egg" if not level else "pc_mon")
         s.say(
             m.t(
                 "{PLAYER} received an EGG!"
@@ -849,8 +878,17 @@ def gifts_section(m, back):
             )
         )
         s.goto("gifts")
+    s.label("pc_mon")
+    s.say(m.t("{STR1} was sent to the PC."))
+    s.goto("gifts")
+    s.label("pc_egg")
+    s.say(m.t("The EGG was sent to the PC."))
+    s.goto("gifts")
     s.label("full")
     s.say(m.t("There is no room for it."))
+    s.goto("gifts")
+    s.label("party_full")
+    s.say(m.t("This EGG needs a place\nin your party."))
     s.goto("gifts")
     return "GIFTS", "gifts"
 
