@@ -13,6 +13,13 @@ git log, not here.
   every row over four frames, and a cursor step showed a frame with no
   highlight. A scroll now moves the rows in VRAM and draws only what
   changed, and the engine commits strided copies in one VBlank (1d3cd617).
+- **Fixed:** the in-game menu no longer lets the game show through bright
+  near its bottom: the dark cover and the panel took more sprite time than a
+  line has when the game sets H-blank free; and a list's scroll no longer
+  shows a half-drawn row or footer for a frame (d987826f).
+- **Changed:** the in-game lists that scroll have a scroll bar; the cheat
+  list shows the cheats first, its actions after them in the accent, and how
+  many cheats are on in its title (d987826f).
 
 ## v0.9.13
 
