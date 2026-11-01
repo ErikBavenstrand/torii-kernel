@@ -936,8 +936,10 @@ static const struct ui_view_spec gv_view = {"cheat-guide", gv_nodes, CS_NODES, C
 static void detail_add(u32 *n, const char *s, u32 len)
 {
 	char *d = cheatstore()->detail;
-	if (*n + len >= CHEATSTORE_DETAIL)
-		len = CHEATSTORE_DETAIL - 1 - *n;
+	if (*n >= CHEATSTORE_DETAIL - 1)
+		return;  // full
+	if (len > CHEATSTORE_DETAIL - 1 - *n)
+		len = CHEATSTORE_DETAIL - 1 - *n;  // never *n + len, which a huge len wraps
 	memcpy(d + *n, s, len);
 	*n += len;
 	d[*n] = 0;

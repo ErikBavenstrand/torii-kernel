@@ -299,11 +299,18 @@ class Merge(unittest.TestCase):
         )
         self.assertEqual(old[0].extra, {"keys": "hold L", "guide": "Mine"})
         database = [
-            cheats.Cheat("Warp", "32001000 0009", False, {"keys": "hold L+R", "guide": "Hold L and R.\\nThen walk."}),
+            cheats.Cheat(
+                "Warp",
+                "32001000 0009",
+                False,
+                {"keys": "hold L+R", "guide": "Hold L and R.\\nThen walk."},
+            ),
             cheats.Cheat("HP", "32001004 0063", False),
         ]
         merged, _, _ = cheats.merge(database, old)
-        self.assertEqual(merged[0].extra, {"keys": "hold L+R", "guide": "Hold L and R.\\nThen walk."})
+        self.assertEqual(
+            merged[0].extra, {"keys": "hold L+R", "guide": "Hold L and R.\\nThen walk."}
+        )
         self.assertEqual(merged[1].extra, {"guide": "On the cart"})
         text = cheats.format_cht(merged)
         self.assertIn('cheat0_keys = "hold L+R"\n', text)
