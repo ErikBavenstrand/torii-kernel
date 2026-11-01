@@ -7,7 +7,10 @@
 @ switch in free ROM, 0xFFFF (unpatched) meaning off:
 @   SETTINGS+0 shiny: 1   +2 nature: 0-24   +4 gender byte: 0x00 female, 0xFF male
 @ Lives over Unused_AdjustBgMosaic after the walls stub (walls.s).
-@ Build: as -mcpu=arm7tdmi pid.s -o pid.o && ld -T pid.ld pid.o -o pid.elf && objcopy -O binary -j .stub pid.elf pid.bin
+@ Build: tools/golden/build.sh. mod25's BIOS Div (swi 6) returns its quotient's
+@ size in r3 as well: r3's 0xFFFF is loaded again after it, or an unset
+@ gender read as 0xFFFF, the low half stuck at 0xFFFF, and a shiny one with
+@ the personality's own nature was searched for forever (one of its 8 had it).
 @ (emerald.py writes the hook, a bl and 8 nops, itself)
 	.thumb
 	.equ	SETTINGS, 0x08F1F000
@@ -32,6 +35,7 @@ pid:
 	ldrh	r1, [r7, #0]
 	bl	mod25
 1:	str	r0, [sp, #0]
+	ldr	r3, =0xFFFF		@ again: mod25's BIOS Div left its quotient in r3
 	ldrh	r0, [r6, #4]		@ gender byte: the setting, or the personality's
 	cmp	r0, r3
 	bne	2f
