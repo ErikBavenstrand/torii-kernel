@@ -13,10 +13,12 @@ raw for ROM patches and save-block pointer writes, and Torii's raw lines
 (AnyGBA's syntax) only where a value must be XORed with the save's key or
 bits ORed in: money, coins, badges, symbols, the National Pokédex flag.
 
-The two menus (L+R+B items, L+R+A field) are game scripts, strings and menu
-tables written into the ROM's free space at launch, opened by a short RAM
-trigger that starts the script when the player is free to move. They borrow
-Emerald's unused multichoice menus (sMultichoiceLists) for their lists.
+The shop and the field menu start nothing from RAM: the shop is a routine
+in the game's own Buy list (tools/golden/shop.c: L and R change the shelf),
+the field menu game scripts, strings and menu tables in the ROM's free
+space, opened by L+R+A from the game's own field input (tools/golden/
+field.c), as a sign's or a person's script opens. It borrows Emerald's
+unused multichoice menus (sMultichoiceLists) for its lists.
 """
 
 import json
@@ -40,13 +42,8 @@ SB1, SB2 = 0x03005D8C, 0x03005D90  # gSaveBlock1Ptr, gSaveBlock2Ptr
 KEY = "[03005D90]+00AC"  # the save's encryption key, SaveBlock2 + 0xAC
 FLAGS = 0x1270  # SaveBlock1's event flags
 VARS = 0x139C  # SaveBlock1's vars, from VARS_START 0x4000
-KEYINPUT = 0x04000130
-STATUS = 0x03000E38  # sGlobalScriptContextStatus: 2 = no script
-CONTEXT = 0x03000E40  # sGlobalScriptContext: stackDepth, mode, ..., scriptPtr at +8
-LOCK = 0x03000F2C  # sLockFieldControls
 MULTICHOICE = 0x0858B760  # sMultichoiceLists: {list, count} by multichoice id
 UNUSED_MENUS = [9, 10, 15, 19, 21, 22, 40, 41, 47, 51, 89, 90, 91, 92]  # MULTI_UNUSED_*
-TRIGGER = 0x0203FF10  # free EWRAM past the game's last variable (0x0203CF64)
 
 
 def flag_byte(flag):
@@ -228,7 +225,16 @@ class Menus:
             more = p + 1 < len(pages)
             rows = page + ([("MORE", f"{name}{p + 1}")] if more else [])
             mid = self.ids.pop(0)
-            self.lists.append((mid, [self.t(title) for title, _ in rows]))
+            # A title is text, or the address of the game's own (an int)
+            self.lists.append(
+                (
+                    mid,
+                    [
+                        title if isinstance(title, int) else self.t(title)
+                        for title, _ in rows
+                    ],
+                )
+            )
             s = self.s
             s.label(name if p == 0 else f"{name}{p}")
             s.cmd("multichoice", ("b", 0), ("b", 0), ("b", mid), ("b", 0))
@@ -262,45 +268,6 @@ class Menus:
                 (a + 4, n),
             ]
         return patches
-
-
-def trigger(code, blocks):
-    """Starts a script while keys are held, once, when the player is free:
-    blocks are (KEYINPUT value, script address). A trigger byte in free EWRAM
-    carries the AND of the conditions, as each conditional covers one line."""
-    code += AR.write(1, TRIGGER, 0)
-    for k, (keys, _) in enumerate(blocks, 1):
-        code += AR.cond("EQ", 2, KEYINPUT, keys)
-        code += AR.write(1, TRIGGER, k)
-    code += AR.cond("NE", 1, LOCK, 0)
-    code += AR.write(1, TRIGGER, 0)
-    code += AR.cond("NE", 1, STATUS, 2)
-    code += AR.write(1, TRIGGER, 0)
-    for k, (_, script) in enumerate(blocks, 1):
-        code += AR.cond("EQ", 1, TRIGGER, k, "block")
-        code += AR.write(1, STATUS, 0)
-        code += AR.write(2, CONTEXT, 0x0100)  # stackDepth 0, mode: bytecode
-        code += AR.write(4, CONTEXT + 8, script)
-        code += AR.endif()
-
-
-def keys(*names):
-    bit = {
-        "A": 0,
-        "B": 1,
-        "SELECT": 2,
-        "START": 3,
-        "RIGHT": 4,
-        "LEFT": 5,
-        "UP": 6,
-        "DOWN": 7,
-        "R": 8,
-        "L": 9,
-    }
-    v = 0x3FF
-    for n in names:
-        v &= ~(1 << bit[n])
-    return v
 
 
 def rom_code(patches, code=None):
@@ -587,8 +554,82 @@ GIFTS = [  # name, species, level (0: an egg)
 ]
 
 
+# The game's own names, which the menus' lists point at instead of copies
+# (pokeemerald.sym): each place's region-map name, a species' and an item's
+SPECIES_NAMES = 0x083185C8  # gSpeciesNames, 11 bytes each
+ITEMS = 0x085839A0  # gItems, 44 bytes each, the name first
+MAP_NAMES = {
+    "LITTLEROOT": 0x085A0B10,  # sMapName_LITTLEROOT_TOWN
+    "OLDALE": 0x085A0B20,  # sMapName_OLDALE_TOWN
+    "PETALBURG": 0x085A0B77,  # sMapName_PETALBURG_CITY
+    "RUSTBORO": 0x085A0BA3,  # sMapName_RUSTBORO_CITY
+    "DEWFORD": 0x085A0B2C,  # sMapName_DEWFORD_TOWN
+    "SLATEPORT": 0x085A0B86,  # sMapName_SLATEPORT_CITY
+    "MAUVILLE": 0x085A0B95,  # sMapName_MAUVILLE_CITY
+    "VERDANTURF": 0x085A0B57,  # sMapName_VERDANTURF_TOWN
+    "FALLARBOR": 0x085A0B48,  # sMapName_FALLARBOR_TOWN
+    "LAVARIDGE": 0x085A0B39,  # sMapName_LAVARIDGE_TOWN
+    "FORTREE": 0x085A0BB1,  # sMapName_FORTREE_CITY
+    "LILYCOVE": 0x085A0BBE,  # sMapName_LILYCOVE_CITY
+    "MOSSDEEP": 0x085A0BCC,  # sMapName_MOSSDEEP_CITY
+    "SOOTOPOLIS": 0x085A0BDA,  # sMapName_SOOTOPOLIS_CITY
+    "PACIFIDLOG": 0x085A0B67,  # sMapName_PACIFIDLOG_TOWN
+    "EVER GRANDE": 0x085A0BEA,  # sMapName_EVER_GRANDE_CITY
+    "METEOR FALLS": 0x085A0DCA,  # sMapName_METEOR_FALLS
+    "GRANITE CAVE": 0x085A0D5A,  # sMapName_GRANITE_CAVE
+    "FIERY PATH": 0x085A0E40,  # sMapName_FIERY_PATH
+    "MT. CHIMNEY": 0x085A0D67,  # sMapName_MT__CHIMNEY
+    "MT. PYRE": 0x085A0DD7,  # sMapName_MT__PYRE
+    "NEW MAUVILLE": 0x085A0DBD,  # sMapName_NEW_MAUVILLE
+    "ABANDONED SHIP": 0x085A0DAE,  # sMapName_ABANDONED_SHIP
+    "SAFARI ZONE": 0x085A0D73,  # sMapName_SAFARI_ZONE
+    "SHOAL CAVE": 0x085A0DEB,  # sMapName_SHOAL_CAVE
+    "SEAFLOOR CAVERN": 0x085A0DF6,  # sMapName_SEAFLOOR_CAVERN
+    "CAVE OF ORIGIN": 0x085A0E21,  # sMapName_CAVE_OF_ORIGIN
+    "SKY PILLAR": 0x085A0EAA,  # sMapName_SKY_PILLAR
+    "VICTORY ROAD": 0x085A0E06,  # sMapName_VICTORY_ROAD
+    "DESERT RUINS": 0x085A0E80,  # sMapName_DESERT_RUINS
+    "ISLAND CAVE": 0x085A0E74,  # sMapName_ISLAND_CAVE
+    "ANCIENT TOMB": 0x085A0E8D,  # sMapName_ANCIENT_TOMB
+    "ARTISAN CAVE": 0x085A1438,  # sMapName_ARTISAN_CAVE
+    "BATTLE FRONTIER": 0x085A0D7F,  # sMapName_BATTLE_FRONTIER
+    "SOUTHERN ISLAND": 0x085A0E30,  # sMapName_SOUTHERN_ISLAND
+    "BIRTH ISLAND": 0x085A1374,  # sMapName_BIRTH_ISLAND
+    "FARAWAY ISLAND": 0x085A1429,  # sMapName_FARAWAY_ISLAND
+    "NAVEL ROCK": 0x085A12CA,  # sMapName_NAVEL_ROCK
+}
+
+
+def species_name(name):
+    return SPECIES_NAMES + 11 * species(name)
+
+
+def item_name(item):
+    return ITEMS + 44 * ITEM[item]
+
+
+FIELD_MENU = 0x08F08000  # the field menu's scripts, its first the menu
+FIELD_HOOK = 0x08001A4C  # tools/golden/field.c, over Unused_LoadBgPalette (0x88 bytes)
+FIELD_CALL = 0x08085DDE  # DoCB1_Overworld's bl ProcessPlayerFieldInput
+
+
+def field_hook():
+    """L+R+A opens the field menu where the game opens its own scripts
+    (tools/golden/field.c): the routine, and DoCB1_Overworld's call to
+    ProcessPlayerFieldInput sent through it"""
+    code = Path(__file__).with_name("field.bin").read_bytes()
+    assert len(code) <= 0x88, "field.bin runs past Unused_LoadBgPalette"
+    code += b"\0" * (len(code) & 1)
+    off = FIELD_HOOK - (FIELD_CALL + 4)
+    bl = (0xF000 | (off >> 12) & 0x7FF, 0xF800 | (off >> 1) & 0x7FF)
+    return [
+        (FIELD_HOOK + i, int.from_bytes(code[i : i + 2], "little"))
+        for i in range(0, len(code), 2)
+    ] + [(FIELD_CALL, bl[0]), (FIELD_CALL + 2, bl[1])]
+
+
 def field_menu():
-    m = Menus(0x08F08000, UNUSED_MENUS)
+    m = Menus(FIELD_MENU, UNUSED_MENUS)
     s = m.s
     s.label("main")
     s.cmd("lockall")
@@ -620,9 +661,19 @@ def field_menu():
         [("TOWNS", "towns"), ("DUNGEONS", "dungeons"), ("ISLANDS", "islands")],
         "field",
     )
-    m.menu("towns", [(n, f"wt{i}") for i, (n, *_) in enumerate(TOWNS)], "warp")
-    m.menu("dungeons", [(n, f"wd{i}") for i, (n, *_) in enumerate(DUNGEONS)], "warp")
-    m.menu("islands", [(n, f"wi{i}") for i, (n, *_) in enumerate(ISLANDS)], "warp")
+    m.menu(
+        "towns", [(MAP_NAMES[n], f"wt{i}") for i, (n, *_) in enumerate(TOWNS)], "warp"
+    )
+    m.menu(
+        "dungeons",
+        [(MAP_NAMES[n], f"wd{i}") for i, (n, *_) in enumerate(DUNGEONS)],
+        "warp",
+    )
+    m.menu(
+        "islands",
+        [(MAP_NAMES[n], f"wi{i}") for i, (n, *_) in enumerate(ISLANDS)],
+        "warp",
+    )
     for tag, rows in (("wt", TOWNS), ("wi", ISLANDS)):
         for i, (_, group, num, x, y) in enumerate(rows):
             s.label(f"{tag}{i}")
@@ -632,14 +683,28 @@ def field_menu():
         s.label(f"wd{i}")
         s.cmd("warp", ("b", group), ("b", num), ("b", 0), ("h", 0xFFFF), ("h", 0xFFFF))
         s.cmd("waitstate")
-    m.menu("legends", [(n, f"lg{i}") for i, (n, _) in enumerate(LEGENDS)], "field")
+    m.menu(
+        "legends",
+        [
+            (n if "&" in n else species_name(n), f"lg{i}")
+            for i, (n, _) in enumerate(LEGENDS)
+        ],
+        "field",
+    )
     for i, (_, flags) in enumerate(LEGENDS):
         s.label(f"lg{i}")
         for f in flags:
             s.cmd("clearflag", ("h", f))
         s.say(m.t("It waits in its lair again."))
         s.goto("legends")
-    m.menu("gifts", [(n, f"gf{i}") for i, (n, *_) in enumerate(GIFTS)], "field")
+    m.menu(
+        "gifts",
+        [
+            (species_name(sp) if level else n, f"gf{i}")
+            for i, (n, sp, level) in enumerate(GIFTS)
+        ],
+        "field",
+    )
     for i, (_, sp, level) in enumerate(GIFTS):
         s.label(f"gf{i}")
         if level:
@@ -678,7 +743,9 @@ def field_menu():
         "field",
     )
     m.menu(
-        "tickets", [(n, "tk" + str(i)) for i, (n, _, _) in enumerate(TICKETS)], "unlock"
+        "tickets",
+        [(item_name(it), "tk" + str(i)) for i, (_, it, _) in enumerate(TICKETS)],
+        "unlock",
     )
     for i, (_, item, flag) in enumerate(TICKETS):
         s.label("tk" + str(i))
@@ -822,16 +889,16 @@ def cheats():
         )
     )
     field, at = field_menu()
-    code = Code(AR)
-    trigger(code, [(keys("L", "R", "A"), at["main"])])
-    code = Mixed(field, code)
+    assert at["main"] == FIELD_MENU, (
+        "tools/golden/field.c opens the menu at its first script"
+    )
     out.append(
         Cheat(
             "Menus",
             "Menus: Field menu (L+R+A)",
-            code,
-            "L+R+A opens it (face away from people): PC, Heal, Warp, Legends, Gifts, Moves, Unlock (badges, symbols, Pokédex, event tickets). "
-            "Pick before you play.",
+            vba(*Mixed(field + field_hook(), None).lines),
+            "Hold L and R, press A where nothing is in front of you: PC, Heal, Warp, Legends, Gifts, Moves, "
+            "Unlock (badges, symbols, Pokédex, event tickets).",
             None,
         )
     )
