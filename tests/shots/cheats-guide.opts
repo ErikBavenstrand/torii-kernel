@@ -47,6 +47,6 @@
 -w "screen ready: cheats"
 -k @8:START -k @12:-
 -w "screen ready: cheat-menu"
--k @24:DOWN -k @28:- -k @36:DOWN -k @40:- -k @52:A -k @56:-
+-k @24:DOWN -k @28:- -k @36:DOWN -k @40:- -k @48:DOWN -k @52:- -k @64:A -k @68:-
 -w "screen ready: cheat-buttons"
 -s @8:locked.png

@@ -1638,6 +1638,25 @@ u32 cheatfile_set_guide(struct cheatfile *f, const struct cheatfile_room *room, 
 	return set_key_line(f, room, i, KEY_GUIDE, "guide", n ? value : NULL);
 }
 
+u32 cheatfile_set_folder(struct cheatfile *f, const struct cheatfile_room *room, u32 i, const char *folder)
+{
+	char value[CHEATFILE_FOLDER_MAX + 1];
+	u32 n = (u32)strlen(folder);
+	if (n > CHEATFILE_FOLDER_MAX || !folder_ok(folder, n))
+		return CHEATFILE_EDIT_BAD;
+	for (u32 j = 0; j < n; j++)
+		value[j] = folder[j] == '"' ? '\'' : folder[j];
+	value[n] = 0;
+	return set_key_line(f, room, i, KEY_FOLDER, "folder", n ? value : NULL);
+}
+
+u32 cheatfile_set_own(struct cheatfile *f, const struct cheatfile_room *room, u32 i)
+{
+	if (i < f->count && f->cheats[i].own)
+		return CHEATFILE_EDIT_OK;
+	return set_key_line(f, room, i, KEY_USER, "user", "true");
+}
+
 u32 cheatfile_guide(const struct cheatfile *f, u32 i, char *out, u32 size)
 {
 	if (!size)

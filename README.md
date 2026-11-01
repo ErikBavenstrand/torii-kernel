@@ -59,8 +59,12 @@ it. Info's Controls page lists every key.
   code does, or why it doesn't read; SELECT sets a format instead. START
   saves it, the keyboard names it, and it goes at the end of the file
   (made if the game had none), picked, as `cheatN_user = true`, with
-  `cheatN_format = "..."` when you set the format. SELECT on a code of your
-  own edits or deletes it; the database's can only be unpicked. A greyed
+  `cheatN_format = "..."` when you set the format; START's Add code puts it
+  under the heading the cursor is in (`cheatN_folder`). START's menu edits
+  any cheat's code (a database cheat edited becomes your own,
+  `cheatN_user`, so `just cheats` keeps it beside the database's), renames
+  it, sets its buttons, puts it under a heading, an existing one or a new
+  one, or deletes it. A greyed
   code with digits to fill in (`00??`) opens the keypad with them marked,
   and saving replaces that code in place. Every launch with addons
   applies them, and the in-game menu's Cheats list turns each one off and
@@ -154,8 +158,9 @@ also name them, fetch their box art and write their cheats in one step, run
 - **Rename** gives the game a name of your own in the lists (its file stays
   as it is); deleting the whole name gives it its original name back.
 - **Cheats** lists its cheats: A turns one on or off, `+ Add code` types a
-  new one, and SELECT on a cheat renames, edits (your own codes) or deletes
-  it. Cheats that can't work on Torii are greyed with the reason; Settings'
+  new one, SELECT shows a cheat's guide and details (A there edits the
+  guide), and START's menu edits, renames, moves under a heading, sets the
+  buttons of or deletes it. Cheats that can't work on Torii are greyed with the reason; Settings'
   **Clean up cheats** removes them from every game.
 - **Delete** removes the game and its cheat file; its saves stay.
 

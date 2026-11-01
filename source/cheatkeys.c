@@ -59,15 +59,19 @@ u32 cheatkeys_sentence(u16 v, char *out, u32 room)
 
 u32 cheatkeys_tag(u16 v, char *out, u32 room)
 {
-	u32 mode = cheatkeys_mode(v);
+	u32 mode = cheatkeys_mode(v), n = 0, k = 0;
 	if (!room)
 		return 0;
 	out[0] = 0;
 	if ((mode != CHEATKEYS_HOLD && mode != CHEATKEYS_PRESS) || !cheatkeys_valid(v))
 		return 0;
-	const char *first = S(STR_BUTTON_SHORT_L + (u32)cheatkeys_first(v));
-	u32 more = cheatkeys_count(v) - 1;
-	if (!more)
-		return lang_fill(out, room, "{1}", LS(first));
-	return SF(out, room, STR_BUTTON_MORE, LS(first), LN(more));
+	for (s32 b = cheatkeys_first(v); b >= 0 && k < CHEATKEYS_TAG_BUTTONS; b = cheatkeys_next(v, b), k++)
+		n += lang_fill(out + n, room - n, n ? "{1}{2}" : "{2}", LS(S(STR_BUTTON_JOIN)),
+			       LS(S(STR_BUTTON_SHORT_L + (u32)b)));
+	if (cheatkeys_count(v) <= CHEATKEYS_TAG_BUTTONS)
+		return n;
+	char shown[CHEATKEYS_TEXT_MAX];
+	memcpy(shown, out, n + 1 < sizeof(shown) ? n + 1 : sizeof(shown));
+	shown[sizeof(shown) - 1] = 0;
+	return SF(out, room, STR_BUTTON_MORE, LS(shown));
 }

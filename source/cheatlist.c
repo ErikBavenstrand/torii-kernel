@@ -105,6 +105,8 @@ u32 cheatlist_row(u32 r)
 u32 cheatlist_name(const struct cheatlist_entry *e, char *out, u32 size)
 {
 	u32 n = e->name_len < size ? e->name_len : size - 1;
+	if (e->name_at > CHEATLIST_NAMES_BYTES - CHEATLIST_NAME_MAX - 1)
+		n = 0;  // past the names' room (a cache that passed its CRC all the same): no name
 	if (n)
 		page_get(NAMES + e->name_at, out, n);
 	out[n] = 0;
@@ -556,7 +558,7 @@ static u32 cache_fill(struct cache_out *o, u8 *buf, u32 max)
 				o->total += n;
 				return n;
 			}
-			if (e.name_len) {
+			if (e.name_len && e.name_at <= CHEATLIST_NAMES_BYTES - CHEATLIST_NAME_MAX - 1) {
 				page_get(NAMES + e.name_at, buf + n, len);
 				n += len;
 			}

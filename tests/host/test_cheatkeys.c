@@ -174,9 +174,11 @@ void test_cheatkeys_text(void)
 	cheatkeys_tag(parse("hold select"), out, sizeof(out));
 	CHECK_STR(out, "SEL");
 	cheatkeys_tag(v, out, sizeof(out));
-	CHECK_STR(out, "L+1");
+	CHECK_STR(out, "L+SEL");
 	cheatkeys_tag(parse("press a+b+r"), out, sizeof(out));
-	CHECK_STR(out, "R+2");
+	CHECK_STR(out, "R+A+B");
+	cheatkeys_tag(parse("hold l+r+select+start"), out, sizeof(out));
+	CHECK_STR(out, "L+R+SEL+...");
 	CHECK_EQ(cheatkeys_tag(CHEATKEYS_ALWAYS_ON, out, sizeof(out)), 0);
 	CHECK_EQ(cheatkeys_tag(CHEATKEYS_AT_LAUNCH, out, sizeof(out)), 0);
 }

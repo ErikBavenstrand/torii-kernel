@@ -236,6 +236,8 @@ u32 cheatstore_set_code(u32 i, const char *desc, const char *code, u8 format);
 u32 cheatstore_rename(u32 i, const char *desc);
 u32 cheatstore_set_keys(u32 i, u16 keys);
 u32 cheatstore_set_guide(u32 i, const char *guide);
+u32 cheatstore_set_folder(u32 i, const char *folder);
+u32 cheatstore_set_own(u32 i);
 u32 cheatstore_remove(u32 i);
 // cheatfile_can_add for the read file in its PSRAM room (CHEATFILE_EDIT_FAILED
 // once a PSRAM write has failed)

@@ -720,7 +720,7 @@ static int index_write(void)
 	struct cheatstore *cs = cheatstore();
 	char path[SAFEFILE_PATH_MAX];
 	index_path(path);
-	int ok = safefile_write(path, CHEATSTORE_INDEX_MAX, index_fill, cs);
+	int ok = safefile_write_cut(path, CHEATSTORE_INDEX_MAX, index_fill, cs);
 	if (ok)
 		cs->picks_changed = 0;
 	tlog("cheats: %s: index %s (%u windows, %u picks)", path, ok ? "written" : "not written", cs->windows,
@@ -1560,6 +1560,16 @@ u32 cheatstore_set_guide(u32 i, const char *guide)
 	return edit_done(cheatfile_set_guide(edited_file(), the_room(), i, guide));
 }
 
+u32 cheatstore_set_folder(u32 i, const char *folder)
+{
+	return edit_done(cheatfile_set_folder(edited_file(), the_room(), i, folder));
+}
+
+u32 cheatstore_set_own(u32 i)
+{
+	return edit_done(cheatfile_set_own(edited_file(), the_room(), i));
+}
+
 u32 cheatstore_remove(u32 i)
 {
 	return edit_done(cheatfile_remove(edited_file(), the_room(), i));
@@ -1631,7 +1641,8 @@ static int write_windows(void)
 		show_progress(cs->windows + j + 1, cs->windows * 2u);
 	}
 	cs->file_size = card_size();
-	index_write();
+	if (!index_write())
+		tlog_error("cheats: %s: the index wasn't written: read whole again next time", cs->path);
 	cheatstore_listed();
 	return 1;
 }
@@ -1684,11 +1695,14 @@ int cheatstore_delete(const char *rom_path)
 		tlog("cheats: %s: deleted (FatFs %u, %u)", path, (unsigned)a, (unsigned)b);
 	// A larger file's index, after the file: one left by a cut fits no file
 	memcpy(path + len - 4, CHEATINDEX_EXT, 5);
-	f_unlink(path);
+	if (f_unlink(path) == FR_OK)
+		cutpoint("cheats: its index deleted");
 	memcpy(path + len, ".bak", 5);
-	f_unlink(path);
+	if (f_unlink(path) == FR_OK)
+		cutpoint("cheats: its index's .bak deleted");
 	memcpy(path + len - 4, CHEATLIST_EXT, 5);  // and the cheat screen's list
-	f_unlink(path);
+	if (f_unlink(path) == FR_OK)
+		cutpoint("cheats: its list deleted");
 	return gone;
 }
 
@@ -1725,7 +1739,8 @@ int cheatstore_drop(void)
 		cheatfile_written(&cs->file);  // nothing to write: no file is what it says
 		listed_cache.valid = 0;
 		memcpy(path + len - 4, CHEATLIST_EXT, 5);  // the cheat screen's list, of no file now
-		f_unlink(path);
+		if (f_unlink(path) == FR_OK)
+			cutpoint("cheats: the emptied file's list deleted");
 		memcpy(path + len - 4, ".cht", 5);
 		cheatlist_drop();
 	}

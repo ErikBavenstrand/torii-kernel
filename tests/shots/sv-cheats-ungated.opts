@@ -25,7 +25,7 @@
 -w "screen ready: cheats"
 -k @20:START -k @24:-
 -w "screen ready: cheat-menu"
--k @32:DOWN -k @36:- -k @44:DOWN -k @48:- -k @60:A -k @64:-
+-k @32:DOWN -k @36:- -k @44:DOWN -k @48:- -k @56:DOWN -k @60:- -k @72:A -k @76:-
 -w "screen ready: cheat-buttons"
 -s @8:page.png
 -k @16:UP -k @20:-

@@ -140,9 +140,11 @@ u32 cheatkeys_names(u16 v, char *out, u32 room);
 // L+SELECT", "Always on", "Set when the game starts"); "" for 0. The bytes
 // written.
 u32 cheatkeys_sentence(u16 v, char *out, u32 room);
-// A list row's short tag for a Hold or Press value: its first button's
-// [button.short] name, alone or with [button] more's count of the others
-// ("SEL", "L+1"); "" for any other value. The bytes written.
+// A list row's short tag for a Hold or Press value: its buttons'
+// [button.short] names joined ("SEL", "L+R+B"), the first
+// CHEATKEYS_TAG_BUTTONS of a longer one in [button] more ("L+R+SEL+..."); ""
+// for any other value. The bytes written.
+#define CHEATKEYS_TAG_BUTTONS 3
 u32 cheatkeys_tag(u16 v, char *out, u32 room);
 
 #endif

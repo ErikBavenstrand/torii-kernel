@@ -27,7 +27,8 @@
 // activated ("hold L+Select", cheatkeys.h) and "cheatN_guide" what it does
 // and how to use it (free text, "\n" a paragraph break), both set on the
 // cart (cheatfile_set_keys, _set_guide). "cheatN_folder" is the heading the
-// cheat shows under (cheatfile_folder): set in the file only. The keypad's edits
+// cheat shows under (cheatfile_folder), set in the file or on the cart
+// (cheatfile_set_folder). The keypad's edits
 // (cheatfile_add, _set_code, _remove) change the text in place, through a
 // struct cheatfile_room (the card side's text is in PSRAM, which takes no
 // byte stores), and read it again.
@@ -450,6 +451,16 @@ u32 cheatfile_set_keys(struct cheatfile *f, const struct cheatfile_room *room, u
 // a whole character. A guide empty after that removes every such line.
 #define CHEATFILE_GUIDE_MAX 250
 u32 cheatfile_set_guide(struct cheatfile *f, const struct cheatfile_room *room, u32 i, const char *guide);
+// Puts cheat i under the heading folder (cheatN_folder; UTF-8, NUL-ended,
+// 1 to CHEATFILE_FOLDER_MAX bytes with no control character, a '"' written
+// as '\''), its last such line's value replaced or a line added, as
+// cheatfile_set_keys does; "" takes it out of any. CHEATFILE_EDIT_BAD for a
+// name that can't be one.
+u32 cheatfile_set_folder(struct cheatfile *f, const struct cheatfile_room *room, u32 i, const char *folder);
+// Marks cheat i the user's own (cheatN_user = true), as a code typed on the
+// cart is: done to a database cheat whose code is edited, so `just cheats`
+// keeps it as the user's beside the database's. Nothing if it is already.
+u32 cheatfile_set_own(struct cheatfile *f, const struct cheatfile_room *room, u32 i);
 // Cheat i's guide for showing: each "\n" in it a line break, cut to size - 1
 // bytes on a whole character and ended (size 0 writes nothing). Its bytes;
 // 0 and "" without one.

@@ -1618,3 +1618,37 @@ void test_cheatfile_folders(void)
 	CHECK_EQ(cheats[CHEATFILE_FOLDERS - 1].folder, CHEATFILE_FOLDERS);
 	CHECK_EQ(cheats[CHEATFILE_FOLDERS].folder, 0);
 }
+
+// The cart's heading and own-code edits: a cheatN_folder line added after
+// the code line, replaced, removed with ""; a name that can't be a heading
+// refused; cheatN_user added once
+void test_cheatfile_set_folder_own(void)
+{
+	u32 len;
+	load_cap("cheat0_desc = \"Money\"\n"
+		 "cheat0_code = \"32001000 0009\"\n"
+		 "cheat1_desc = \"Lives\"\n"
+		 "cheat1_code = \"32001002 0009\"\n"
+		 "cheat1_folder = \"Old\"\n",
+		 4096);
+	CHECK_EQ(cheatfile_set_folder(&file, &room, 0, "Items \"x\""), CHEATFILE_EDIT_OK);
+	CHECK(text_has("cheat0_code = \"32001000 0009\"\ncheat0_folder = \"Items 'x'\"\n"));
+	CHECK(!strncmp(cheatfile_folder_name(&file, &cheats[0], &len), "Items 'x'", 9));
+	CHECK_EQ(len, 9);
+	CHECK_EQ(cheatfile_set_folder(&file, &room, 1, "Items 'x'"), CHEATFILE_EDIT_OK);
+	CHECK(!text_has("Old"));
+	CHECK(cheatfile_same_folder(&file, 0, 1));
+	CHECK_EQ(cheatfile_set_folder(&file, &room, 1, ""), CHEATFILE_EDIT_OK);
+	CHECK(!text_has("cheat1_folder"));
+	CHECK_EQ(cheats[1].folder, 0);
+	CHECK_EQ(cheatfile_set_folder(&file, &room, 0, "A name far past twenty-four bytes"), CHEATFILE_EDIT_BAD);
+	CHECK_EQ(cheatfile_set_folder(&file, &room, 0, "Tab\there"), CHEATFILE_EDIT_BAD);
+	CHECK_EQ(cheatfile_set_folder(&file, &room, 2, "Items"), CHEATFILE_EDIT_BAD);
+	CHECK_EQ(cheats[0].own, 0);
+	CHECK_EQ(cheatfile_set_own(&file, &room, 0), CHEATFILE_EDIT_OK);
+	CHECK_EQ(cheats[0].own, 1);
+	CHECK(text_has("cheat0_user = \"true\"\n"));
+	file.edited = 0;
+	CHECK_EQ(cheatfile_set_own(&file, &room, 0), CHEATFILE_EDIT_OK);
+	CHECK(!file.edited);
+}

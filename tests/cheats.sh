@@ -403,7 +403,7 @@ del_scenario() {
   # shellcheck disable=SC2046 # nav.sh's options
   cut_run "$@" $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -k @48:- \
     -w "screen ready: cheats" -k @8:START -k @12:- \
-    -w "screen ready: cheat-menu" -k @16:DOWN -k @20:- -k @28:DOWN -k @32:- -k @40:DOWN -k @44:- -k @52:DOWN -k @56:- -k @64:DOWN -k @68:- -k @76:DOWN -k @80:- -k @88:A -k @92:- \
+    -w "screen ready: cheat-menu" -k @16:DOWN -k @20:- -k @28:DOWN -k @32:- -k @40:DOWN -k @44:- -k @52:DOWN -k @56:- -k @64:DOWN -k @68:- -k @76:DOWN -k @80:- -k @88:DOWN -k @92:- -k @100:DOWN -k @104:- -k @112:A -k @116:- \
     -w "screen ready: confirm" -k @8:RIGHT -k @12:- -k @20:A -k @24:- \
     -w "cheats: deleted" -w "screen ready: cheats" -k @8:B -k @12:- -w "cheats: back" -f 12000
 }
@@ -555,7 +555,7 @@ before=$(cheat_lines | head -n 4)
 # shellcheck disable=SC2046 # nav.sh's options
 boot $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -k @48:- \
   -w "screen ready: cheats" -k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:START -k @48:- \
-  -w "screen ready: cheat-menu" -k @16:DOWN -k @20:- -k @28:DOWN -k @32:- -k @40:DOWN -k @44:- -k @52:DOWN -k @56:- -k @64:DOWN -k @68:- -k @76:DOWN -k @80:- -k @88:A -k @92:- \
+  -w "screen ready: cheat-menu" -k @16:DOWN -k @20:- -k @28:DOWN -k @32:- -k @40:DOWN -k @44:- -k @52:DOWN -k @56:- -k @64:DOWN -k @68:- -k @76:DOWN -k @80:- -k @88:DOWN -k @92:- -k @100:DOWN -k @104:- -k @112:A -k @116:- \
   -w "screen ready: confirm" -k @8:RIGHT -k @12:- -k @20:A -k @24:- \
   -w "cheats: deleted" -w "screen ready: cheats" -k @8:B -k @12:- -w "cheats: back" -f 6000 >"$cart/delete.txt" 2>&1 ||
   fail "the delete didn't run: $(grep -a '^kernel' "$cart/delete.txt" | tail -3)"
@@ -575,7 +575,7 @@ before=$(cheat_lines)
 # shellcheck disable=SC2046 # nav.sh's options
 boot $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -k @48:- \
   -w "screen ready: cheats" -k @8:START -k @12:- \
-  -w "screen ready: cheat-menu" -k @16:DOWN -k @20:- -k @28:A -k @32:- \
+  -w "screen ready: cheat-menu" -k @16:DOWN -k @20:- -k @28:DOWN -k @32:- -k @40:A -k @44:- \
   -w "screen ready: rename" -k @10:A -k @14:- -k @24:START -k @28:- \
   -w "cheats: renamed" -w "screen ready: cheats" -k @8:B -k @12:- -w "cheats: back" -f 6000 >"$cart/rename.txt" 2>&1 ||
   fail "the rename didn't run: $(grep -a '^kernel' "$cart/rename.txt" | tail -3)"
@@ -614,7 +614,7 @@ echo "PASS: cheats: SELECT opens a cheat's Guide page, and B comes back"
 # keys line (cheat 2, the row under the cursor's: its code only writes RAM);
 # the row shows its tag. From the code then removes the line.
 cheat_run "$cart/hold.txt" -k @8:DOWN -k @12:- -k @24:START -k @28:- -w "screen ready: cheat-menu" \
-  -k @16:DOWN -k @20:- -k @28:DOWN -k @32:- -k @44:A -k @48:- -w "screen ready: cheat-buttons" \
+  -k @16:DOWN -k @20:- -k @28:DOWN -k @32:- -k @40:DOWN -k @44:- -k @52:A -k @56:- -w "screen ready: cheat-buttons" \
   -k @16:UP -k @20:- -k @28:UP -k @32:- -k @44:A -k @48:- -k @64:L+R -k @104:- \
   -w "cheats: buttons captured" -k @16:B -k @20:- -w "screen ready: cheats"
 grep -q "cheats: buttons of cheat 2: hold L+R: ok" "$cart/hold.txt" ||
@@ -623,7 +623,7 @@ cheat_file | grep -x 'cheat2_keys = "hold L+R"' >/dev/null || fail "cheat 2's ke
 [ "$(cheat_lines | wc -l)" = 5 ] || fail "setting buttons changed the cheats: $(cheat_lines | tr '\n' ' ')"
 echo "PASS: cheats: Buttons captures a held combination and writes it as the cheat's keys line"
 cheat_run "$cart/code.txt" -k @8:DOWN -k @12:- -k @24:START -k @28:- -w "screen ready: cheat-menu" \
-  -k @16:DOWN -k @20:- -k @28:DOWN -k @32:- -k @44:A -k @48:- -w "screen ready: cheat-buttons" \
+  -k @16:DOWN -k @20:- -k @28:DOWN -k @32:- -k @40:DOWN -k @44:- -k @52:A -k @56:- -w "screen ready: cheat-buttons" \
   -k @16:DOWN -k @20:- -k @28:DOWN -k @32:- -k @44:A -k @48:- -k @60:B -k @64:- -w "screen ready: cheats"
 grep -q "cheats: buttons of cheat 2: from the code: ok" "$cart/code.txt" ||
   fail "From the code wasn't set: $(grep -a 'cheats:' "$cart/code.txt" | tail -3)"
@@ -632,7 +632,7 @@ echo "PASS: cheats: Buttons' From the code removes the cheat's keys line"
 # Cheat 1 patches the ROM too, so it can't wait on buttons: A on Hold
 # starts no capture, and B leaves the file as it was
 cheat_run "$cart/ungated.txt" -k @8:START -k @12:- -w "screen ready: cheat-menu" \
-  -k @16:DOWN -k @20:- -k @28:DOWN -k @32:- -k @44:A -k @48:- -w "screen ready: cheat-buttons" \
+  -k @16:DOWN -k @20:- -k @28:DOWN -k @32:- -k @40:DOWN -k @44:- -k @52:A -k @56:- -w "screen ready: cheat-buttons" \
   -k @16:UP -k @20:- -k @28:UP -k @32:- -k @44:A -k @48:- -k @64:L+R -k @104:- -k @130:B -k @134:- \
   -w "screen ready: cheats"
 ! grep -q "cheats: buttons captured\|cheats: buttons of cheat 1:" "$cart/ungated.txt" ||
@@ -644,7 +644,7 @@ echo "PASS: cheats: Buttons keeps Hold off a cheat that patches the ROM"
 # key) and n typed, START; the file's guide line holds them with "\n". Then
 # deleted to nothing, the guide line goes.
 cheat_run "$cart/guide-edit.txt" -k @8:START -k @12:- -w "screen ready: cheat-menu" \
-  -k @16:DOWN -k @20:- -k @28:DOWN -k @32:- -k @40:DOWN -k @44:- -k @56:A -k @60:- -w "screen ready: rename" \
+  -k @16:A -k @20:- -w "screen ready: cheat-guide" -k @8:A -k @12:- -w "screen ready: rename" \
   -k @8:A -k @12:- -k @24:UP -k @28:- -k @36:UP -k @40:- -k @48:RIGHT -k @52:- -k @60:RIGHT -k @64:- \
   -k @72:RIGHT -k @76:- -k @88:A -k @92:- -k @104:UP -k @108:- -k @120:A -k @124:- -k @136:START -k @140:- \
   -w "screen ready: cheats"
@@ -653,13 +653,34 @@ grep -q "cheats: guide of cheat 1 set: ok" "$cart/guide-edit.txt" ||
 cheat_file | grep -x 'cheat1_guide = "q\\nn"' >/dev/null || fail "cheat 1's guide line: $(cheat_file | grep cheat1_)"
 echo "PASS: cheats: Edit guide's keyboard of lines writes the guide, its line break written escaped"
 cheat_run "$cart/guide-rm.txt" -k @8:START -k @12:- -w "screen ready: cheat-menu" \
-  -k @16:DOWN -k @20:- -k @28:DOWN -k @32:- -k @40:DOWN -k @44:- -k @56:A -k @60:- -w "screen ready: rename" \
+  -k @16:A -k @20:- -w "screen ready: cheat-guide" -k @8:A -k @12:- -w "screen ready: rename" \
   -k @8:B -k @12:- -k @20:B -k @24:- -k @32:B -k @36:- -k @48:START -k @52:- -w "screen ready: cheats"
 grep -q "cheats: guide of cheat 1 removed: ok" "$cart/guide-rm.txt" ||
   fail "the guide wasn't removed: $(grep -a 'cheats:' "$cart/guide-rm.txt" | tail -3)"
 ! cheat_file | grep '^cheat1_guide' >/dev/null || fail "an empty guide left its line: $(cheat_file | grep cheat1_)"
 [ "$(cheat_lines | wc -l)" = 5 ] || fail "the guide's edits changed the cheats: $(cheat_lines | tr '\n' ' ')"
 echo "PASS: cheats: an emptied guide removes the cheat's guide line"
+# START's Edit code on a database cheat: its code kept, START, its name
+# kept, START: written as the user's own (cheatN_user), so `just cheats`
+# keeps it beside the database's
+cheat_run "$cart/edit-db.txt" -k @8:START -k @12:- -w "screen ready: cheat-menu" \
+  -k @16:DOWN -k @20:- -k @32:A -k @36:- -w "screen ready: keypad" -k @16:START -k @20:- \
+  -w "screen ready: rename" -k @8:START -k @12:- -w "screen ready: cheats"
+grep -q "cheats: edited cheat 1: ok" "$cart/edit-db.txt" ||
+  fail "the database cheat's edit didn't run: $(grep -a 'cheats:' "$cart/edit-db.txt" | tail -3)"
+cheat_file | grep -E '^cheat1_user = "?true"?$' >/dev/null || fail "cheat 1 isn't marked the user's: $(cheat_file | grep cheat1_)"
+echo "PASS: cheats: Edit code on a database cheat keeps it as the user's own"
+# START's Heading: New heading, "q" typed, START: the cheat's folder line
+# written, the list showing it under its heading
+cheat_run "$cart/heading.txt" -k @8:START -k @12:- -w "screen ready: cheat-menu" \
+  -k @16:DOWN -k @20:- -k @28:DOWN -k @32:- -k @40:DOWN -k @44:- -k @52:DOWN -k @56:- -k @68:A -k @72:- \
+  -w "screen ready: cheat-heading" -k @16:DOWN -k @20:- -k @32:A -k @36:- -w "screen ready: rename" \
+  -k @8:A -k @12:- -k @24:START -k @28:- -w "screen ready: cheats"
+grep -q "cheats: heading of cheat 1: q: ok" "$cart/heading.txt" ||
+  fail "the heading wasn't set: $(grep -a 'cheats:' "$cart/heading.txt" | tail -3)"
+cheat_file | grep -x 'cheat1_folder = "q"' >/dev/null || fail "cheat 1's folder line: $(cheat_file | grep cheat1_)"
+[ "$(cheat_lines | wc -l)" = 5 ] || fail "the heading changed the cheats: $(cheat_lines | tr '\n' ' ')"
+echo "PASS: cheats: START's Heading puts a cheat under a new heading, written as its folder line"
 
 # The last code deleted: a file of one code of the user's goes, both copies,
 # rather than staying as "cheats = 0"; cut at each step, the next power-on
@@ -674,7 +695,7 @@ last_scenario() {
   # shellcheck disable=SC2046 # nav.sh's options
   cut_run "$@" $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -k @48:- \
     -w "screen ready: cheats" -k @8:START -k @12:- \
-    -w "screen ready: cheat-menu" -k @16:DOWN -k @20:- -k @28:DOWN -k @32:- -k @40:DOWN -k @44:- -k @52:DOWN -k @56:- -k @64:DOWN -k @68:- -k @76:DOWN -k @80:- -k @88:A -k @92:- \
+    -w "screen ready: cheat-menu" -k @16:DOWN -k @20:- -k @28:DOWN -k @32:- -k @40:DOWN -k @44:- -k @52:DOWN -k @56:- -k @64:DOWN -k @68:- -k @76:DOWN -k @80:- -k @88:DOWN -k @92:- -k @100:DOWN -k @104:- -k @112:A -k @116:- \
     -w "screen ready: confirm" -k @8:RIGHT -k @12:- -k @20:A -k @24:- \
     -w "cheats: deleted" -w "screen ready: cheats" -k @8:B -k @12:- -w "cheats: back" -f 6000
 }

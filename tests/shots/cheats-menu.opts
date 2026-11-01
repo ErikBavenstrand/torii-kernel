@@ -32,7 +32,7 @@
 -w "screen ready: cheats"
 -k @8:START -k @12:-
 -w "screen ready: cheat-menu"
--k @24:DOWN -k @28:- -k @36:DOWN -k @40:- -k @48:DOWN -k @52:- -k @60:DOWN -k @64:- -k @72:DOWN -k @76:- -k @84:A -k @88:-
+-k @24:DOWN -k @28:- -k @36:DOWN -k @40:- -k @48:DOWN -k @52:- -k @60:DOWN -k @64:- -k @72:DOWN -k @76:- -k @84:DOWN -k @88:- -k @96:DOWN -k @100:- -k @108:A -k @112:-
 -w "cheats: picked only"
 -s @40:only.png
 -k @48:B -k @52:-

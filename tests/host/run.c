@@ -95,6 +95,7 @@ static const struct {
 	{"cheatfile_rom_crc", test_cheatfile_rom_crc},
 	{"cheatfile_keys_guide", test_cheatfile_keys_guide},
 	{"cheatfile_folders", test_cheatfile_folders},
+	{"cheatfile_set_folder_own", test_cheatfile_set_folder_own},
 	{"cheatfile_keys_gate", test_cheatfile_keys_gate},
 	{"cheatfile_variants", test_cheatfile_variants},
 	{"cheatkeys_parse", test_cheatkeys_parse},

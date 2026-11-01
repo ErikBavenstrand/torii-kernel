@@ -67,6 +67,7 @@
 #define CS_BOX_GAP 1
 #define CS_RULE_INSET 0
 #define CS_BOX_TEXT 12  // the box's text, past its icon
+#define CS_KEY_W_MAX 96  // a detail's value at most this far past its label's start
 // The Buttons page: the cheat's name over its rows, the rows (each 16 px),
 // the tick's column and the labels', a key chip's narrowest and the gap
 // between chips; the capture's hold and its time out (Settings' hotkeys')
@@ -119,12 +120,15 @@ enum {
 	MENU_EDIT,
 	MENU_RENAME,
 	MENU_BUTTONS,
-	MENU_EDIT_GUIDE,
-	MENU_DELETE,
+	MENU_HEADING,
+	MENU_ADD,
 	MENU_ALL_OFF,
 	MENU_ONLY,
+	MENU_DELETE,
 	MENU_ITEMS,
 };
+// The Heading menu: No heading, the headings, New heading
+#define HEAD_SHOWN (UI_POPUP_ITEMS - 2)
 
 // The Buttons page's rows
 enum {
@@ -187,10 +191,16 @@ static struct {
 	char ask[128];
 	char reason[48];  // a greyed row's reason with numbers in it
 	char note[64];    // the hint bar's line beside the keys: an activation's sentence
-	char tag[16];     // a row's activation tag ("L+1"), drawn before the next fetch
+	char tag[40];     // a row's activation tag ("L+R+B"), drawn before the next fetch
 	u16 box_from, box_to;  // the Guide page's text: the activation box's bytes
 	u16 rule_at;      // and its divider's line (CHEATSTORE_DETAIL: none)
+	u16 name_end;     // the page's text past the cheat's name (its heading)
+	u8 box_icon;      // the box's icon: ART_ICON8_*
+	u8 key_w;         // px from a detail's label to its value
 	char new_name[16];  // a new code's name until the user gives one
+	u8 add_head;        // the heading (id + 1) a code added from START's menu goes under; 0 none
+	char head_names[HEAD_SHOWN][CHEATFILE_FOLDER_MAX + 1];  // the Heading menu's
+	struct ui_pop_item head_items[HEAD_SHOWN + 2];
 	struct ui_hint keys[4];
 	struct ui_pop_item items[MENU_ITEMS];
 	u8 item_ids[MENU_ITEMS];
@@ -359,15 +369,15 @@ static int cs_fetch(void *ctx, u32 i, struct ui_item *out)
 		out->ink = cs.add_why == CHEATFILE_EDIT_OK ? UI_ROLE_ACCENT_INK : UI_ROLE_DIM;
 		return UI_ITEM_READY;
 	case ROW_HEADING: {
-		// A heading: its name in the accent, how many of its cheats are on
-		// (else how many it has) at the right; the cursor passes it by
+		// A heading: its name in the accent, how many of its rows are on of
+		// how many (else how many) at the right; the cursor passes it by
 		u32 h = ROW_AT(v);
 		out->text = cheatlist_heading(h, &len);
 		out->len = (u16)len;
 		out->ink = UI_ROLE_ACCENT_INK;
 		out->detail = cs.detail;
 		if (cs.sec_on[h])
-			SF(cs.detail, sizeof(cs.detail), STR_CHEATS_PICKS, LN(cs.sec_on[h]));
+			SF(cs.detail, sizeof(cs.detail), STR_CHEATS_FOLDER_ON, LN(cs.sec_on[h]), LN(cs.sec_cheats[h]));
 		else
 			SF(cs.detail, sizeof(cs.detail), STR_N(STR_CHEATS_FOLDER, cs.sec_cheats[h]),
 			   LN(cs.sec_cheats[h]));
@@ -421,9 +431,11 @@ static int cs_fetch(void *ctx, u32 i, struct ui_item *out)
 		out->mark = ART_ICON8_TICK + 1;
 		out->mark_ink = c.status == CHEATFILE_OK ? 0 : UI_ROLE_DIM;
 	}
-	// A Hold or Press cheat's first button at the right, dim ("L+1")
-	if (cheatkeys_tag(cheatfile_activation(&c), cs.tag, sizeof(cs.tag)))
+	// A Hold or Press cheat's buttons at the right, dim, after the keys' icon
+	if (cheatkeys_tag(cheatfile_activation(&c), cs.tag, sizeof(cs.tag))) {
 		out->detail = cs.tag;
+		out->dot = ART_ICON8_KEYS + 1;
+	}
 	return UI_ITEM_READY;
 }
 
@@ -565,21 +577,21 @@ static u32 heads_above(u32 row, u32 *h)
 	return k;
 }
 
-// The title's right: the cursor's cheat or run of those listed (none on +
-// Add code), and how many are on
+// The title's right: how many cheats are on, else how many rows the list
+// has; in a run's choices, the cursor's choice of them before it
 static void cs_counter(void)
 {
-	u32 n = 0, h, all = cs.sel - cs.has_add;
+	u32 n = 0, all = cs.sel - cs.has_add;
 	cs.counter[0] = 0;
-	u32 kind = ROW_KIND(cs.cur_value);
-	if (kind == ROW_CHEAT || kind == ROW_RUN)
-		n = SF(cs.counter, sizeof(cs.counter), STR_CHEATS_POSITION,
-		       LN(cs.cursor - heads_above(cs.cursor, &h) + 1), LN(all));
-	if (cs.picks && n + 1 < sizeof(cs.counter)) {
-		if (n)
-			n += (u32)snprintf(cs.counter + n, sizeof(cs.counter) - n, " \xC2\xB7 ");
-		if (n < sizeof(cs.counter))
+	if (cs.group != CHEATFILE_NONE)
+		n = SF(cs.counter, sizeof(cs.counter), STR_CHEATS_POSITION, LN(cs.cursor + 1), LN(all));
+	if (n && n + 1 < sizeof(cs.counter))
+		n += (u32)snprintf(cs.counter + n, sizeof(cs.counter) - n, " \xC2\xB7 ");
+	if (n < sizeof(cs.counter)) {
+		if (cs.picks)
 			SF(cs.counter + n, sizeof(cs.counter) - n, STR_CHEATS_PICKS, LN(cs.picks));
+		else if (cs.group == CHEATFILE_NONE)
+			SF(cs.counter + n, sizeof(cs.counter) - n, STR_N(STR_CHEATS_FOLDER, all), LN(all));
 	}
 	ui_title_set_right(cs.title, cs.counter);
 }
@@ -801,9 +813,18 @@ static const struct ui_view_spec cs_view = {"cheats", cs_nodes, CS_NODES, CS_LIS
 static int gv_event(struct ui_view *v, const struct ui_event *e)
 {
 	(void)v;
-	if (e->type != UI_EV_KEYS || !(e->keys & ui_input()->pressed & INPUT_B))
+	if (e->type == UI_EV_ACTIVATE) {
+		cs.close = 2;  // A: its guide edited
+		return 1;
+	}
+	if (e->type != UI_EV_KEYS)
 		return 0;
-	cs.close = 1;
+	if (e->keys & ui_input()->pressed & INPUT_B)
+		cs.close = 1;
+	else if (e->keys & ui_input()->pressed & INPUT_A)
+		cs.close = 2;  // its guide edited
+	else
+		return 0;
 	return 1;
 }
 
@@ -821,8 +842,10 @@ static void row_fill(const struct ui_paint *p, u32 x, u32 y, u32 w, u32 h, u32 r
 	}
 }
 
-// A row of the Guide page: the cheat's name (a heading), the activation
-// box's rows on a tint, the divider under the guide, and plain lines
+// A row of the Guide page: the cheat's name (a heading in the accent), the
+// box's rows on a tint (how it is activated, else why it is greyed), the
+// divider under the guide, the sections' headings (Code, Details) faint,
+// a detail's label dim and its value at the labels' column, plain lines
 static int gv_paint(void *ctx, const struct ui_paint *p)
 {
 	const struct ui_reading *r = ctx;
@@ -843,16 +866,27 @@ static int gv_paint(void *ctx, const struct ui_paint *p)
 		u32 y0 = first ? CS_BOX_GAP : 0, y1 = last ? p->rh - CS_BOX_GAP : p->rh;
 		row_fill(p, 0, y0, p->w, y1 - y0, CS_BOX_RADIUS, first, last, UI_ROLE_TINT);
 		if (first)
-			ui_icon8(p->win, x, top + (font->line_height - 8) / 2, ART_ICON8_KEYS, UI_ROLE_ACCENT_INK);
+			ui_icon8(p->win, x, top + (font->line_height - 8) / 2, cs.box_icon, UI_ROLE_ACCENT_INK);
 		x += CS_BOX_TEXT;
 		clip = clip > CS_BOX_TEXT + 8 ? clip - CS_BOX_TEXT : 8;
 		ink = UI_ROLE_ACCENT_INK;
 	} else if (kind == UI_READ_HEADING || kind == UI_READ_HEADING_MORE) {
-		ink = UI_ROLE_ACCENT_INK;
+		ink = start < cs.name_end ? UI_ROLE_ACCENT_INK : UI_ROLE_FAINT;
 		if (kind == UI_READ_HEADING) {
 			s += 2;
 			len -= 2;
 		}
+	} else if (kind == UI_READ_KEY || kind == UI_READ_MORE) {
+		if (kind == UI_READ_KEY) {
+			u32 tab = 0;
+			while (tab < len && s[tab] != '\t')
+				tab++;
+			text_draw(p->win, font, x, top, cs.key_w, UI_ROLE_DIM, s, tab);
+			s += tab < len ? tab + 1 : len;
+			len -= tab < len ? tab + 1 : len;
+		}
+		x += cs.key_w;
+		clip = clip > cs.key_w + 8u ? clip - cs.key_w : 8u;
 	}
 	if (len)
 		text_draw(p->win, font, x, top, clip, ink, s, len);
@@ -945,25 +979,39 @@ static void guide_add(u32 *n, u32 at)
 	detail_add(n, "\n", 1);
 }
 
+// A detail's line: its label (dim), a tab, its value at the labels' column
+static void detail_pair(u32 *n, u32 label, const char *value)
+{
+	detail_add(n, S(label), (u32)strlen(S(label)));
+	detail_add(n, "\t", 1);
+	detail_line(n, value);
+}
+
 // Cheat at's page: its name as the heading; the box with a greyed cheat's
-// reason, else how it is activated; its guide and a divider under it; its
-// code a line each, its format, its share of the budget, its ROM patches
-// and whether it is picked
+// reason, else how it is activated; its guide and a divider under it; then
+// Code, its lines, and Details: whether it is on, its format, its share of
+// the budget (or that it runs once) and its ROM patches, each a label and
+// its value
 static void detail_text(u32 at)
 {
 	struct cheatstore *s = cheatstore();
 	const struct cheatfile *f = &s->file;
 	const struct cheatfile_cheat *c = &s->cheats[at];
+	const struct torii_font *font = ui_theme()->body;
 	char line[96];
 	u32 n = 0, len;
 	const char *name = cheat_name(c, &len);
 	detail_add(&n, "# ", 2);
 	detail_add(&n, name, len);
 	detail_add(&n, "\n", 1);
+	cs.name_end = (u16)n;
 	u32 why = cheatfile_why(f, at);
 	const char *box = why != CHEATFILE_PICKABLE ? cs_reason(c, why) : NULL;
-	if (!box && cheatkeys_sentence(cheatfile_activation(c), cs.note, sizeof(cs.note)))
+	cs.box_icon = ART_ICON8_INFO;
+	if (!box && cheatkeys_sentence(cheatfile_activation(c), cs.note, sizeof(cs.note))) {
 		box = cs.note;
+		cs.box_icon = ART_ICON8_KEYS;
+	}
 	cs.box_from = cs.box_to = (u16)CHEATSTORE_DETAIL;
 	cs.rule_at = (u16)CHEATSTORE_DETAIL;
 	if (box && *box) {
@@ -978,6 +1026,8 @@ static void detail_text(u32 at)
 		detail_add(&n, "\n", 1);
 	}
 	// The code: lines between its '+'s, but a pointer's offset's
+	detail_add(&n, "# ", 2);
+	detail_line(&n, S(STR_CHEATS_SECTION_CODE));
 	const char *code = f->text + c->code;
 	u32 code_len = cheatfile_code_len(c);
 	for (u32 i = 0, from = 0; i <= code_len; i++)
@@ -985,27 +1035,38 @@ static void detail_text(u32 at)
 			code_line(&n, code + from, i - from);
 			from = i + 1;
 		}
-	detail_add(&n, "\n", 1);
+	detail_add(&n, "\n# ", 3);
+	detail_line(&n, S(STR_CHEATS_SECTION_DETAILS));
+	// The labels' column: past the widest, as the language has them
+	static const u16 labels[] = {STR_CHEATS_LABEL_STATE, STR_CHEATS_LABEL_FORMAT, STR_CHEATS_LABEL_FRAME,
+				     STR_CHEATS_LABEL_RUNS, STR_CHEATS_LABEL_ROM};
+	u32 w = 0;
+	for (u32 k = 0; k < sizeof(labels) / sizeof(*labels); k++) {
+		u32 lw = text_width(font, S(labels[k]), (u32)strlen(S(labels[k])));
+		w = lw > w ? lw : w;
+	}
+	cs.key_w = (u8)(w + 8 < CS_KEY_W_MAX ? w + 8 : CS_KEY_W_MAX);
+	detail_pair(&n, STR_CHEATS_LABEL_STATE,
+		    c->picked ? S(STR_CHEATS_DETAIL_PICKED) : S(STR_CHEATS_DETAIL_NOT_PICKED));
 	if (c->detected != CHEAT_FMT_AUTO && c->detected <= CHEAT_FMT_VBA) {
 		SF(line, sizeof(line), STR_CHEATS_FORMAT, LS(S(STR_KEYPAD_FORMAT_NONE + c->detected)),
 		   LS(c->format != CHEAT_FMT_AUTO ? S(STR_CHEATS_DETAIL_SET) : S(STR_CHEATS_DETAIL_DETECTED)));
-		detail_line(&n, line);
+		detail_pair(&n, STR_CHEATS_LABEL_FORMAT, line);
 	} else {
-		detail_line(&n, S(STR_CHEATS_DETAIL_UNKNOWN));
+		detail_pair(&n, STR_CHEATS_LABEL_FORMAT, S(STR_CHEATS_DETAIL_UNKNOWN));
 	}
 	if (c->status == CHEATFILE_OK) {
 		if (c->bytes) {
 			SF(line, sizeof(line), STR_CHEATS_BUDGET, LN(share(c->bytes, c->cost)));
-			detail_line(&n, line);
+			detail_pair(&n, STR_CHEATS_LABEL_FRAME, line);
 		} else {
-			detail_line(&n, S(STR_CHEATS_DETAIL_RUNS));
+			detail_pair(&n, STR_CHEATS_LABEL_RUNS, S(STR_CHEATS_DETAIL_RUNS));
 		}
 		if (c->patches) {
 			SF(line, sizeof(line), STR_CHEATS_ROM, LN(c->patches), LS(S(STR_CHEATS_DETAIL_NOR)));
-			detail_line(&n, line);
+			detail_pair(&n, STR_CHEATS_LABEL_ROM, line);
 		}
 	}
-	detail_line(&n, c->picked ? S(STR_CHEATS_DETAIL_PICKED) : S(STR_CHEATS_DETAIL_NOT_PICKED));
 }
 
 // Wraps the page's text from byte from up to byte to (its end if sooner;
@@ -1029,7 +1090,7 @@ static void wrap_part(u32 from, u32 to, u32 width)
 		text[to] = 0;
 	struct ui_reading part = {text + from,        r->start + r->count,      r->len + r->count,
 				  r->kind + r->count, (u16)(r->cap - r->count), 0};
-	ui_reading_wrap(&part, ui_theme()->body, width, ui_theme()->look.reading_key_w);
+	ui_reading_wrap(&part, ui_theme()->body, width, cs.key_w);
 	for (u32 i = 0; i < part.count; i++)
 		part.start[i] = (u16)(part.start[i] + from);
 	r->count = (u16)(r->count + part.count);
@@ -1041,11 +1102,11 @@ static void wrap_part(u32 from, u32 to, u32 width)
 // nothing shows (the caller shows the cheat view again)
 static void page_title(u8 title, const char *name);
 
-static void cs_guide(u32 at)
+static int cs_guide(u32 at)
 {
 	struct cheatstore *s = cheatstore();
 	if (at >= s->file.count)
-		return;
+		return 0;
 	cheatstore_decode_to(at);
 	detail_text(at);
 	cs.reading = (struct ui_reading){s->detail,      s->detail_start,        s->detail_len,
@@ -1065,19 +1126,24 @@ static void cs_guide(u32 at)
 	struct ui_view *v = ui_push(&gv_view, &cs.reading);
 	if (!v) {
 		tlog_error("cheats: %s", ui_error());
-		return;
+		return 0;
 	}
 	u8 title = (u8)(v->first + CS_TITLE);
 	page_title(title, S(STR_CHEATS_GUIDE_SUB));
-	cs.keys[0] = (struct ui_hint){"B", S(STR_HINT_BACK)};
-	ui_hints_set((u8)(v->first + CS_HINTS), cs.keys, 1);
-	tlog_debug("cheats: guide of cheat %lu, %lu rows", (unsigned long)at, (unsigned long)cs.reading.count);
+	cs.keys[0] = (struct ui_hint){"A", S(STR_CHEATS_HINT_EDIT_GUIDE)};
+	cs.keys[1] = (struct ui_hint){"B", S(STR_HINT_BACK)};
+	ui_hints_set((u8)(v->first + CS_HINTS), cs.keys, 2);
+	tlog_debug("cheats: guide of cheat %lu, %lu rows",
+		   (unsigned long)(cheatstore_window_start(cheatstore_window()) + at), (unsigned long)cs.reading.count);
 	cs.close = 0;
 	while (ui_depth() && !cs.close)
 		ui_frame();
+	if (cs.close == 2)
+		return 1;  // A: the guide's keyboard in the page's place
 	ui_leave(UI_TR_FADE, -1);
 	while (ui_depth())
 		ui_pop();
+	return 0;
 }
 
 // --- Rows, edits, menus --------------------------------------------------------
@@ -1161,7 +1227,7 @@ static u32 cs_rows(u32 at)
 			for (u32 i = 0; i < n; i++) {
 				const struct cheatlist_entry *e = &buf[i];
 				u32 h = e->heading, on = (e->flags & CHEATLIST_PICKED) != 0;
-				cs.sec_cheats[h]++;
+				cs.sec_cheats[h] += !(e->flags & CHEATLIST_VARIANT);  // its rows: a run is one
 				cs.sec_on[h] += on;
 				own_codes += (e->flags & CHEATLIST_OWN) != 0;
 				rows_in[h] += cs.only ? on : !(e->flags & CHEATLIST_VARIANT);
@@ -1469,6 +1535,26 @@ static void cs_redecode(u32 old)
 	cheatlist_from_model(cheatstore_window_start(cheatstore_window()), old);
 }
 
+// A refused edit, said (r CHEATFILE_EDIT_*); after a failed PSRAM write the
+// model was read again from text that can't be trusted: decoded again (old
+// cheats before), so the list matches it until the screen leaves
+static void edit_refused(u32 r, u32 old)
+{
+	if (r == CHEATFILE_EDIT_FAILED)
+		cs_redecode(old);
+	dialog_message(cs.heading, S(STR_CHEATS_EDIT_FAILED + (r <= CHEATFILE_EDIT_FAILED ? r : 0)), DIALOG_ERROR);
+}
+
+// Heading h's (id + 1) name into out (CHEATFILE_FOLDER_MAX + 1 bytes); "" for 0
+static void heading_copy(char *out, u32 h)
+{
+	u32 len;
+	const char *name = cheatlist_heading(h, &len);
+	out[0] = 0;
+	if (name)
+		name_copy(out, CHEATFILE_FOLDER_MAX + 1, name, len);
+}
+
 // Picks entry g at once decoded, if it may be: a code just typed is for using
 static void pick_new(u32 g)
 {
@@ -1490,10 +1576,12 @@ static void cs_write(void)
 	cheatlist_save();
 }
 
-// The keypad for a new code (g CHEATFILE_NONE), entry g's placeholder
-// (fill) or a code of the user's, then the rename keyboard for its name
-// (not a placeholder's; a new code's starts as "Code N", which OK keeps),
-// then the edit into the file and the file written. The row to show after.
+// The keypad for a new code (g CHEATFILE_NONE; under heading cs.add_head),
+// entry g's placeholder (fill) or its code, then the rename keyboard for
+// its name (not a placeholder's; a new code's starts as "Code N", which OK
+// keeps), then the edit into the file and the file written. A database
+// cheat's code edited is the user's own from then on (cheatfile_set_own).
+// The row to show after.
 static u32 cs_code(u32 g, int fill)
 {
 	struct cheatstore *s = cheatstore();
@@ -1528,7 +1616,7 @@ static u32 cs_code(u32 g, int fill)
 		ask.format = c->format;
 		cs.name[0] = 0;
 		if (c->desc != CHEATFILE_NONE)
-			snprintf(cs.name, sizeof(cs.name), "%.*s", (int)c->desc_len, f->text + c->desc);
+			name_copy(cs.name, sizeof(cs.name), f->text + c->desc, c->desc_len);
 	}
 	u8 format = ask.format;
 	char was[sizeof(cs.name)];
@@ -1553,15 +1641,25 @@ static u32 cs_code(u32 g, int fill)
 			break;
 	}
 	u32 r, idx = at, old = f->count;
-	if (!c)
+	int own = c && c->own;
+	if (!c) {
 		r = cheatstore_add(cs.name, cs.code, format, &idx);
-	else
+		if (r == CHEATFILE_EDIT_OK && cs.add_head) {
+			char head[CHEATFILE_FOLDER_MAX + 1];
+			heading_copy(head, cs.add_head);
+			if (cheatstore_set_folder(idx, head) != CHEATFILE_EDIT_OK)
+				tlog("cheats: the new code's heading: refused");  // the code stays, under none
+		}
+	} else {
 		r = cheatstore_set_code(at, fill ? NULL : cs.name, cs.code, format);
+		if (r == CHEATFILE_EDIT_OK && !fill && !own)
+			r = cheatstore_set_own(at);
+	}
 	const char *how = c ? (fill ? "filled in" : "edited") : "added";
 	if (r != CHEATFILE_EDIT_OK) {
-		u32 text = STR_CHEATS_EDIT_FAILED + (r <= CHEATFILE_EDIT_FAILED ? r : 0);
-		tlog("cheats: %s: refused: %s", how, lang_en[text]);
-		dialog_message(cs.heading, S(text), DIALOG_ERROR);
+		tlog("cheats: %s: refused: %s", how,
+		     lang_en[STR_CHEATS_EDIT_FAILED + (r <= CHEATFILE_EDIT_FAILED ? r : 0)]);
+		edit_refused(r, old);
 		return row;
 	}
 	tlog("cheats: %s cheat %lu: ok", how, (unsigned long)cs_global(idx));
@@ -1582,7 +1680,7 @@ static u32 cs_rename(u32 g)
 	const struct cheatfile *f = &cheatstore()->file;
 	cs.name[0] = 0;
 	if (c->desc != CHEATFILE_NONE)
-		snprintf(cs.name, sizeof(cs.name), "%.*s", (int)c->desc_len, f->text + c->desc);
+		name_copy(cs.name, sizeof(cs.name), f->text + c->desc, c->desc_len);
 	char was[sizeof(cs.name)];
 	memcpy(was, cs.name, sizeof(was));
 	const struct rename_ask name = {
@@ -1592,8 +1690,7 @@ static u32 cs_rename(u32 g)
 	u32 old = f->count, r = cheatstore_rename(at, cs.name);
 	tlog("cheats: renamed cheat %lu: %s", (unsigned long)g, r == CHEATFILE_EDIT_OK ? "ok" : "refused");
 	if (r != CHEATFILE_EDIT_OK) {
-		dialog_message(cs.heading, S(STR_CHEATS_EDIT_FAILED + (r <= CHEATFILE_EDIT_FAILED ? r : 0)),
-			       DIALOG_ERROR);
+		edit_refused(r, old);
 		return row;
 	}
 	cs_redecode(old);
@@ -1667,20 +1764,26 @@ static u32 cs_edit_guide(u32 at)
 	struct cheatstore *s = cheatstore();
 	u32 row = cs.act_row;
 	char was[sizeof(cs.name)];
+	if (at >= s->file.count)
+		return row;
+	if (cheatfile_guide_len(&s->file.cheats[at]) > CHEATFILE_GUIDE_MAX) {
+		// Longer than the keyboard takes (written in the file): it would be cut
+		SF(cs.ask, sizeof(cs.ask), STR_CHEATS_GUIDE_TOO_LONG, LN(CHEATFILE_GUIDE_MAX));
+		dialog_message(cs.heading, cs.ask, DIALOG_INFO);
+		return row;
+	}
 	cheatfile_guide(&s->file, at, was, sizeof(was));
 	const struct rename_ask ask = {
 		cs.icon, was, NULL, CHEATFILE_GUIDE_MAX, 0, guide_submit, 0, S(STR_CHEATS_GUIDE_TITLE), 0, 1, 0};
 	if (!rename_run(&ask))
 		return row;  // cancelled, or as it was
-	u32 r = cheatstore_set_guide(at, cs.name);
-	tlog("cheats: guide of cheat %lu %s: %s", (unsigned long)at, cs.name[0] ? "set" : "removed",
+	u32 g = cs_global(at), r = cheatstore_set_guide(at, cs.name);
+	tlog("cheats: guide of cheat %lu %s: %s", (unsigned long)g, cs.name[0] ? "set" : "removed",
 	     r == CHEATFILE_EDIT_OK ? "ok" : "refused");
 	if (r != CHEATFILE_EDIT_OK) {
-		dialog_message(cs.heading, S(STR_CHEATS_EDIT_FAILED + (r <= CHEATFILE_EDIT_FAILED ? r : 0)),
-			       DIALOG_ERROR);
+		edit_refused(r, cheatstore()->file.count);
 		return row;
 	}
-	u32 g = cs_global(at);
 	cs_redecode(cheatstore()->file.count);
 	cs_write();
 	return rows_at(g);
@@ -1877,12 +1980,26 @@ static void bp_hints(void)
 		ui_hints_note(cs.bp.hints, cs.bp.why, &danger);
 		return;
 	}
-	u32 id = STR_CHEATS_EXPLAIN_ALWAYS + cs.bp.row;
-	if (cs.bp.locked)
+	// The row's line beside the keys: A where it does something, B always
+	static const struct ui_hint_note beside = {0, 0, 0, 0, 0, 0, 1};
+	u32 id = STR_CHEATS_EXPLAIN_ALWAYS + cs.bp.row, n = 0;
+	int a = 1;
+	if (cs.bp.locked) {
 		id = STR_CHEATS_EXPLAIN_LOCKED;
-	else if (cs.bp.ungated && (cs.bp.row == BP_HOLD || cs.bp.row == BP_PRESS))
+		a = 0;
+	} else if (cs.bp.ungated && (cs.bp.row == BP_HOLD || cs.bp.row == BP_PRESS)) {
 		id = STR_CHEATS_EXPLAIN_UNGATED;
-	ui_hints_text(cs.bp.hints, S(id));
+		a = 0;
+	}
+	if (a)
+		cs.keys[n++] = (struct ui_hint){"A", S(STR_HINT_SET)};
+	cs.keys[n++] = (struct ui_hint){"B", S(STR_HINT_DONE)};
+	if (n == 2 && ui_hints_width(cs.keys, n, S(id)) > (u32)ui_node(cs.bp.hints)->w) {
+		cs.keys[0] = cs.keys[1];  // the line needs A's room: B stays
+		n = 1;
+	}
+	ui_hints_set(cs.bp.hints, cs.keys, n);
+	ui_hints_note(cs.bp.hints, S(id), &beside);
 }
 
 // A on the cursor's row: Always and From the code at once, Hold and Press
@@ -2028,8 +2145,7 @@ static u32 cs_buttons(u32 at)
 	tlog("cheats: buttons of cheat %lu: %s: %s", (unsigned long)at, cs.bp.keys ? text : "from the code",
 	     r == CHEATFILE_EDIT_OK ? "ok" : "refused");
 	if (r != CHEATFILE_EDIT_OK) {
-		dialog_message(cs.heading, S(STR_CHEATS_EDIT_FAILED + (r <= CHEATFILE_EDIT_FAILED ? r : 0)),
-			       DIALOG_ERROR);
+		edit_refused(r, cheatstore()->file.count);
 		return row;
 	}
 	u32 g = cs_global(at);
@@ -2038,42 +2154,132 @@ static u32 cs_buttons(u32 at)
 	return rows_at(g);
 }
 
-// START's menu on row: on a cheat, its Guide, its Rename (Edit code for a
-// code of the user's), Buttons and Edit guide; then Turn all off and Show
-// picked only; on a cheat, Delete last. The row to show after, or
+// --- Headings: the one a cheat shows under, chosen --------------------------------
+
+// OK on the heading's keyboard: the name, if the file takes it
+static const char *heading_submit(void *ctx, const char *text)
+{
+	(void)ctx;
+	if (strlen(text) > CHEATFILE_FOLDER_MAX) {
+		SF(cs.reason, sizeof(cs.reason), STR_CHEATS_GUIDE_LONG, LN(CHEATFILE_FOLDER_MAX));
+		return cs.reason;
+	}
+	snprintf(cs.name, sizeof(cs.name), "%s", text);
+	return NULL;
+}
+
+// The Heading menu for entry g, then its cheatN_folder line written: No
+// heading, the headings in the list's order (the one it is under chosen
+// first), New heading (the keyboard). The row to show after, CHEATFILE_NONE
+// to stay on the view (B).
+static u32 cs_heading(u32 g)
+{
+	struct cheatlist_entry e;
+	u32 at = cs_focus(g), n = 0, cur = 0;
+	if (at == CHEATFILE_NONE)
+		return cs.act_row;
+	cheatlist_get(g, &e);
+	u8 ids[HEAD_SHOWN];
+	cs.head_items[n++] = (struct ui_pop_item){S(STR_CHEATS_HEADING_NONE), 0, 0};
+	// The headings the list shows, in its order, then the others that have
+	// cheats (the cheat's own among them)
+	for (u32 pass = 0; pass < 2; pass++) {
+		u32 last = pass ? cheatstore()->list.n_headings : cs.n_heads;
+		for (u32 k = 0; k < last && n - 1 < HEAD_SHOWN; k++) {
+			u32 h = pass ? k + 1 : cs.head_ids[k], shown = 0;
+			for (u32 j = 0; pass && j < cs.n_heads && !shown; j++)
+				shown = cs.head_ids[j] == h;
+			if (pass && (shown || (!cs.sec_cheats[h] && h != e.heading)))
+				continue;
+			u32 i = n - 1;
+			heading_copy(cs.head_names[i], h);
+			ids[i] = (u8)h;
+			if (h == e.heading)
+				cur = n;
+			cs.head_items[n++] = (struct ui_pop_item){cs.head_names[i], 0, 0};
+		}
+	}
+	u32 add = n;
+	cs.head_items[n++] = (struct ui_pop_item){S(STR_CHEATS_HEADING_NEW), 0, 0};
+	cs.popup =
+		(struct ui_popup){S(STR_CHEATS_MENU_HEADING), ART_ICON8_FOLDER + 1, cs.head_items, (u8)n, (u8)cur, 0};
+	if (!ui_popup_open(cs.list, cs.hints, &cs.popup))
+		return CHEATFILE_NONE;
+	tlog_debug("screen ready: cheat-heading");
+	s32 pick = ui_popup_choose();
+	if (pick < 0 || (u32)pick >= n)
+		return CHEATFILE_NONE;  // B: it has closed
+	ui_popup_close();
+	if ((u32)pick == add) {
+		// New heading: named on the keyboard, the cheat's heading to start
+		heading_copy(cs.name, e.heading);
+		char was[CHEATFILE_FOLDER_MAX + 1];
+		memcpy(was, cs.name, sizeof(was));
+		cs_leave();
+		const struct rename_ask ask = {
+			cs.icon, was, NULL, CHEATFILE_FOLDER_MAX, 0, heading_submit, 0, S(STR_CHEATS_HEADING_TITLE),
+			0,       0,   0};
+		if (!rename_run(&ask))
+			return cs.act_row;  // cancelled, or as it was
+	} else if ((u32)pick == cur) {
+		return CHEATFILE_NONE;  // where it is already
+	} else if (pick) {
+		heading_copy(cs.name, ids[pick - 1]);
+		cs_leave();
+	} else {
+		cs.name[0] = 0;
+		cs_leave();
+	}
+	at = cs_focus(g);  // the keyboard may have read another window ahead
+	if (at == CHEATFILE_NONE)
+		return cs.act_row;
+	u32 old = cheatstore()->file.count, r = cheatstore_set_folder(at, cs.name);
+	tlog("cheats: heading of cheat %lu: %s: %s", (unsigned long)g, cs.name[0] ? cs.name : "none",
+	     r == CHEATFILE_EDIT_OK ? "ok" : "refused");
+	if (r != CHEATFILE_EDIT_OK) {
+		edit_refused(r, old);
+		return cs.act_row;
+	}
+	cs_redecode(old);
+	cs_write();
+	return rows_at(g);
+}
+
+// START's menu on row: on a cheat, its Guide, Edit code, Rename, Buttons and
+// Heading; then Add code (under the cursor's heading), Turn all off and
+// Show picked only; on a cheat, Delete last. The row to show after, or
 // CHEATFILE_NONE to stay on the view.
 static u32 cs_menu(u32 row)
 {
 	struct cheatstore *s = cheatstore();
 	u32 g = row_entry(row), at = g != CHEATFILE_NONE ? cheatstore_focus(g) : CHEATFILE_NONE, n = 0;
 	const struct cheatfile_cheat *c = at != CHEATFILE_NONE ? &s->cheats[at] : NULL;
+#define ITEM(id, text, flags) (cs.item_ids[n] = (id), cs.items[n++] = (struct ui_pop_item){(text), 0, (u8)(flags)})
 	if (c) {
 		struct cheatlist_entry e;
 		u32 len;
 		cheatlist_get(g, &e);
 		const char *name = entry_name(&e, &len);
-		snprintf(cs.pop_title, sizeof(cs.pop_title), "%.*s", (int)len, name);
-		cs.item_ids[n] = MENU_GUIDE;
-		cs.items[n++] = (struct ui_pop_item){S(STR_CHEATS_MENU_GUIDE), 0, 0};
-		cs.item_ids[n] = c->own ? MENU_EDIT : MENU_RENAME;
-		cs.items[n++] =
-			(struct ui_pop_item){c->own ? S(STR_CHEATS_MENU_EDIT) : S(STR_CHEATS_MENU_RENAME), 0, 0};
-		cs.item_ids[n] = MENU_BUTTONS;
-		cs.items[n++] = (struct ui_pop_item){S(STR_CHEATS_MENU_BUTTONS), 0, 0};
-		cs.item_ids[n] = MENU_EDIT_GUIDE;
-		cs.items[n++] = (struct ui_pop_item){S(STR_CHEATS_MENU_EDIT_GUIDE), 0, 0};
+		name_copy(cs.pop_title, sizeof(cs.pop_title), name, len);
+		ITEM(MENU_GUIDE, S(STR_CHEATS_MENU_GUIDE), 0);
+		ITEM(MENU_EDIT, S(STR_CHEATS_MENU_EDIT), 0);
+		ITEM(MENU_RENAME, S(STR_CHEATS_MENU_RENAME), 0);
+		ITEM(MENU_BUTTONS, S(STR_CHEATS_MENU_BUTTONS), 0);
+		ITEM(MENU_HEADING, S(STR_CHEATS_MENU_HEADING), 0);
 	} else {
 		snprintf(cs.pop_title, sizeof(cs.pop_title), "%s", cs.heading);
 	}
-	cs.item_ids[n] = MENU_ALL_OFF;
-	cs.items[n++] = (struct ui_pop_item){S(STR_CHEATS_MENU_ALL_OFF), 0, (u8)(cs.picks ? 0 : UI_POP_DIM)};
-	cs.item_ids[n] = MENU_ONLY;
-	cs.items[n++] = (struct ui_pop_item){cs.only ? S(STR_CHEATS_MENU_ALL) : S(STR_CHEATS_MENU_ONLY), 0,
-					     (u8)(cs.picks || cs.only ? 0 : UI_POP_DIM)};
-	if (c) {
-		cs.item_ids[n] = MENU_DELETE;
-		cs.items[n++] = (struct ui_pop_item){S(STR_CHEATS_MENU_DELETE), 0, UI_POP_DANGER};
-	}
+	// A code added here goes under the heading the cursor is under
+	cs.add_head = cs.only ? 0 : cs.place;
+	if (ROW_KIND(cs.cur_value) == ROW_ADD)
+		cs.add_head = 0;
+	ITEM(MENU_ADD, S(STR_CHEATS_MENU_ADD), cs.add_why == CHEATFILE_EDIT_OK ? 0 : UI_POP_DIM);
+	ITEM(MENU_ALL_OFF, S(STR_CHEATS_MENU_ALL_OFF), cs.picks ? 0 : UI_POP_DIM);
+	ITEM(MENU_ONLY, cs.only ? S(STR_CHEATS_MENU_ALL) : S(STR_CHEATS_MENU_ONLY),
+	     cs.picks || cs.only ? 0 : UI_POP_DIM);
+	if (c)
+		ITEM(MENU_DELETE, S(STR_CHEATS_MENU_DELETE), UI_POP_DANGER);
+#undef ITEM
 	cs.popup = (struct ui_popup){cs.pop_title, 0, cs.items, (u8)n, 0, 0};
 	if (!ui_popup_open(cs.list, cs.hints, &cs.popup))
 		return CHEATFILE_NONE;
@@ -2083,12 +2289,15 @@ static u32 cs_menu(u32 row)
 		if (pick < 0 || (u32)pick >= n)
 			return CHEATFILE_NONE;  // B: it has closed
 		u32 id = cs.item_ids[pick];
-		if (!c && id != MENU_ALL_OFF && id != MENU_ONLY)
+		if (!c && id != MENU_ADD && id != MENU_ALL_OFF && id != MENU_ONLY)
 			return CHEATFILE_NONE;  // a cheat's item: never listed without one
 		switch (id) {
 		case MENU_GUIDE:
 			ui_popup_close();
-			cs_guide(at);
+			if (cs_guide(at)) {
+				cs_leave();
+				return cs_edit_guide(at);
+			}
 			return row;
 		case MENU_EDIT:
 			ui_popup_close();
@@ -2101,10 +2310,15 @@ static u32 cs_menu(u32 row)
 		case MENU_BUTTONS:
 			ui_popup_close();
 			return cs_buttons(at);
-		case MENU_EDIT_GUIDE:
+		case MENU_HEADING:
+			ui_popup_close();
+			return cs_heading(g);
+		case MENU_ADD:
+			if (cs.add_why != CHEATFILE_EDIT_OK)
+				continue;  // greyed: + Add code's row says why
 			ui_popup_close();
 			cs_leave();
-			return cs_edit_guide(at);
+			return cs_code(CHEATFILE_NONE, 0);
 		case MENU_ALL_OFF:
 			if (!cs.picks)
 				continue;  // greyed: nothing to turn off
@@ -2173,6 +2387,7 @@ void cheats_run(const char *rom_path, const char *title, u16 icon)
 	snprintf(cs.heading, sizeof(cs.heading), "%s", title);
 	cs.icon = icon;
 	cheatstore_progress(cs_progress);  // a larger file read whole, and the list built, the first time
+	u32 began = torii_frames;
 	int opened = cheatstore_open(rom_path);
 	int listed = (opened == CHEATSTORE_READ || opened == CHEATSTORE_NEW) && cheatlist_open();
 	cs_progress_end();
@@ -2191,15 +2406,18 @@ void cheats_run(const char *rom_path, const char *title, u16 icon)
 	cs_rows(CHEATFILE_NONE);
 	// The cursor starts on the first row A does something on
 	u32 row = first_actable(0), greyed = 0;
-	for (u32 g = 0; g < s->list.count; g++) {
-		struct cheatlist_entry e;
-		cheatlist_get(g, &e);
-		greyed += entry_why(g, &e) != CHEATFILE_PICKABLE;
+	struct cheatlist_entry *buf = (struct cheatlist_entry *)s->part;
+	const u32 per = sizeof(s->part) / sizeof(*buf);
+	for (u32 g = 0; g < s->list.count; g += per) {
+		u32 n = s->list.count - g < per ? s->list.count - g : per;
+		cheatlist_read(g, n, buf);
+		for (u32 i = 0; i < n; i++)
+			greyed += entry_why(g + i, &buf[i]) != CHEATFILE_PICKABLE;
 	}
-	tlog("cheats: %s: %lu cheats, %lu greyed, %lu picked (%lu bytes), %lu rows%s", s->path,
+	tlog("cheats: %s: %lu cheats, %lu greyed, %lu picked (%lu bytes), %lu rows, open in %lu frames%s", s->path,
 	     (unsigned long)s->list.count, (unsigned long)greyed, (unsigned long)cs.picks,
 	     (unsigned long)s->file.bytes + s->file.more_bytes, (unsigned long)cs.count,
-	     opened == CHEATSTORE_NEW ? ", no file yet" : "");
+	     (unsigned long)(torii_frames - began), opened == CHEATSTORE_NEW ? ", no file yet" : "");
 	if (cs.add_why != CHEATFILE_EDIT_OK)
 		tlog("cheats: + Add code greyed: %s", add_reason());
 	int up = cs_show(row);
@@ -2234,10 +2452,13 @@ void cheats_run(const char *rom_path, const char *title, u16 icon)
 			continue;
 		}
 		if (cs.act == ACT_GUIDE) {
-			u32 at = cs_focus(cs.act_g);
+			u32 at = cs_focus(cs.act_g), to = cs.act_row;
 			if (at != CHEATFILE_NONE) {
-				cs_guide(at);
-				up = cs_show(cs.act_row);
+				if (cs_guide(at)) {
+					cs_leave();
+					to = cs_edit_guide(at);
+				}
+				up = cs_show(to);
 			}
 			continue;
 		}
@@ -2249,6 +2470,7 @@ void cheats_run(const char *rom_path, const char *title, u16 icon)
 		}
 		if (cs.act != ACT_ADD)
 			break;
+		cs.add_head = 0;  // + Add code ends the list, under no heading
 		cs_leave();
 		row = cs_code(CHEATFILE_NONE, 0);
 		up = cs_show(row);
