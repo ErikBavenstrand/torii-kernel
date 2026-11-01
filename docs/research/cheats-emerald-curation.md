@@ -335,3 +335,5 @@ More cheats (D51-D60, 2026-10-31, from `research-emerald-more-cheats.md`): D51 o
 ## Names and guides (2026-10-31)
 
 Folders in this order: Menus, Money, Pokémon, Battle, Wild, Overworld, Minigames. Names are short and say what the cheat does; a menu's names carry its buttons. Guides say what happens and how to use it in one or two sentences, without repeating what Torii shows above them: a launch cheat's "Set when the game starts" comes from its buttons line. Run-once cheats say "Run it once" (SELECT on it in the in-game menu).
+
+The e-Reader (2026-11-01, dropped): English Emerald's e-Reader screen takes only Trainer Hill course cards, which the Hill never uses; Enigma Berries and visiting trainers came by Mystery Gift scripts, and no original card data is documented to give them faithfully. Nothing to add.
