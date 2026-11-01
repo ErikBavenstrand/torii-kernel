@@ -117,12 +117,14 @@ OP = {
     "pokemartdecoration": 0x87,
 }
 VAR_RESULT, VAR_8000, VAR_8001 = 0x800D, 0x8000, 0x8001
+VAR_8004, VAR_8005 = 0x8004, 0x8005
 SPECIAL = {  # indexes into gSpecials (0x081DBA64), counted from 0
     "HealPlayerParty": 0,
     "ShowPokemonStorageSystemPC": 0x3F,
     "PlayerPC": 0xFD,
     "ScriptMenu_CreatePCMultichoice": 0x109,
     "AccessHallOfFamePC": 0x10A,
+    "CallFrontierUtilFunc": 0xEA,
 }
 HOW_MAY_I_SERVE_YOU = 0x08272A2A  # gText_HowMayIServeYou past its "Welcome!" page
 # The game's PC (data/scripts/pc.inc), for the menu's copy of it
@@ -135,6 +137,9 @@ TEXT_STORAGE_OPENED = 0x082726A3
 TEXT_PLAYERS_PC = 0x082726C2  # gText_AccessedPlayersPC
 SOMEONES_PC = 0x08271E35  # EventScript_AccessSomeonesPC: its message, then return
 LANETTES_PC = 0x08271E3E  # EventScript_AccessLanettesPC
+# frontier_get FRONTIER_DATA_CHALLENGE_STATUS: CallFrontierUtilFunc's
+# FRONTIER_UTIL_FUNC_GET_DATA of data 0, the save's frontier.challengeStatus
+FRONTIER_UTIL_FUNC_GET_DATA, FRONTIER_DATA_CHALLENGE_STATUS = 1, 0
 
 
 class Blob:
@@ -642,9 +647,22 @@ def pc_section(m, back):
     under the player facing down), and the menu opens away from any PC.
     Logging off goes back to the main list. The storage, the item PC and
     the Hall of Fame come back to the field into this copy, as into the
-    game's."""
+    game's.
+
+    Never during a Battle Frontier or Battle Tent challenge: the party is
+    then the challenge's (picked, or rented), the player's own kept in the
+    save until it ends (frontier.challengeStatus is set from before the
+    party changes until after it is back), so a Pokémon put in a box then
+    would stay there beside the one the party gets back."""
     s = m.s
     s.label("pc")
+    s.cmd("setvar", ("h", VAR_8004), ("h", FRONTIER_UTIL_FUNC_GET_DATA))
+    s.cmd("setvar", ("h", VAR_8005), ("h", FRONTIER_DATA_CHALLENGE_STATUS))
+    s.cmd("special", ("h", SPECIAL["CallFrontierUtilFunc"]))
+    s.when(VAR_RESULT, 0, "pc_on")
+    s.say(m.t("The PC can't be used\nduring a challenge."))
+    s.goto(back)
+    s.label("pc_on")
     s.cmd("playse", ("h", SE_PC_ON))
     s.msgbox(TEXT_BOOT_UP_PC)
     s.label("pc_menu")  # EventScript_PCMainMenu
