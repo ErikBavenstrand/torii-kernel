@@ -133,6 +133,9 @@ SPECIAL = {  # indexes into gSpecials (0x081DBA64), counted from 0
     "CallFrontierUtilFunc": 0xEA,
     "ExitSafariMode": 0xD1,
     "CalculatePlayerPartyCount": 0x86,
+    "CreateAbnormalWeatherEvent": 0x1EB,
+    "GetAbnormalWeatherMapNameAndType": 0x1EC,
+    "InitRoamer": 0x12B,
 }
 HOW_MAY_I_SERVE_YOU = 0x08272A2A  # gText_HowMayIServeYou past its "Welcome!" page
 # The game's PC (data/scripts/pc.inc), for the menu's copy of it
@@ -581,19 +584,38 @@ ISLANDS = [  # name, map group, map number, x, y: where the ferry leaves you
     ("FARAWAY ISLAND", 26, 56, 13, 38),
     ("NAVEL ROCK", 26, 67, 8, 4),
 ]
-LEGENDS = [  # name, flags to clear: defeated, caught, hidden (the map shows it again when not defeated)
-    ("RAYQUAZA", [0x1C0]),
-    ("GROUDON", [0x1BF]),
-    ("KYOGRE", [0x1BE]),
-    ("REGIROCK", [0x1BB, 0x3A7]),
-    ("REGICE", [0x1BC, 0x3A8]),
-    ("REGISTEEL", [0x1BD, 0x3A9]),
-    ("LATIAS & LATIOS", [0x1C8, 0x1C9]),
-    ("MEW", [0x1C7, 0x1CA]),
-    ("DEOXYS", [0x1AC]),
-    ("LUGIA", [0x1DD, 0x91, 0x320]),
-    ("HO-OH", [0x1DC, 0x92, 0x321]),
+LEGENDS = [  # name, flags to clear, where it waits: as each lair's map script shows it again
+    ("RAYQUAZA", [0x1C0], "atop SKY PILLAR"),  # FLAG_DEFEATED_RAYQUAZA
+    (
+        "GROUDON",
+        [0x1BF],
+        None,
+    ),  # FLAG_DEFEATED_GROUDON: in Terra Cave, while its sun lasts
+    (
+        "KYOGRE",
+        [0x1BE],
+        None,
+    ),  # FLAG_DEFEATED_KYOGRE: in Marine Cave, while its rain lasts
+    ("REGIROCK", [0x1BB, 0x3A7], "in the DESERT RUINS"),  # defeated, hidden
+    ("REGICE", [0x1BC, 0x3A8], "in the ISLAND CAVE"),
+    ("REGISTEEL", [0x1BD, 0x3A9], "in the ANCIENT TOMB"),
+    ("LATI ON ISLAND", [0x1C8, 0x1C9], "on SOUTHERN ISLAND"),  # defeated, caught
+    ("ROAMING LATI", [], None),  # InitRoamer, as Mom's TV news does
+    ("MEW", [0x1C7, 0x1CA], "on FARAWAY ISLAND"),  # defeated, caught
+    (
+        "DEOXYS",
+        [0x1AC, 0x1AD],
+        "on BIRTH ISLAND",
+    ),  # defeated, battled: its puzzle shows again
+    ("LUGIA", [0x1DD, 0x91, 0x320], "deep in NAVEL ROCK"),  # defeated, caught, hidden
+    ("HO-OH", [0x1DC, 0x92, 0x321], "atop NAVEL ROCK"),
 ]
+VAR_ROAMER_POKEMON = (
+    0x40D5  # the roaming one: 0 Latias, 1 Latios (Southern Island has the other)
+)
+FLAG_LATIOS_OR_LATIAS_ROAMING = 0xFF
+FLAG_ENABLE_SHIP_SOUTHERN_ISLAND = 0x8B3
+FLAG_DEFEATED_GROUDON, FLAG_DEFEATED_KYOGRE = 0x1BF, 0x1BE
 
 
 def species(name):
@@ -1056,23 +1078,72 @@ def gifts_section(m, back):
 
 
 @section(
-    "Legends", "Brings back a legendary Pokémon you defeated or caught, in its lair."
+    "Legends",
+    "Brings back a legendary Pokémon you defeated or caught, in its lair. GROUDON and KYOGRE wait "
+    "in a cave on the route the menu names, while its sun or rain lasts. The roaming LATIAS or "
+    "LATIOS roams again.",
 )
 def legends_section(m, back):
     s = m.s
     m.list(
         "legends",
         [
-            (n if "&" in n else species_name(n), f"lg{i}")
-            for i, (n, _) in enumerate(LEGENDS)
+            (n if " " in n else species_name(n), f"lg{i}")
+            for i, (n, *_) in enumerate(LEGENDS)
         ],
         back,
     )
-    for i, (_, flags) in enumerate(LEGENDS):
+    for i, (name, flags, where) in enumerate(LEGENDS):
         s.label(f"lg{i}")
         for f in flags:
             s.cmd("clearflag", ("h", f))
-        s.say(m.t("It waits in its lair again."))
+        if name in ("GROUDON", "KYOGRE"):
+            # As the Weather Institute's scientist does after the credits
+            # (CreateAbnormalWeatherEvent): it picks Groudon's sun while
+            # Kyogre counts as defeated, Kyogre's rain while Groudon does,
+            # so the other's flag is set for the call and put back after
+            other = FLAG_DEFEATED_KYOGRE if name == "GROUDON" else FLAG_DEFEATED_GROUDON
+            s.cmd("checkflag", ("h", other))
+            s.cmd("goto_if", ("b", 1), ("p", f"lg{i}_set"))
+            s.cmd("setflag", ("h", other))
+            s.cmd("special", ("h", SPECIAL["CreateAbnormalWeatherEvent"]))
+            s.cmd("clearflag", ("h", other))
+            s.goto(f"lg{i}_say")
+            s.label(f"lg{i}_set")
+            s.cmd("special", ("h", SPECIAL["CreateAbnormalWeatherEvent"]))
+            s.label(f"lg{i}_say")
+            s.cmd(
+                "specialvar",
+                ("h", VAR_RESULT),
+                ("h", SPECIAL["GetAbnormalWeatherMapNameAndType"]),
+            )  # the route into {STR1}
+            s.say(
+                m.t(
+                    "Harsh sun beats down on\n{STR1}: GROUDON is there."
+                    if name == "GROUDON"
+                    else "Heavy rain falls on\n{STR1}: KYOGRE is there."
+                )
+            )
+        elif name == "ROAMING LATI":
+            s.cmd("copyvar", ("h", VAR_8004), ("h", VAR_ROAMER_POKEMON))
+            s.cmd("special", ("h", SPECIAL["InitRoamer"]))
+            s.cmd("setflag", ("h", FLAG_LATIOS_OR_LATIAS_ROAMING))
+            s.cmd("bufferspeciesname", ("b", 0), ("h", species("LATIAS")))
+            s.when(VAR_ROAMER_POKEMON, 0, f"lg{i}_say")
+            s.cmd("bufferspeciesname", ("b", 0), ("h", species("LATIOS")))
+            s.label(f"lg{i}_say")
+            s.say(m.t("{STR1} roams HOENN again."))
+        else:
+            if name == "LATI ON ISLAND":
+                # The other one of the pair, met only with the Eon Ticket's ferry open
+                s.cmd("setflag", ("h", FLAG_ENABLE_SHIP_SOUTHERN_ISLAND))
+                s.cmd("bufferspeciesname", ("b", 0), ("h", species("LATIOS")))
+                s.when(VAR_ROAMER_POKEMON, 0, f"lg{i}_say")
+                s.cmd("bufferspeciesname", ("b", 0), ("h", species("LATIAS")))
+                s.label(f"lg{i}_say")
+                s.say(m.t("{STR1} waits " + where + "\nagain."))
+            else:
+                s.say(m.t(name + " waits " + where + "\nagain."))
         s.goto("legends")
     return "LEGENDS", "legends"
 
