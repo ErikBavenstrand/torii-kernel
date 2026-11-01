@@ -4,7 +4,7 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
-## Unreleased
+## v0.9.15
 
 - **Changed:** the cheat screen reads more clearly (8f6c5abf). Its title
   says how many cheats are on, a heading how many of its rows are on, and a
