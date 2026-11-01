@@ -551,6 +551,19 @@ GIFTS = [  # name, species, level (0: an egg), held item: as the game's own gift
     ),  # the Pokémon Center's Mystery Gift: Surf, a fateful encounter
 ]
 MOVE_SURF = 57
+# The Mystery Gift's other news: which of the cave's 9 wild sets lives in it
+VAR_ALTERING_CAVE_WILD_SET = 0x403E
+ALTERING_CAVE = [  # its wild sets in order (gAlteringCave1 to 9)
+    "ZUBAT",
+    "MAREEP",
+    "PINECO",
+    "HOUNDOUR",
+    "TEDDIURSA",
+    "AIPOM",
+    "SHUCKLE",
+    "STANTLER",
+    "SMEARGLE",
+]
 METLOC_FATEFUL_ENCOUNTER = 0xFF
 
 
@@ -826,7 +839,7 @@ def warp_section(m, back):
 
 @section(
     "Gifts",
-    "The game's gift Pokémon and eggs, again: the starters, fossils, Castform, Beldum, the Wynaut egg and the Mystery Gift's Surfing Pichu egg.",
+    "The game's gift Pokémon and eggs, again: the starters, fossils, Castform, Beldum, the Wynaut egg and the Mystery Gift's Surfing Pichu egg. ALTERING CAVE picks which Pokémon live in the cave on Route 103.",
 )
 def gifts_section(m, back):
     s = m.s
@@ -835,9 +848,23 @@ def gifts_section(m, back):
         [
             (species_name(sp) if level else n, f"gf{i}")
             for i, (n, sp, level, _) in enumerate(GIFTS)
-        ],
+        ]
+        + [("ALTERING CAVE", "cave")],
         back,
     )
+    # MysteryGiftScript_AlteringCave steps the cave to its next set; here
+    # its set is picked by the species that lives there
+    m.list(
+        "cave",
+        [(species_name(sp), f"cave{k}") for k, sp in enumerate(ALTERING_CAVE)],
+        "gifts",
+    )
+    for k, sp in enumerate(ALTERING_CAVE):
+        s.label(f"cave{k}")
+        s.cmd("setvar", ("h", VAR_ALTERING_CAVE_WILD_SET), ("h", k))
+        s.cmd("bufferspeciesname", ("b", 0), ("h", species(sp)))
+        s.say(m.t("{STR1} now lives in\nthe ALTERING CAVE."))
+        s.goto("gifts")
     for i, (_, sp, level, item) in enumerate(GIFTS):
         s.label(f"gf{i}")
         if sp == "PICHU":
