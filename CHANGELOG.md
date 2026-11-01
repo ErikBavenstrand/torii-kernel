@@ -35,6 +35,9 @@ git log, not here.
   written into free ROM) now fit about 23,000 patches where 4,096 did, and a
   cheat may have 4,096. The cheat screen shows the room in percent, and
   the cheat list's cache is built again once (ad7b48e9).
+- **Changed:** Emerald's Max EVs fills each stat the foe yields to 255
+  (a Zubat: Speed) instead of always HP and Attack, and all of Emerald's ROM-patch
+  cheats are Torii code (06506abf).
 - **Changed:** Emerald's Money cheats are all Torii code; Shopping costs 1
   is now a ROM patch, so the shop's list shows 1 apiece and selling pays
   as before (58efaeb9, 2b084478).
