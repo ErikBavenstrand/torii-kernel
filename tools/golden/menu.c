@@ -14,6 +14,11 @@
 // it lists only the sections picked. With no row left, the script goes on
 // at the list's empty script.
 //
+// A list of values (LIST_VALUES) has a value in each row in place of its
+// script: a choice puts its halves in VAR_0x8004 and VAR_0x8005 and sets
+// the script going at the list's empty script, one for every row (Warp's:
+// 106 places cost a row each, not a script each).
+//
 // Built by tools/golden/build.sh at 0x08F00000. Its variables are in EWRAM
 // past the game's last (0x0203CF64), below what Torii and plugins use
 // (0x0203FB00 on). Addresses are pokeemerald.sym's for this ROM (BPEE,
@@ -34,7 +39,8 @@ struct list {
 	const u8 *empty;  // with no row set
 	u8 count;         // rows
 	u8 memory;        // which cursor it keeps, below MEMORIES
-	u8 pad[2];
+	u8 flags;         // LIST_*
+	u8 pad;
 	struct row rows[];
 };
 
@@ -70,6 +76,8 @@ struct context {
 	const u8 *script;
 };
 
+#define LIST_VALUES 1  // rows hold values; empty is the script every row runs
+
 #define ROWS_MAX 48
 #define MEMORIES 32
 #define SHOWN 7
@@ -89,6 +97,8 @@ struct menu {
 
 #define M (*(struct menu *)0x0203F000)
 #define CONTEXT (*(struct context *)0x03000E40)  // sGlobalScriptContext
+#define VAR_8004 (*(volatile u16 *)0x020375E0)  // gSpecialVar_0x8004
+#define VAR_8005 (*(volatile u16 *)0x020375E2)
 #define PALETTE_FADE_ACTIVE (*(volatile u8 *)(0x02037FD4 + 7) & 0x80)  // gPaletteFade.active
 
 #define LIST_NOTHING_CHOSEN -1
@@ -159,6 +169,12 @@ static void task(u8 id)
 	CopyWindowToVram(M.window, 2);  // COPYWIN_GFX
 	RemoveWindow(M.window);
 	DestroyTask(id);
+	if (input != LIST_CANCEL && (l->flags & LIST_VALUES)) {
+		VAR_8004 = (u16)input;
+		VAR_8005 = (u16)((u32)input >> 16);
+		go(l->empty);
+		return;
+	}
 	go(input == LIST_CANCEL ? l->back : (const u8 *)input);
 }
 
@@ -171,7 +187,7 @@ __attribute__((section(".text.entry"))) int show_list(void)
 	u32 n = 0;
 	s32 width = 0;
 	for (u32 i = 0; i < l->count && n < ROWS_MAX; i++) {
-		if (!set(l->rows[i].script))
+		if (!(l->flags & LIST_VALUES) && !set(l->rows[i].script))
 			continue;
 		M.items[n].name = l->rows[i].name;
 		M.items[n].id = (s32)l->rows[i].script;

@@ -136,6 +136,7 @@ SPECIAL = {  # indexes into gSpecials (0x081DBA64), counted from 0
     "CreateAbnormalWeatherEvent": 0x1EB,
     "GetAbnormalWeatherMapNameAndType": 0x1EC,
     "InitRoamer": 0x12B,
+    "EnableNationalPokedex": 0x1F3,
 }
 HOW_MAY_I_SERVE_YOU = 0x08272A2A  # gText_HowMayIServeYou past its "Welcome!" page
 # The game's PC (data/scripts/pc.inc), for the menu's copy of it
@@ -231,6 +232,7 @@ SLOTS = 12  # the main list's rows, one a section
 FIELD_HOOK = 0x08001A4C  # tools/golden/field.c, over Unused_LoadBgPalette (0x88 bytes)
 FIELD_CALL = 0x08085DDE  # DoCB1_Overworld's bl ProcessPlayerFieldInput
 FIELD_MENU = MENU_CORE  # field.c starts the menu here, the base's first script
+LIST_VALUES = 1  # menu.c's: a list whose rows hold values, one script for all
 
 
 class Menu:
@@ -252,9 +254,11 @@ class Menu:
             self.texts[s] = f"t{len(self.texts)}"
         return self.texts[s]
 
-    def list(self, name, rows, back, empty=None, count=None):
+    def list(self, name, rows, back, empty=None, count=None, run=None):
         """rows: (name, script label), a name text or the address of the
-        game's own (an int)"""
+        game's own (an int). With run, a list of values (menu.c's
+        LIST_VALUES): each row's second item is a value, put in VAR_0x8004
+        (low half) and VAR_0x8005 as the script run starts."""
         s = self.s
         s.label(name)
         s.cmd("callnative", ("w", MENU | 1))
@@ -262,7 +266,10 @@ class Menu:
         s.cmd("waitstate")
         rows = [(r if isinstance(r, int) else self.t(r), target) for r, target in rows]
         n = len(rows) if count is None else count
-        self.lists.append((name, back, empty or back, rows, n, next(Menu.memories)))
+        flags = LIST_VALUES if run else 0
+        self.lists.append(
+            (name, back, run or empty or back, rows, n, next(Menu.memories), flags)
+        )
 
     def blob(self):
         """The blob as ROM patches: scripts, then strings, then lists"""
@@ -271,11 +278,11 @@ class Menu:
             s.label(lbl)
             s.raw(text(txt))
         s.align()
-        for name, back, empty, rows, count, memory in self.lists:
+        for name, back, empty, rows, count, memory, flags in self.lists:
             s.label(f"{name}.list")
             s.ptr(back)
             s.ptr(empty)
-            s.b(count, memory, 0, 0)
+            s.b(count, memory, flags, 0)
             for title, target in rows:
                 s.ptr(title)
                 s.ptr(target)
@@ -950,50 +957,42 @@ def warp_section(m, back):
         ],
         back,
     )
-    # By place (x, y) or by the map's first warp (its door): each list's rows,
-    # named by the game's own place names, else a text of the menu's
+    # Each list's rows are values for tools/golden/warp.c (menu.c's
+    # LIST_VALUES): the map's group and number, then x and y, or x 0xFF for
+    # the map's first warp (its door), so a place costs its row alone
     kinds = (
-        ("towns", "wt", TOWNS, True),
-        ("routes", "wr", ROUTES, True),
-        ("dungeons", "wd", DUNGEONS, False),
-        ("gyms", "wg", GYMS, False),
-        ("places", "wp", PLACES, False),
-        ("islands", "wi", ISLANDS, True),
+        ("towns", TOWNS, True),
+        ("routes", ROUTES, True),
+        ("dungeons", DUNGEONS, False),
+        ("gyms", GYMS, False),
+        ("places", PLACES, False),
+        ("islands", ISLANDS, True),
     )
-    for name, tag, rows, _ in kinds:
-        m.list(
-            name,
-            [
-                (MAP_NAMES[n] if n in MAP_NAMES else m.t(n), f"{tag}{i}")
-                for i, (n, *_) in enumerate(rows)
-            ],
-            "warp",
-        )
+    for name, rows, at in kinds:
+        values = []
+        for n, group, num, *xy in rows:
+            x, y = xy if at else (0xFF, 0xFF)
+            assert x < 0xFF and y < 0x100 if at else True, (n, x, y)
+            values.append(
+                (
+                    MAP_NAMES[n] if n in MAP_NAMES else m.t(n),
+                    group | num << 8 | x << 16 | y << 24,
+                )
+            )
+        m.list(name, values, "warp", run="go")
     # Out of the Safari Zone as its gate does (ExitSafariMode): its flag
-    # left on would make battles outside Safari battles until its steps run out
-    s.label("leave")
+    # left on would make battles outside Safari battles until its steps run
+    # out. Then the warp, as the game's warp command does it.
+    s.label("go")
     s.cmd("checkflag", ("h", FLAG_SYS_SAFARI_MODE))
     s.cmd("goto_if", ("b", 0), ("p", "left"))
     s.cmd("special", ("h", SPECIAL["ExitSafariMode"]))
     s.label("left")
-    s.cmd("return")
-    for _, tag, rows, at in kinds:
-        for i, (_, group, num, *xy) in enumerate(rows):
-            s.label(f"{tag}{i}")
-            s.cmd("call", ("p", "leave"))
-            if at:
-                x, y = xy
-                s.cmd("warp", ("b", group), ("b", num), ("b", 0xFF), ("h", x), ("h", y))
-            else:
-                s.cmd(
-                    "warp",
-                    ("b", group),
-                    ("b", num),
-                    ("b", 0),
-                    ("h", 0xFFFF),
-                    ("h", 0xFFFF),
-                )
-            s.cmd("waitstate")
+    s.cmd("callnative", ("p", "warp_to+1"))
+    s.cmd("waitstate")
+    s.align()
+    s.label("warp_to")
+    s.raw(Path(__file__).with_name("warp.bin").read_bytes())
     return "WARP", "warp"
 
 
@@ -1180,13 +1179,20 @@ def tickets_section(m, back):
 
 
 @section(
-    "Unlock", "All 8 badges, all 14 Frontier symbols, or a complete National Pokédex."
+    "Unlock",
+    "All 8 badges, all 14 Frontier symbols, every town on the FLY map (and the Battle Frontier), "
+    "or a complete National Pokédex.",
 )
 def unlock_section(m, back):
     s = m.s
     m.list(
         "unlock",
-        [("BADGES", "ub"), ("FRONTIER SYMBOLS", "us"), ("POKéDEX", "ud")],
+        [
+            ("BADGES", "ub"),
+            ("FRONTIER SYMBOLS", "us"),
+            ("FLY SPOTS", "uf"),
+            ("POKéDEX", "ud"),
+        ],
         back,
     )
     for tag, flags, msg in (
@@ -1196,17 +1202,21 @@ def unlock_section(m, back):
             range(0x8C4, 0x8D2),
             "All 14 Frontier symbols are yours.",
         ),  # FLAG_SYS_*_SILVER/GOLD
+        (
+            "uf",
+            [*range(0x86F, 0x87F), 0x8A8],
+            "FLY takes you to every town\nand the BATTLE FRONTIER.",
+        ),  # FLAG_VISITED_* (the region map's), FLAG_LANDMARK_BATTLE_FRONTIER
     ):
         s.label(tag)
         for f in flags:
             s.cmd("setflag", ("h", f))
         s.say(m.t(msg))
         s.goto("unlock")
-    s.label(
-        "ud"
-    )  # EnableNationalPokedex's var and flag, then tools/golden/dex.s for the bits
-    s.cmd("setvar", ("h", 0x4046), ("h", 0x302))  # VAR_NATIONAL_DEX
-    s.cmd("setflag", ("h", 0x896))  # FLAG_SYS_NATIONAL_DEX
+    # The game's own switch (its var, flag and magic byte, and the dex in
+    # national mode), then tools/golden/dex.s for the seen and caught bits
+    s.label("ud")
+    s.cmd("special", ("h", SPECIAL["EnableNationalPokedex"]))
     s.cmd("callnative", ("p", "dex+1"))
     s.say(m.t("All 386 POKéMON are seen and caught."))
     s.goto("unlock")
