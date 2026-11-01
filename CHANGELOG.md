@@ -23,6 +23,9 @@ git log, not here.
   L+R+A, plus a cheat for each section it lists (Heal, PC, Shop, Warp,
   Gifts, Legends, Tickets, Unlock), as the game's scrolling list with page
   jumps. The Shop opens the game's own marts; Moves is gone (0a00ed28).
+- **Fixed:** Emerald's Pokérus when caught no longer wipes where every new
+  Pokémon was met: only a caught one gets Pokérus, the game's own way
+  (3daf5c67).
 
 ## v0.9.15
 
