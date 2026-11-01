@@ -88,14 +88,19 @@ OP = {
     "end": 0x02,
     "goto": 0x05,
     "goto_if": 0x06,
+    "call_if": 0x07,
     "callstd": 0x09,
+    "loadword": 0x0F,
     "setvar": 0x16,
+    "copyvar": 0x19,
     "setorcopyvar": 0x1A,
     "compare": 0x21,
     "callnative": 0x23,
     "special": 0x25,
     "waitstate": 0x27,
     "setflag": 0x29,
+    "checkflag": 0x2B,
+    "playse": 0x2F,
     "clearflag": 0x2A,
     "warp": 0x39,
     "waitmessage": 0x66,
@@ -114,11 +119,22 @@ OP = {
 VAR_RESULT, VAR_8000, VAR_8001 = 0x800D, 0x8000, 0x8001
 SPECIAL = {  # indexes into gSpecials (0x081DBA64), counted from 0
     "HealPlayerParty": 0,
+    "ShowPokemonStorageSystemPC": 0x3F,
+    "PlayerPC": 0xFD,
+    "ScriptMenu_CreatePCMultichoice": 0x109,
+    "AccessHallOfFamePC": 0x10A,
 }
 HOW_MAY_I_SERVE_YOU = 0x08272A2A  # gText_HowMayIServeYou past its "Welcome!" page
-PC_SCRIPT = (
-    0x08271D9B  # EventScript_PC past its turn-on effect (GameHacking's "Access PC")
-)
+# The game's PC (data/scripts/pc.inc), for the menu's copy of it
+SE_PC_LOGIN, SE_PC_OFF, SE_PC_ON = 2, 3, 4
+MSGBOX_DEFAULT = 4  # callstd's: message, wait for A, the box kept
+FLAG_SYS_GAME_CLEAR, FLAG_SYS_PC_LANETTE = 0x864, 0x8AB
+TEXT_BOOT_UP_PC = 0x0827265A
+TEXT_WHICH_PC = 0x0827266F  # gText_WhichPCShouldBeAccessed
+TEXT_STORAGE_OPENED = 0x082726A3
+TEXT_PLAYERS_PC = 0x082726C2  # gText_AccessedPlayersPC
+SOMEONES_PC = 0x08271E35  # EventScript_AccessSomeonesPC: its message, then return
+LANETTES_PC = 0x08271E3E  # EventScript_AccessLanettesPC
 
 
 class Blob:
@@ -178,6 +194,10 @@ class Blob:
     def when(self, var, value, target):  # compare_var_to_value; goto_if ==
         self.cmd("compare", ("h", var), ("h", value))
         self.cmd("goto_if", ("b", 1), ("p", target))
+
+    def msgbox(self, text):  # msgbox TEXT, MSGBOX_DEFAULT: the box stays up
+        self.cmd("loadword", ("b", 0), ("p", text))
+        self.cmd("callstd", ("b", MSGBOX_DEFAULT))
 
     def say(self, label):  # message, wait for A
         self.cmd("message", ("p", label))
@@ -616,8 +636,55 @@ def heal_section(m, back):
 
 @section("PC", "Opens the PC: your boxes, your items, Hall of Fame.")
 def pc_section(m, back):
-    m.s.label("pc")
-    m.s.goto(PC_SCRIPT)
+    """The game's PC script (EventScript_PC on), command for command, but for
+    its turn-on and turn-off effects: those draw the PC's screen on the tile
+    the player faces (DoPCTurnOffEffect writes an impassable PC there, or
+    under the player facing down), and the menu opens away from any PC.
+    Logging off goes back to the main list. The storage, the item PC and
+    the Hall of Fame come back to the field into this copy, as into the
+    game's."""
+    s = m.s
+    s.label("pc")
+    s.cmd("playse", ("h", SE_PC_ON))
+    s.msgbox(TEXT_BOOT_UP_PC)
+    s.label("pc_menu")  # EventScript_PCMainMenu
+    s.cmd("message", ("p", TEXT_WHICH_PC))
+    s.cmd("waitmessage")
+    s.cmd("special", ("h", SPECIAL["ScriptMenu_CreatePCMultichoice"]))
+    s.cmd("waitstate")
+    s.label("pc_access")  # EventScript_AccessPC
+    s.cmd("copyvar", ("h", VAR_8000), ("h", VAR_RESULT))
+    s.when(VAR_8000, 0, "pc_storage")
+    s.when(VAR_8000, 1, "pc_items")
+    s.when(VAR_8000, 2, "pc_hof")
+    s.goto("pc_off")  # 3, LOG OFF, and B (MULTI_B_PRESSED)
+    s.label("pc_items")  # EventScript_AccessPlayersPC
+    s.cmd("playse", ("h", SE_PC_LOGIN))
+    s.msgbox(TEXT_PLAYERS_PC)
+    s.cmd("special", ("h", SPECIAL["PlayerPC"]))
+    s.cmd("waitstate")
+    s.goto("pc_menu")
+    s.label("pc_storage")  # EventScript_AccessPokemonStorage
+    s.cmd("playse", ("h", SE_PC_LOGIN))
+    s.cmd("checkflag", ("h", FLAG_SYS_PC_LANETTE))
+    s.cmd("call_if", ("b", 0), ("p", SOMEONES_PC))
+    s.cmd("checkflag", ("h", FLAG_SYS_PC_LANETTE))
+    s.cmd("call_if", ("b", 1), ("p", LANETTES_PC))
+    s.msgbox(TEXT_STORAGE_OPENED)
+    s.cmd("special", ("h", SPECIAL["ShowPokemonStorageSystemPC"]))
+    s.cmd("waitstate")
+    s.goto("pc_menu")
+    s.label("pc_hof")  # EventScript_AccessHallOfFame
+    s.cmd("checkflag", ("h", FLAG_SYS_GAME_CLEAR))
+    s.cmd("goto_if", ("b", 0), ("p", "pc_off"))
+    s.cmd("playse", ("h", SE_PC_LOGIN))
+    s.cmd("special", ("h", SPECIAL["AccessHallOfFamePC"]))
+    s.cmd("waitstate")
+    s.goto("pc_access")
+    s.label("pc_off")  # EventScript_TurnOffPC
+    s.cmd("playse", ("h", SE_PC_OFF))
+    s.cmd("closemessage")
+    s.goto(back)
     return "PC", "pc"
 
 
