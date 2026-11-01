@@ -60,7 +60,7 @@ static void print_raw(void)
 		if (cheat_raw.line[i].drop)
 			continue;
 		u8 f = cheat_raw.line[i].format;
-		if (f == CHEAT_FMT_VBA || (format != CHEAT_FMT_AUTO && f != format)) {
+		if (f == CHEAT_FMT_TORII || (format != CHEAT_FMT_AUTO && f != format)) {
 			printf("R\t-\t\n");
 			return;
 		}
