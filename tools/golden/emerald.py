@@ -479,28 +479,100 @@ TOWNS = [  # name, map group, map number, x, y: the heal locations (outside each
     ("PACIFIDLOG", 0, 15, 8, 16),
     ("EVER GRANDE", 0, 8, 27, 49),
 ]
+ROUTES = [  # name, map group, map number, x, y: picked from pokeemerald's layouts, walking
+    # in from the route's edge toward a town (else a neighbour) at one height: land
+    # there, else (and first on ocean routes) water, where the game puts you surfing
+    ("ROUTE 101", 0, 16, 8, 2),
+    ("ROUTE 102", 0, 17, 2, 8),
+    ("ROUTE 103", 0, 18, 11, 19),
+    ("ROUTE 104", 0, 19, 17, 2),
+    ("ROUTE 105", 0, 20, 17, 2),  # surfing
+    ("ROUTE 106", 0, 21, 68, 17),
+    ("ROUTE 107", 0, 22, 2, 10),
+    ("ROUTE 108", 0, 23, 2, 8),  # surfing
+    ("ROUTE 109", 0, 24, 17, 2),
+    ("ROUTE 110", 0, 25, 17, 2),
+    ("ROUTE 111", 0, 26, 19, 137),
+    ("ROUTE 112", 0, 27, 2, 49),
+    ("ROUTE 113", 0, 28, 2, 8),
+    ("ROUTE 114", 0, 29, 37, 15),
+    ("ROUTE 115", 0, 30, 21, 77),
+    ("ROUTE 116", 0, 31, 2, 8),
+    ("ROUTE 117", 0, 32, 2, 8),
+    ("ROUTE 118", 0, 33, 2, 8),
+    ("ROUTE 119", 0, 34, 37, 64),
+    ("ROUTE 120", 0, 35, 2, 51),
+    ("ROUTE 121", 0, 36, 77, 9),
+    ("ROUTE 122", 0, 37, 20, 37),
+    ("ROUTE 123", 0, 38, 119, 2),
+    ("ROUTE 124", 0, 39, 2, 43),  # surfing
+    ("ROUTE 125", 0, 40, 41, 37),  # surfing
+    ("ROUTE 126", 0, 41, 36, 2),  # surfing
+    ("ROUTE 127", 0, 42, 38, 2),  # surfing
+    ("ROUTE 128", 0, 43, 117, 20),  # surfing
+    ("ROUTE 129", 0, 44, 36, 2),  # surfing
+    ("ROUTE 130", 0, 45, 2, 17),  # surfing
+    ("ROUTE 131", 0, 46, 2, 17),  # surfing
+    ("ROUTE 132", 0, 47, 77, 21),  # surfing
+    ("ROUTE 133", 0, 48, 2, 0),  # surfing
+    ("ROUTE 134", 0, 49, 2, 18),  # surfing
+]
 DUNGEONS = [  # name, map group, map number: arriving by the map's first warp
     ("METEOR FALLS", 24, 0),
+    ("PETALBURG WOODS", 24, 11),
+    ("RUSTURF TUNNEL", 24, 4),
     ("GRANITE CAVE", 24, 7),
     ("FIERY PATH", 24, 14),
+    ("JAGGED PASS", 24, 13),
     ("MT. CHIMNEY", 24, 12),
+    ("MAGMA HIDEOUT", 24, 86),
+    ("MIRAGE TOWER", 24, 94),
+    ("DESERT UNDERPASS", 24, 98),
     ("MT. PYRE", 24, 22),
+    ("AQUA HIDEOUT", 24, 23),
     ("NEW MAUVILLE", 24, 52),
     ("ABANDONED SHIP", 24, 54),
     ("SAFARI ZONE", 26, 3),
+    ("SCORCHED SLAB", 24, 73),
     ("SHOAL CAVE", 24, 46),
     ("SEAFLOOR CAVERN", 24, 27),
     ("CAVE OF ORIGIN", 24, 37),
     ("SKY PILLAR", 24, 85),
+    ("SEALED CHAMBER", 24, 71),
     ("VICTORY ROAD", 24, 43),
+    ("ALTERING CAVE", 24, 106),
     ("DESERT RUINS", 24, 6),
     ("ISLAND CAVE", 24, 67),
     ("ANCIENT TOMB", 24, 68),
-    (
-        "ARTISAN CAVE",
-        24,
-        99,
-    ),  # Terra and Marine Cave exist only while their weather lasts
+    ("ARTISAN CAVE", 24, 99),
+]  # Terra and Marine Cave exist only while their weather lasts, their way out a dynamic warp
+GYMS = [  # name, map group, map number: arriving at the door, by the map's first warp
+    ("RUSTBORO GYM", 11, 3),
+    ("DEWFORD GYM", 3, 3),
+    ("MAUVILLE GYM", 10, 0),
+    ("LAVARIDGE GYM", 4, 1),
+    ("PETALBURG GYM", 8, 1),
+    ("FORTREE GYM", 12, 1),
+    ("MOSSDEEP GYM", 14, 0),
+    ("SOOTOPOLIS GYM", 15, 0),
+    ("POKéMON LEAGUE", 16, 10),
+]
+PLACES = [  # name, map group, map number: arriving at the door, by the map's first warp
+    ("BIRCH'S LAB", 1, 4),
+    ("DEVON CORP.", 11, 0),
+    ("OCEANIC MUSEUM", 9, 7),
+    ("BIKE SHOP", 10, 1),
+    ("GAME CORNER", 10, 3),
+    ("DAY CARE", 22, 0),
+    ("FOSSIL MANIAC", 20, 0),
+    ("TRICK HOUSE", 29, 0),
+    ("WEATHER INSTITUTE", 32, 0),
+    ("DEPT. STORE", 13, 16),
+    ("CONTEST HALL", 13, 4),
+    ("LILYCOVE MUSEUM", 13, 2),
+    ("SPACE CENTER", 14, 9),
+    ("TRAINER HILL", 26, 60),
+    ("BATTLE TOWER", 26, 14),
 ]
 ISLANDS = [  # name, map group, map number, x, y: where the ferry leaves you
     ("BATTLE FRONTIER", 26, 4, 19, 67),
@@ -610,6 +682,50 @@ MAP_NAMES = {
     "BIRTH ISLAND": 0x085A1374,  # sMapName_BIRTH_ISLAND
     "FARAWAY ISLAND": 0x085A1429,  # sMapName_FARAWAY_ISLAND
     "NAVEL ROCK": 0x085A12CA,  # sMapName_NAVEL_ROCK
+    "ROUTE 101": 0x085A0BFB,  # sMapName_ROUTE_101
+    "ROUTE 102": 0x085A0C05,  # sMapName_ROUTE_102
+    "ROUTE 103": 0x085A0C0F,  # sMapName_ROUTE_103
+    "ROUTE 104": 0x085A0C19,  # sMapName_ROUTE_104
+    "ROUTE 105": 0x085A0C23,  # sMapName_ROUTE_105
+    "ROUTE 106": 0x085A0C2D,  # sMapName_ROUTE_106
+    "ROUTE 107": 0x085A0C37,  # sMapName_ROUTE_107
+    "ROUTE 108": 0x085A0C41,  # sMapName_ROUTE_108
+    "ROUTE 109": 0x085A0C4B,  # sMapName_ROUTE_109
+    "ROUTE 110": 0x085A0C55,  # sMapName_ROUTE_110
+    "ROUTE 111": 0x085A0C5F,  # sMapName_ROUTE_111
+    "ROUTE 112": 0x085A0C69,  # sMapName_ROUTE_112
+    "ROUTE 113": 0x085A0C73,  # sMapName_ROUTE_113
+    "ROUTE 114": 0x085A0C7D,  # sMapName_ROUTE_114
+    "ROUTE 115": 0x085A0C87,  # sMapName_ROUTE_115
+    "ROUTE 116": 0x085A0C91,  # sMapName_ROUTE_116
+    "ROUTE 117": 0x085A0C9B,  # sMapName_ROUTE_117
+    "ROUTE 118": 0x085A0CA5,  # sMapName_ROUTE_118
+    "ROUTE 119": 0x085A0CAF,  # sMapName_ROUTE_119
+    "ROUTE 120": 0x085A0CB9,  # sMapName_ROUTE_120
+    "ROUTE 121": 0x085A0CC3,  # sMapName_ROUTE_121
+    "ROUTE 122": 0x085A0CCD,  # sMapName_ROUTE_122
+    "ROUTE 123": 0x085A0CD7,  # sMapName_ROUTE_123
+    "ROUTE 124": 0x085A0CE1,  # sMapName_ROUTE_124
+    "ROUTE 125": 0x085A0CEB,  # sMapName_ROUTE_125
+    "ROUTE 126": 0x085A0CF5,  # sMapName_ROUTE_126
+    "ROUTE 127": 0x085A0CFF,  # sMapName_ROUTE_127
+    "ROUTE 128": 0x085A0D09,  # sMapName_ROUTE_128
+    "ROUTE 129": 0x085A0D13,  # sMapName_ROUTE_129
+    "ROUTE 130": 0x085A0D1D,  # sMapName_ROUTE_130
+    "ROUTE 131": 0x085A0D27,  # sMapName_ROUTE_131
+    "ROUTE 132": 0x085A0D31,  # sMapName_ROUTE_132
+    "ROUTE 133": 0x085A0D3B,  # sMapName_ROUTE_133
+    "ROUTE 134": 0x085A0D45,  # sMapName_ROUTE_134
+    "PETALBURG WOODS": 0x085A0D8F,  # sMapName_PETALBURG_WOODS
+    "RUSTURF TUNNEL": 0x085A0D9F,  # sMapName_RUSTURF_TUNNEL
+    "JAGGED PASS": 0x085A0E4B,  # sMapName_JAGGED_PASS
+    "MAGMA HIDEOUT": 0x085A140E,  # sMapName_MAGMA_HIDEOUT
+    "MIRAGE TOWER": 0x085A141C,  # sMapName_MIRAGE_TOWER
+    "DESERT UNDERPASS": 0x085A145C,  # sMapName_DESERT_UNDERPASS
+    "AQUA HIDEOUT": 0x085A1401,  # sMapName_AQUA_HIDEOUT
+    "SCORCHED SLAB": 0x085A0E66,  # sMapName_SCORCHED_SLAB
+    "SEALED CHAMBER": 0x085A0E57,  # sMapName_SEALED_CHAMBER
+    "ALTERING CAVE": 0x085A133B,  # sMapName_ALTERING_CAVE
 }
 
 
@@ -793,28 +909,41 @@ def shop_section(m, back):
 
 @section(
     "Warp",
-    "Takes you to any town (outside its Pokémon Center), dungeon or island you choose.",
+    "Takes you to any town (outside its Pokémon Center), route, dungeon, gym, landmark or island you choose.",
 )
 def warp_section(m, back):
     s = m.s
     m.list(
         "warp",
-        [("TOWNS", "towns"), ("DUNGEONS", "dungeons"), ("ISLANDS", "islands")],
+        [
+            ("TOWNS", "towns"),
+            ("ROUTES", "routes"),
+            ("DUNGEONS", "dungeons"),
+            ("GYMS", "gyms"),
+            ("PLACES", "places"),
+            ("ISLANDS", "islands"),
+        ],
         back,
     )
-    m.list(
-        "towns", [(MAP_NAMES[n], f"wt{i}") for i, (n, *_) in enumerate(TOWNS)], "warp"
+    # By place (x, y) or by the map's first warp (its door): each list's rows,
+    # named by the game's own place names, else a text of the menu's
+    kinds = (
+        ("towns", "wt", TOWNS, True),
+        ("routes", "wr", ROUTES, True),
+        ("dungeons", "wd", DUNGEONS, False),
+        ("gyms", "wg", GYMS, False),
+        ("places", "wp", PLACES, False),
+        ("islands", "wi", ISLANDS, True),
     )
-    m.list(
-        "dungeons",
-        [(MAP_NAMES[n], f"wd{i}") for i, (n, *_) in enumerate(DUNGEONS)],
-        "warp",
-    )
-    m.list(
-        "islands",
-        [(MAP_NAMES[n], f"wi{i}") for i, (n, *_) in enumerate(ISLANDS)],
-        "warp",
-    )
+    for name, tag, rows, _ in kinds:
+        m.list(
+            name,
+            [
+                (MAP_NAMES[n] if n in MAP_NAMES else m.t(n), f"{tag}{i}")
+                for i, (n, *_) in enumerate(rows)
+            ],
+            "warp",
+        )
     # Out of the Safari Zone as its gate does (ExitSafariMode): its flag
     # left on would make battles outside Safari battles until its steps run out
     s.label("leave")
@@ -823,17 +952,23 @@ def warp_section(m, back):
     s.cmd("special", ("h", SPECIAL["ExitSafariMode"]))
     s.label("left")
     s.cmd("return")
-    for tag, rows in (("wt", TOWNS), ("wi", ISLANDS)):
-        for i, (_, group, num, x, y) in enumerate(rows):
+    for _, tag, rows, at in kinds:
+        for i, (_, group, num, *xy) in enumerate(rows):
             s.label(f"{tag}{i}")
             s.cmd("call", ("p", "leave"))
-            s.cmd("warp", ("b", group), ("b", num), ("b", 0xFF), ("h", x), ("h", y))
+            if at:
+                x, y = xy
+                s.cmd("warp", ("b", group), ("b", num), ("b", 0xFF), ("h", x), ("h", y))
+            else:
+                s.cmd(
+                    "warp",
+                    ("b", group),
+                    ("b", num),
+                    ("b", 0),
+                    ("h", 0xFFFF),
+                    ("h", 0xFFFF),
+                )
             s.cmd("waitstate")
-    for i, (_, group, num) in enumerate(DUNGEONS):
-        s.label(f"wd{i}")
-        s.cmd("call", ("p", "leave"))
-        s.cmd("warp", ("b", group), ("b", num), ("b", 0), ("h", 0xFFFF), ("h", 0xFFFF))
-        s.cmd("waitstate")
     return "WARP", "warp"
 
 
