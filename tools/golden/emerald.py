@@ -1415,18 +1415,16 @@ def cheats():
     )
     add(
         "Money",
-        "Max Battle Points (BP)",
-        ar(AR.write_ptr(2, SB2, 9999, 0xEB8)),
-        "Keeps your Battle Frontier BP at 9,999.",
+        "Max Battle Points",
+        vba("[03005D90]+0EB8:270F"),  # SaveBlock2's frontier.battlePoints
+        "Keeps your Battle Points (BP), the Battle Frontier's prize money, at 9,999.",
     )
     add(
         "Money",
         "Shopping costs 1",
-        ar(
-            AR.cond("NE", 4, 0x02039F70, 0, "next2"),  # sShopData, while a shop is open
-            AR.write_ptr(2, 0x02039F70, 1, 0x2000),
-            AR.write_ptr(2, 0x02039F70, 0, 0x2002),
-        ),
+        # While a shop is open (sShopData set), its totalCost (past its four
+        # 0x800-byte tilemap buffers) is 1, whatever the quantity
+        vba("02039F70!00000000", "[02039F70]+2000:00000001"),
         "Every purchase costs 1 in total, however many you buy. The list still shows the normal prices.",
     )
 

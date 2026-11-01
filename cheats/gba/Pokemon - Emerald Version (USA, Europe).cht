@@ -96,17 +96,17 @@ cheat11_keys = "always"
 cheat11_guide = "Keeps your Game Corner coins at 9,999. Needs the Coin Case."
 cheat11_enable = false
 
-cheat12_desc = "Money: Max Battle Points (BP)"
-cheat12_code = "42305D90 075C270F"
-cheat12_format = "PARv3 raw"
+cheat12_desc = "Money: Max Battle Points"
+cheat12_code = "[03005D90]+0EB8:270F"
+cheat12_format = "Torii"
 cheat12_folder = "Money"
 cheat12_keys = "always"
-cheat12_guide = "Keeps your Battle Frontier BP at 9,999."
+cheat12_guide = "Keeps your Battle Points (BP), the Battle Frontier's prize money, at 9,999."
 cheat12_enable = false
 
 cheat13_desc = "Money: Shopping costs 1"
-cheat13_code = "54239F70 00000000+42239F70 10000001+42239F70 10010000"
-cheat13_format = "PARv3 raw"
+cheat13_code = "02039F70!00000000+[02039F70]+2000:00000001"
+cheat13_format = "Torii"
 cheat13_folder = "Money"
 cheat13_keys = "always"
 cheat13_guide = "Every purchase costs 1 in total, however many you buy. The list still shows the normal prices."
