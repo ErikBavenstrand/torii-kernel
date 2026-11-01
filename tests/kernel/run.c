@@ -83,6 +83,7 @@ static const struct {
 	// A game's cheat file on the card, and its picks at a launch
 	{"cheatstore", test_cheatstore},
 	{"cheatstore_clean", test_cheatstore_clean},
+	{"cheatlist", test_cheatlist},
 	{"slotstore", test_slotstore},
 	{"saveorphan", test_saveorphan},
 	// Not in Diagnostics: they use the index's PSRAM and write games to the card

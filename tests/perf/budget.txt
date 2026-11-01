@@ -2,7 +2,7 @@
 # NAME CYCLES: the most one frame of NAME took in the scenarios' runs.
 # A run fails over 280896 (a whole frame) or 10% above the figure here.
 carousel-step 111068
-cheats-move 106281
+cheats-move 132510
 cheats-toggle 176348
 confirm-draw 145968
 confirm-motion 164105

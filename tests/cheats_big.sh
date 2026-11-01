@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # A cheat file past one read (source/cheatstore.h): 2,500 cheats in windows
 # of 250, laid out as tools/cheats.py writes them (no enable line but for a
-# pick), and no index yet. The screen reads it whole once and writes its
-# index; A picks the first cheat; UP past the first row goes round to the
-# last window, where a cheat is picked too; DOWN past the last row goes
-# round to the first window again. The picks go in the index alone, the
-# file as it was, and the next open goes by the index. At a launch, the pick
-# the file had and the two made on the screen all run.
+# pick), and no index yet. The screen reads it whole once, writes its index
+# and its list (cheatlist.h), and lists all 2,500 as one; A picks the first
+# cheat; UP past the first row goes round to + Add code, UP again to the
+# last cheat, in the last window, which A reads and picks; DOWN twice goes
+# round to the first again. The picks go in the index alone, the file as it
+# was, and the next open goes by the index and the list. At a launch, the
+# pick the file had and the two made on the screen all run.
 # Runs inside the torii-emu container after `just build`, `just
 # emu-headless` and building tests/roms/hello.
 set -euo pipefail
@@ -46,23 +47,25 @@ mcopy -i "$cart/sd.img" "$cart/Hello.cht" ::/torii/cheats/Hello.cht
 boot() { OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin "$@"; }
 
 # Hello's popup, DOWN past Saves to Cheats, A; A picks cheat 0; UP round to
-# the last window, UP from + Add code to cheat 2499, A picks it; DOWN to +
-# Add code, DOWN round to the first window; B saves
+# + Add code, UP to cheat 2499, A picks it; DOWN to + Add code, DOWN round to
+# the first; B saves
 cheat_screen() {
   # shellcheck disable=SC2046 # nav.sh's options
   boot $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -k @48:- \
     -w "screen ready: cheats" "$@"
 }
-cheat_screen -k @8:A -k @12:- -w "cheats: picked cheat 0" -k @8:UP -k @12:- -w "cheats: window 10 of 10" \
-  -k @16:UP -k @20:- -k @32:A -k @36:- -w "cheats: picked cheat 2499" \
-  -k @8:DOWN -k @12:- -k @24:DOWN -k @28:- -w "cheats: window 1 of 10" \
-  -k @16:B -k @20:- -w "cheats: back" -f 30000 >"$cart/screen.txt" 2>&1 ||
+cheat_screen -k @8:A -k @12:- -w "cheats: picked cheat 0" -k @8:UP -k @12:- \
+  -k @24:UP -k @28:- -k @40:A -k @44:- -w "cheats: picked cheat 2499" \
+  -k @8:DOWN -k @12:- -k @24:DOWN -k @28:- \
+  -k @40:B -k @44:- -w "cheats: back" -f 30000 >"$cart/screen.txt" 2>&1 ||
   fail "the screen didn't run: $(grep -a '^kernel' "$cart/screen.txt" | tail -3)"
 grep -q "cheats: /torii/cheats/Hello.cht: 2500 cheats in 10 windows, 1 picked, read whole and indexed" "$cart/screen.txt" ||
   fail "the file read: $(grep -a 'cheats:' "$cart/screen.txt" | head -3)"
 grep -q "cheats: /torii/cheats/Hello.cdx: index written (10 windows, 3 picks)" "$cart/screen.txt" ||
   fail "the save: $(grep -a 'cheats:' "$cart/screen.txt" | tail -3)"
-echo "PASS: cheats-big: a file of 2500 cheats with no index is read whole once and indexed; the cursor goes round its 10 windows both ways"
+grep -q "cheats: /torii/cheats/Hello.cht: 2500 cheats, 1 greyed, 1 picked (.*), 2501 rows" "$cart/screen.txt" ||
+  fail "the list: $(grep -a 'cheats:.*rows' "$cart/screen.txt" | head -3)"
+echo "PASS: cheats-big: a file of 2500 cheats with no index is read whole once, indexed and listed as one; the cursor goes round it both ways"
 
 # The picks are the index's: the cheat file stays as it was
 mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | cmp -s - "$cart/Hello.cht" || fail "the cheat file changed"
@@ -77,9 +80,11 @@ cheat_screen -k @8:B -k @12:- -w "cheats: back" -f 30000 >"$cart/again.txt" 2>&1
   fail "the screen didn't run again: $(grep -a '^kernel' "$cart/again.txt" | tail -3)"
 grep -q "cheats: /torii/cheats/Hello.cht: 2500 cheats in 10 windows, 3 picked, by its index" "$cart/again.txt" ||
   fail "the read by the index: $(grep -a 'cheats:' "$cart/again.txt" | head -3)"
-grep -q "cheats: /torii/cheats/Hello.cht: 250 cheats, 0 greyed, 3 picked" "$cart/again.txt" ||
-  fail "the first window: $(grep -a 'cheats:' "$cart/again.txt" | head -4)"
-echo "PASS: cheats-big: the file opens again by its index"
+grep -q "cheats: /torii/cheats/Hello.cht: 2500 cheats listed from its cache" "$cart/again.txt" ||
+  fail "the list's cache: $(grep -a 'cheats:' "$cart/again.txt" | head -4)"
+grep -q "cheats: /torii/cheats/Hello.cht: 2500 cheats, 1 greyed, 3 picked" "$cart/again.txt" ||
+  fail "the list: $(grep -a 'cheats:' "$cart/again.txt" | head -4)"
+echo "PASS: cheats-big: the file opens again by its index and its list"
 
 cp "$cart/kernel-nor.bin" "$cart/nor-before.bin"
 # shellcheck disable=SC2046 # nav.sh's options
@@ -131,7 +136,8 @@ echo "PASS: cheats-big: the file the kernel wrote opens by its index"
 
 # Edited on a PC, its size kept (one digit of a name in the last window): the
 # index still fits by size, but that window's CRC doesn't once read. The
-# index is set aside (its size 0, its picks kept), and the next open reads
+# index is set aside (its size 0, its picks kept) as UP twice reads that
+# window ahead for the cursor on its last cheat, and the next open reads
 # the file whole and indexes it, the picks carried by hash.
 cp "$cart/nor-before.bin" "$cart/kernel-nor.bin"
 rm -f "$cart/sram.bin"
@@ -139,7 +145,7 @@ mdel -i "$cart/sd.img" ::/torii/recent.txt ::/torii/recent.txt.bak 2>/dev/null |
 mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | sed 's/^cheat2450_desc = "Cheat 2450"/cheat2450_desc = "Cheat 2459"/' >"$cart/edited.cht"
 cmp -s "$cart/edited.cht" "$cart/clean.cht" && fail "the edit didn't change the file"
 mcopy -o -i "$cart/sd.img" "$cart/edited.cht" ::/torii/cheats/Hello.cht
-cheat_screen -k @8:UP -k @12:- -w "isn't as its index says" -f 30000 >"$cart/changed.txt" 2>&1 ||
+cheat_screen -k @8:UP -k @12:- -k @24:UP -k @28:- -w "isn't as its index says" -f 30000 >"$cart/changed.txt" 2>&1 ||
   fail "the changed file's window wasn't caught: $(grep -a 'cheats' "$cart/changed.txt" | tail -3)"
 mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cdx | grep '^file 0$' >/dev/null || fail "the stale index wasn't set aside"
 cp "$cart/nor-before.bin" "$cart/kernel-nor.bin"

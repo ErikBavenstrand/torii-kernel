@@ -9,7 +9,7 @@ static const struct {
 	unsigned long cycles;
 } perf_budget[] = {
 	{"carousel-step", 111068},
-	{"cheats-move", 106281},
+	{"cheats-move", 132510},
 	{"cheats-toggle", 176348},
 	{"confirm-draw", 145968},
 	{"confirm-motion", 164105},

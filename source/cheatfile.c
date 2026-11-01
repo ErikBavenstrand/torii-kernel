@@ -413,6 +413,7 @@ void cheatfile_begin(struct cheatfile_work *w)
 	w->n_prog = w->n_patches = w->cost = 0;
 	w->last = CHEATFILE_NONE;
 	w->last_shape = 0;
+	w->first_shape = 0;
 	memset(w->seen, 0, sizeof(w->seen));
 }
 
@@ -602,6 +603,8 @@ s32 cheatfile_next(struct cheatfile *f, struct cheatfile_work *w)
 	c->variant = shape && w->last + 1 == i && shape == w->last_shape && cheatfile_same_folder(f, i - 1, i);
 	w->last = i;
 	w->last_shape = shape;
+	if (!i)
+		w->first_shape = shape;
 	if (c->status != CHEATFILE_OK)
 		w->n_prog = w->n_patches = w->cost = 0;
 	c->bytes = (u16)(w->n_prog * 4);
@@ -630,7 +633,7 @@ u32 cheatfile_group(const struct cheatfile *f, u32 i, u32 *end)
 
 // 1 if c ends a word in a cheat's name: a space or a mark that joins a name
 // to its variant's part
-static int name_break(char c)
+int cheatfile_name_break(char c)
 {
 	return c == ' ' || c == '-' || c == ':' || c == '=' || c == '|' || c == ',' || c == '/' || c == '(' || c == '[';
 }
@@ -657,13 +660,13 @@ u32 cheatfile_group_name(const struct cheatfile *f, u32 start, u32 end, u32 *own
 	int whole = 1;
 	for (u32 i = start; i < end && whole; i++) {
 		const struct cheatfile_cheat *c = &f->cheats[i];
-		whole = c->desc_len == n || name_break(f->text[c->desc + n]);
+		whole = c->desc_len == n || cheatfile_name_break(f->text[c->desc + n]);
 	}
 	if (!whole)
-		while (n && !name_break(a[n - 1]))
+		while (n && !cheatfile_name_break(a[n - 1]))
 			n--;
 	u32 part = n;
-	while (n && (name_break(a[n - 1]) || a[n - 1] == ')' || a[n - 1] == ']'))
+	while (n && (cheatfile_name_break(a[n - 1]) || a[n - 1] == ')' || a[n - 1] == ']'))
 		n--;
 	if (n < 3)
 		return 0;
@@ -674,7 +677,7 @@ u32 cheatfile_group_name(const struct cheatfile *f, u32 start, u32 end, u32 *own
 u32 cheatfile_own_part(const char *name, u32 len, u32 own)
 {
 	u32 k = own < len ? own : len;
-	while (k < len && name_break(name[k]) && name[k] != '(' && name[k] != '[')
+	while (k < len && cheatfile_name_break(name[k]) && name[k] != '(' && name[k] != '[')
 		k++;
 	return k < len ? k : 0;  // nothing of its own: the whole name
 }
@@ -706,7 +709,7 @@ u32 cheatfile_folder(const struct cheatfile *f, u32 i, u32 *end)
 
 u32 cheatfile_folder_part(const char *name, u32 len, const char *folder, u32 flen)
 {
-	if (!flen || len <= flen || memcmp(name, folder, flen) != 0 || !name_break(name[flen]))
+	if (!flen || len <= flen || memcmp(name, folder, flen) != 0 || !cheatfile_name_break(name[flen]))
 		return 0;  // "Items" doesn't start "Itemsets: ..."
 	return cheatfile_own_part(name, len, flen);
 }

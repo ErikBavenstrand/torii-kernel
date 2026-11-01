@@ -35,7 +35,9 @@
 // (cheatstore.h, CHEATSTORE_SLOT_PAGE), selected only within the calls that
 // copy them; page 2, the screenshot viewer's pictures and list and the
 // game popup's screenshot counts (shotlist.h, SHOTLIST_PAGE), likewise;
-// Diagnostics' tests use page 3.
+// page 3, the cheat screen's list of a game's cheats (cheatlist.h,
+// CHEATLIST_PAGE), likewise, below the last 64 KB, where Diagnostics' tests
+// run.
 //
 // A game launch fills PSRAM with the game, so everything here is lost then:
 // the launch calls cover_cache_invalidate first.

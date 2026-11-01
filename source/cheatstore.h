@@ -26,6 +26,12 @@
 // (none, or the file changed since: `just cheats` wrote it anew, or it was
 // edited on a PC) is read whole once, decoded, and its index written.
 //
+// The cheat screen shows neither: it lists the whole file from its list
+// (cheatlist.h), built once from the decoded windows (or the small file) and
+// kept beside it, and goes to a cheat's window only to pick it, edit it or
+// show its Guide. A window read once the list is up takes its cheats'
+// decoded state from the list instead of decoding them.
+//
 // A larger file's picks are the index's: a list (struct cheatstore_pick)
 // with what each takes of the budget, so the budget counts every window's
 // picks without decoding them, and a pick saves the index alone, a few KB,
@@ -38,6 +44,7 @@
 
 #include "cheatfile.h"
 #include "cheatindex.h"
+#include "cheatlist.h"
 #include "ff.h"
 #include "safefile.h"
 
@@ -101,7 +108,6 @@ struct cheatstore {
 	struct cheatfile_work work;
 	struct cheatfile_cheat cheats[CHEATFILE_MAX];
 	char path[SAFEFILE_PATH_MAX];  // the file's, as cheatstore_read read it
-	u16 rows[CHEATFILE_MAX];  // the cheat screen's: the cheat each row shows
 	u32 part[CHEATSTORE_CHUNK / 4];  // a part read from the card (word-aligned for f_read)
 	u16 stage[CHEATSTORE_PART / 2 + 2];  // a part on its way to PSRAM, a byte each side for odd ends
 	u8 room_failed;  // a PSRAM write of the text failed since the read: never written back
@@ -122,6 +128,8 @@ struct cheatstore {
 	char detail[CHEATSTORE_DETAIL];
 	u16 detail_start[CHEATSTORE_DETAIL_ROWS];
 	u8 detail_len[CHEATSTORE_DETAIL_ROWS], detail_kind[CHEATSTORE_DETAIL_ROWS];
+	struct cheatlist list;  // the cheat screen's (cheatlist.h)
+	u8 listed_decode;  // the model's decoded state came from the list: the decoder itself wasn't run
 };
 struct cheatstore *cheatstore(void);
 // A long call's progress (decoding a larger file's windows, cleaning cheat
@@ -197,6 +205,20 @@ void cheatstore_begin(void);
 // The decoder as it is before cheat i (the file's count: after the last),
 // decoding the file again from the first unless it has just got there
 void cheatstore_decoder_before(u32 i, struct cheat_decoder *out);
+// The read file's key for the list's cache (cheatlist.h): a small file's
+// lines but its enable lines, their bytes and CRC32, as the model's text has
+// them now; a larger file's bytes and its windows' index entries
+void cheatstore_key(u32 *size, u32 *crc);
+// 1 if cheat g of the file (counting every window's) is picked now
+int cheatstore_picked(u32 g);
+// 1 if cheat number n of a larger file is in its pick list (a window not read now)
+int cheatstore_number_picked(u32 number);
+// Makes the window cheat g of the file is in the one read now (read from
+// the card if it isn't in its slot yet): its index there, or CHEATFILE_NONE
+// if it couldn't be read
+u32 cheatstore_focus(u32 g);
+// Shows progress through cheatstore_progress's function, if one is set
+void cheatstore_show_progress(u32 done, u32 total);
 // Decodes the read file's cheats from cheatstore()->work.next on, until
 // budget cycles have passed (0: all of them). 1 once all are decoded.
 int cheatstore_decode(u32 budget);

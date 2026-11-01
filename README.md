@@ -46,7 +46,11 @@ it. Info's Controls page lists every key.
   (`/GBA/Golden Sun.gba` has `/torii/cheats/GBA/Golden Sun.cht`), shows how
   many the file holds. Its screen lists them with a tick on the picked ones: A
   picks or drops one, and B saves the picks into the file (only the
-  `cheatN_enable` lines change) and goes back. **+ Add code**, the last row,
+  `cheatN_enable` lines change) and goes back. However large the file, it
+  lists as one: under the headings its `cheatN_folder` lines give (L and R
+  jump between them), each run of variants (the same cheat with other
+  values) one row that opens its choices; the list is built once and kept
+  beside the file (`.cdc`), so it opens at once. **+ Add code**, the last row,
   opens a hex keypad: type a code's lines (L and R move between them, Line
   starts one, `:` is for VBA's `address:value`, and the key between Line and
   Del shows AnyGBA's `[ ] + ^ |`), and the keypad shows the

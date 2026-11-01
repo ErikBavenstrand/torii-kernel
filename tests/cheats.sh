@@ -278,34 +278,43 @@ boot $(nav_launch /Hello.gba clean) -u "launch: loading" -f 4000 >"$cart/clean.t
 echo "PASS: cheats: a clean boot applies none"
 
 # A big file (500 cheats, 46 KB, GameShark codes that decrypt, all one code:
-# the 499 after the first greyed as the same): the popup
-# never reads it, so it shows no count; the screen reads it once, shows it
-# at once (decoding it a slice a frame, no progress dialog), and A answers at once; B saves, and back on the
-# list the popup has the count the screen found, kept for the file as saved
+# the 499 after the first greyed as the same): the popup never reads it, so
+# it shows no count; the screen reads it once and lists it, decoding it
+# whole the first time behind a progress dialog, and keeps the list beside
+# it (cheatlist.h); A answers at once; B saves, and back on the list the
+# popup has the count the screen found, kept for the file as saved. Opened
+# again, the screen takes the list from its cache: no dialog, nothing decoded.
 cp "$cart/clean/sd.img" "$cart/clean/kernel-nor.bin" "$cart/"
 rm -f "$cart/sram.bin"
-python3 - "$cart/Big.cht" <<'EOF'
+python3 - "$cart/Big.cht" <<'EOF2'
 import sys
 lines = ["cheats = 500", ""]
 for n in range(500):
     lines += [f'cheat{n}_desc = "Cheat number {n}"', f'cheat{n}_code = "8C1A761B 31E2378B"', f"cheat{n}_enable = false", ""]
 open(sys.argv[1], "w").write("\n".join(lines))
-EOF
+EOF2
 mcopy -o -i "$cart/sd.img" "$cart/Big.cht" "::/torii/cheats/Hello.cht"
 # shellcheck disable=SC2046 # nav.sh's options
 boot $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -k @48:- \
   -w "screen ready: cheats" -k @8:A -k @12:- -w "cheats: picked cheat 0" -k @8:B -k @12:- \
-  -w "screen ready: games" -k @8:START -k @12:- -w "screen ready: game-popup" -f 8000 >"$cart/big.txt" 2>&1 ||
+  -w "screen ready: games" -k @8:START -k @12:- -w "screen ready: game-popup" \
+  -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -k @48:- -w "screen ready: cheats" -k @8:B -k @12:- \
+  -w "cheats: back" -f 8000 >"$cart/big.txt" 2>&1 ||
   fail "the big file's screen didn't run: $(grep -a '^kernel' "$cart/big.txt" | tail -3)"
-! grep -q "screen ready: progress" "$cart/big.txt" || fail "a progress dialog while the big file decoded"
-grep -q "cheats: .*Hello.cht: 500 cheats, [0-9]* greyed" "$cart/big.txt" ||
+grep -q "cheats: .*Hello.cht: 500 cheats listed, decoded in" "$cart/big.txt" ||
+  fail "the big file wasn't listed: $(grep -a 'cheats:' "$cart/big.txt" | head -3)"
+grep -q "cheats: .*Hello.cht: 500 cheats, 499 greyed" "$cart/big.txt" ||
   fail "the big file read: $(grep -a 'cheats:' "$cart/big.txt" | head -3)"
 # Until the screen's write-back: the screen's read alone
 [ "$(sed '/cheats: back/q' "$cart/big.txt" | grep -c 'safefile: .*Hello.cht')" -le 1 ] ||
   fail "the big file was read more than once"
 popups=$(sed -n 's/.*cheats: popup: \(-\{0,1\}[0-9]*\) listed.*/\1/p' "$cart/big.txt" | tr '\n' ' ')
 [ "$popups" = "-1 500 " ] || fail "the popup counted ${popups:-nothing}, not -1 (no count) and then 500"
-echo "PASS: cheats: a file of 500 cheats is read once, shown at once and decoded as it shows, and picks at once; the popup counts it once the screen has"
+again=$(tac "$cart/big.txt" | sed '/screen ready: game-popup/q' | tac) # from the last popup on
+echo "$again" | grep -q "cheats: .*Hello.cht: 500 cheats listed from its cache" ||
+  fail "the second visit didn't take the list from its cache: $(echo "$again" | grep -a 'cheats:' | head -3)"
+! echo "$again" | grep -q "screen ready: progress" || fail "a progress dialog on the second visit"
+echo "PASS: cheats: a file of 500 cheats is read once and listed once, picks at once, and opens again from its list; the popup counts it once the screen has"
 
 # big_cht OUT COUNT BYTES [user] [from]: a file of COUNT cheats padded to
 # about BYTES (LF). Cheat k (counting from FROM, numbered from 0) writes

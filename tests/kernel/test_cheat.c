@@ -393,3 +393,151 @@ void test_cheatstore_clean(void)
 	CHECK_EQ(sum.failed, 0);
 	cheatstore_delete(T_ROM);
 }
+
+// Appends cheats from to to - 1 to path, each a write of its own byte to
+// EWRAM under heading folder; from 248 to 253 (a window's edge at 250) one
+// run of variants, the same byte with other values
+static __attribute__((noinline)) int put_many(const char *path, u32 from, u32 to, const char *folder)
+{
+	FIL f;
+	char *line = (char *)stage_buffer();
+	UINT done = 0;
+	int ok = f_open(&f, path, FA_WRITE | (from ? FA_OPEN_APPEND : FA_CREATE_ALWAYS)) == FR_OK;
+	for (u32 k = from; ok && k < to; k++) {
+		int run = k >= 248 && k < 253;
+		u32 n = (u32)snprintf(line, 160,
+				      "cheat%lu_desc = \"%s: Cheat %lu\"\ncheat%lu_code = \"3%07lX 00%02lX\"\n"
+				      "cheat%lu_folder = \"%s\"\n",
+				      (unsigned long)k, folder, (unsigned long)k, (unsigned long)k,
+				      (unsigned long)(run ? 0x2030000 : 0x2030000 + 1 + k), (unsigned long)(k & 0xFF),
+				      (unsigned long)k, folder);
+		ok = f_write(&f, line, n, &done) == FR_OK && done == n;
+	}
+	return (f_close(&f) == FR_OK) & ok;
+}
+
+// The cheat screen's list (cheatlist.h) on the emulated cart: built from a
+// small file and a larger one in windows, every cheat with its heading and
+// its run of variants (across a window's edge too), kept in its cache and
+// taken from it again, the picks no part of its key; a cache that no
+// longer fits the file, or is cut short, is built again
+void test_cheatlist(void)
+{
+	if (!EZcardFs.fs_type && f_mount(&EZcardFs, "", 1) != FR_OK)
+		return;
+	static const char cdc[] = "/torii/cheats/T19/Cheat Test.cdc";
+	struct cheatstore *s = cheatstore();
+	struct cheatlist_entry e;
+	u32 end, len;
+	f_unlink(cdc);
+	CHECK(put(T_CHT, "cheat0_desc = \"Loose\"\ncheat0_code = \"32001000 0001\"\n"
+			 "cheat1_desc = \"Items: Rare Candy\"\ncheat1_code = \"32001001 0002\"\n"
+			 "cheat1_folder = \"Items\"\n"
+			 "cheat2_desc = \"Money: Max\"\ncheat2_code = \"32001004 0063\"\ncheat2_folder = \"Money\"\n"
+			 "cheat3_desc = \"Items: Ball: Master\"\ncheat3_code = \"32001002 0001\"\n"
+			 "cheat3_folder = \"Items\"\n"
+			 "cheat4_desc = \"Items: Ball: Ultra\"\ncheat4_code = \"32001002 0002\"\n"
+			 "cheat4_folder = \"Items\"\ncheat4_enable = true\n"));
+	CHECK_EQ(cheatstore_open(T_ROM), CHEATSTORE_READ);
+	CHECK(cheatlist_open());
+	CHECK(s->list.valid);
+	CHECK_EQ(s->list.count, 5);
+	CHECK_EQ(s->list.n_headings, 2);
+	const char *h = cheatlist_heading(1, &len);
+	CHECK(h && len == 5 && !memcmp(h, "Items", 5));
+	cheatlist_get(3, &e);
+	CHECK_EQ(e.heading, 1);
+	CHECK(!(e.flags & CHEATLIST_VARIANT));
+	cheatlist_get(4, &e);
+	CHECK(e.flags & CHEATLIST_VARIANT);
+	CHECK(e.flags & CHEATLIST_PICKED);
+	CHECK_EQ(e.status, CHEATFILE_OK);
+	CHECK_EQ(cheatlist_run(4, &end), 3);
+	CHECK_EQ(end, 5);
+	CHECK_EQ(cheatlist_run_pick(3, 5), 4);
+	char name[CHEATLIST_NAME_MAX + 1];
+	cheatlist_get(1, &e);
+	CHECK_EQ(cheatlist_name(&e, name, sizeof(name)), 17);
+	CHECK(!strcmp(name, "Items: Rare Candy"));
+	CHECK(file_size(cdc) > 0);
+
+	// Again: from the cache, the model's decoded state taken from it
+	CHECK_EQ(cheatstore_open(T_ROM), CHEATSTORE_READ);
+	CHECK(cheatlist_open());
+	CHECK(s->listed_decode);
+	CHECK_EQ(s->cheats[1].status, CHEATFILE_OK);
+	CHECK(s->cheats[4].variant);
+	CHECK_EQ(s->list.count, 5);
+	// A pick changes the file but not the list's key
+	CHECK(cheatstore_toggle(0));
+	CHECK(cheatstore_write());
+	cheatlist_save();
+	CHECK_EQ(cheatstore_open(T_ROM), CHEATSTORE_READ);
+	CHECK(cheatlist_open());
+	CHECK(s->listed_decode);
+	cheatlist_get(0, &e);
+	CHECK(e.flags & CHEATLIST_PICKED);
+	// The decoder runs for real where a code needs it: an added code reads
+	// as decoded from the first
+	struct cheat_decoder dec;
+	cheatstore_decoder_before(s->file.count, &dec);
+	CHECK(!s->listed_decode);
+
+	// A cache cut short is built again; so is one for another text
+	CHECK(put_size(cdc, 40));
+	CHECK_EQ(cheatstore_open(T_ROM), CHEATSTORE_READ);
+	CHECK(cheatlist_open());
+	CHECK(!s->listed_decode);
+	CHECK_EQ(s->list.count, 5);
+	CHECK(put(T_CHT, "cheat0_desc = \"Other\"\ncheat0_code = \"32001000 0001\"\n"));
+	CHECK_EQ(cheatstore_open(T_ROM), CHEATSTORE_READ);
+	CHECK(cheatlist_open());
+	CHECK(!s->listed_decode);
+	CHECK_EQ(s->list.count, 1);
+	CHECK_EQ(s->list.n_headings, 0);
+
+	// A larger file, in windows: 1,100 cheats under two headings, a run of
+	// variants across the first window's edge
+	CHECK(put_many(T_CHT, 0, 600, "First"));
+	CHECK(put_many(T_CHT, 600, 1100, "Second"));
+	f_unlink(T_CHT ".bak");
+	f_unlink("/torii/cheats/T19/Cheat Test.cdx");
+	f_unlink(cdc);
+	CHECK_EQ(cheatstore_open(T_ROM), CHEATSTORE_READ);
+	CHECK(cheatstore_windows() > 1);
+	CHECK(cheatlist_open());
+	CHECK_EQ(s->list.count, 1100);
+	CHECK_EQ(s->list.n_headings, 2);
+	CHECK_EQ(cheatlist_run(251, &end), 248);
+	CHECK_EQ(end, 253);
+	cheatlist_get(1099, &e);
+	CHECK_EQ(e.heading, 2);
+	CHECK_EQ(e.number, 1099);
+	// A cheat of another window: read when it is wanted, its state the list's
+	u32 i = cheatstore_focus(1000);
+	CHECK(i != CHEATFILE_NONE);
+	CHECK(cheatstore_window() > 0);
+	CHECK_EQ(s->cheats[i].number, 1000);
+	CHECK_EQ(s->cheats[i].status, CHEATFILE_OK);
+	CHECK(s->listed_decode);
+	CHECK(cheatstore_toggle(i));
+	CHECK(cheatstore_picked(1000));
+	CHECK(cheatstore_focus(3) != CHEATFILE_NONE);
+	CHECK(cheatstore_picked(1000));  // kept in the pick list as the window went
+	CHECK(cheatstore_write());
+	cheatlist_save();
+	// Again, by the index and the cache
+	CHECK_EQ(cheatstore_open(T_ROM), CHEATSTORE_READ);
+	CHECK(cheatlist_open());
+	CHECK(s->listed_decode);
+	CHECK_EQ(s->list.count, 1100);
+	cheatlist_get(1000, &e);
+	CHECK(e.flags & CHEATLIST_PICKED);
+
+	f_unlink(T_CHT);
+	f_unlink(T_CHT ".bak");
+	f_unlink("/torii/cheats/T19/Cheat Test.cdx");
+	f_unlink("/torii/cheats/T19/Cheat Test.cdx.bak");
+	f_unlink(cdc);
+	f_unlink("/torii/cheats/T19");
+}

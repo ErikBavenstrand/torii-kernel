@@ -176,11 +176,13 @@ void cheatstore_progress(cheatstore_progress_fn progress)
 	progress_fn = progress;
 }
 
-static void show_progress(u32 done, u32 total)
+void cheatstore_show_progress(u32 done, u32 total)
 {
 	if (progress_fn && total)
 		progress_fn(done, total);
 }
+
+#define show_progress cheatstore_show_progress
 
 u32 cheatstore_windows(void)
 {
@@ -281,8 +283,66 @@ void cheatstore_begin(void)
 {
 	struct cheatstore *cs = cheatstore();
 	cheatfile_begin(&cs->work);
+	cs->listed_decode = 0;
 	if (cs->windows)
 		cs->work.dec = cs->win[cs->window].ix.dec;
+}
+
+void cheatstore_key(u32 *size, u32 *crc)
+{
+	struct cheatstore *cs = cheatstore();
+	*crc = 0;
+	if (cs->windows) {
+		*size = cs->file_size;
+		for (u32 k = 0; k < cs->windows; k++) {
+			const struct cheatindex_window *w = &cs->win[k].ix;
+			u32 v[5] = {w->at, w->len, w->crc, w->first, k == cs->window ? cs->file.count : w->count};
+			*crc = crc32_update(*crc, v, sizeof(v));
+		}
+		return;
+	}
+	// The model's text a line at a time, in PSRAM (page 0)
+	const struct cheatfile *f = &cs->file;
+	*size = 0;
+	for (u32 at = 0; at < f->len;) {
+		const char *nl = memchr(f->text + at, '\n', f->len - at);
+		u32 end = nl ? (u32)(nl - f->text) : f->len, n = end - at;
+		if (n && f->text[end - 1] == '\r')
+			n--;
+		*crc = cheatlist_key_line(*crc, f->text + at, n, size);
+		at = end + 1;
+	}
+}
+
+int cheatstore_number_picked(u32 number)
+{
+	return pick_find(number) >= 0;
+}
+
+int cheatstore_picked(u32 g)
+{
+	struct cheatstore *cs = cheatstore();
+	u32 start = cheatstore_window_start(cs->window);
+	if (g >= start && g < start + cs->file.count)
+		return cs->cheats[g - start].picked;
+	if (!cs->windows)
+		return 0;
+	struct cheatlist_entry e;
+	cheatlist_get(g, &e);
+	return pick_find(e.number) >= 0;
+}
+
+u32 cheatstore_focus(u32 g)
+{
+	struct cheatstore *cs = cheatstore();
+	u32 k = 0;
+	if (cs->windows)
+		while (k + 1u < cs->windows && g >= cheatstore_window_start(k + 1))
+			k++;
+	if (k != cs->window && !cheatstore_window_go(k))
+		return CHEATFILE_NONE;
+	u32 start = cheatstore_window_start(k);
+	return g >= start && g < start + cs->file.count ? g - start : CHEATFILE_NONE;
 }
 
 static int index_write(void);
@@ -391,6 +451,7 @@ static void window_parse(u32 k)
 			cs->file.more_patches += cs->picks[i].patches;
 		}
 	cheatstore_begin();
+	cheatlist_apply(cheatstore_window_start(k));  // the screen's list, once up: nothing to decode
 }
 
 // Window k read now: loaded, its text in place and parsed. 0 if it can't be
@@ -454,11 +515,14 @@ static int window_keep(void)
 	struct cheat_decoder end = cs->work.dec;
 	for (u32 j = k + 1; j < cs->windows && !same_state(&end, &cs->win[j].ix.dec); j++) {
 		cs->win[j].ix.dec = end;
-		if (j + 1u == cs->windows)
-			break;
+		if (j + 1u == cs->windows && !cs->list.valid)
+			break;  // nothing after it (the cheat screen's list wants its cheats again)
 		if (!window_read(j))
 			return 0;  // the windows after can't be worked out: the file isn't written
+		cheatstore_begin();  // decoded for real, not taken from the list
 		decode_all(0, 0);
+		if (cs->list.valid)
+			cheatlist_from_model(cheatstore_window_start(j), cs->file.count);
 		end = cs->work.dec;
 	}
 	if (cs->window != k && !window_read(k))
@@ -757,6 +821,7 @@ static void index_build(s32 old_picks)
 	struct cheat_decoder dec;
 	cheat_decoder_init(&dec);
 	cs->n_picks = 0;
+	cheatlist_build_begin();  // the cheat screen's list from the same pass
 	for (u32 k = 0; k < cs->windows; k++) {
 		cs->win[k].ix.dec = dec;
 		window_parse(k);  // its picks: none in the list yet, so the text's below
@@ -777,8 +842,10 @@ static void index_build(s32 old_picks)
 				pick_note(c);
 		}
 		cs->win[k].ix.count = (u16)cs->file.count;
+		cheatlist_from_model(cheatstore_window_start(k), 0);
 		dec = cs->work.dec;
 	}
+	cheatlist_build_end();
 	index_write();
 }
 // The open copy's text into PSRAM, a part at a time (never f_read straight
@@ -984,6 +1051,8 @@ static int open_read(const char *rom_path)
 	cs->n_picks = 0;
 	cs->picks_changed = 0;
 	cs->ahead.busy = 0;
+	cs->listed_decode = 0;
+	cs->list.valid = cs->list.on = cs->list.building = cs->list.names_full = 0;
 	int indexed = open_index(rom_path);
 	if (indexed != CHEATSTORE_NONE)
 		return indexed;
@@ -1057,7 +1126,7 @@ int cheatstore_read(const char *rom_path)
 void cheatstore_decoder_before(u32 i, struct cheat_decoder *out)
 {
 	struct cheatstore *cs = cheatstore();
-	if (cs->work.next != i || i == 0) {
+	if (cs->work.next != i || i == 0 || cs->listed_decode) {
 		cheatstore_begin();
 		while (cs->work.next < i && cheatfile_next(&cs->file, &cs->work) >= 0)
 			;
@@ -1618,6 +1687,8 @@ int cheatstore_delete(const char *rom_path)
 	f_unlink(path);
 	memcpy(path + len, ".bak", 5);
 	f_unlink(path);
+	memcpy(path + len - 4, CHEATLIST_EXT, 5);  // and the cheat screen's list
+	f_unlink(path);
 	return gone;
 }
 
@@ -1653,6 +1724,10 @@ int cheatstore_drop(void)
 	if (gone) {
 		cheatfile_written(&cs->file);  // nothing to write: no file is what it says
 		listed_cache.valid = 0;
+		memcpy(path + len - 4, CHEATLIST_EXT, 5);  // the cheat screen's list, of no file now
+		f_unlink(path);
+		memcpy(path + len - 4, ".cht", 5);
+		cheatlist_drop();
 	}
 	return gone;
 }

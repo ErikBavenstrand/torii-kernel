@@ -32,7 +32,40 @@ entry + 1 in 7 bits beside `patches` (which needs 9). A text with more than
 127 names leaves the cheats of the rest in no folder. Two cheats are in the
 same folder when their entries are equal.
 
-## The screen
+## v0.10: one flat list, headings in it (2026-11-01)
+
+Folders that open, each its own level, read badly on Pokémon Emerald's file
+(477 cheats, 198 KB): read in windows, its Pokémon and Wild folders were
+split across them, each part a folder row with its own count, and the list
+reflowed as decoding folded runs of variants in. The screen is now one flat
+list of the whole file, and nothing below in "The screen" opens a folder
+any more:
+
+- **Order:** the cheats under no heading first, then each heading in the
+  order the file first names it, its cheats in file order under it. A
+  cheat added on the cart (no heading) shows at the top; one whose heading
+  the file already has shows under it, wherever it is in the file.
+- **A heading's row:** its name in the accent ink, "2 on" or "36 cheats" at
+  its right. The cursor passes it by; it is never picked or opened.
+- **Runs of variants** still fold into one choice row that opens its
+  choices, now anywhere in the list ("Nature", "Species: 386 choices").
+- **L and R** (and LEFT and RIGHT) go to the next heading's first row, or
+  back to the start of this one, then the one before. Without headings, or
+  in a run's choices, they page.
+- **The title** names the heading the cursor is under, the game faint after
+  it; at the top (no heading), the game alone. A run's choices name the
+  run, their heading faint after it.
+- **The counter** counts the rows the cursor stops on: "26/44 · 2 on".
+- **The list (`source/cheatlist.h`):** every cheat of the file, whatever
+  its size, with its name, heading, status, budget and variant mark, built
+  once from the decoded file and kept beside it as `<stem>.cdc`, keyed by
+  the file's lines but its enable lines (a small file) or its index (a
+  larger one). Opening Emerald again takes 4 frames for the list; the first
+  time decodes it behind a progress dialog. A larger file's windows stay
+  the store's way to read and edit it; the screen reads one only to pick,
+  edit or show a cheat in it, read ahead while the cursor rests there.
+
+## The screen (v0.9, folders that open)
 
 - **What is a folder:** a run of adjacent cheats with the same folder
   (`cheatfile_folder`). Known from the parse, so folders fold at once, not
@@ -117,10 +150,8 @@ stays, so another can be picked. See `cheat-variants-run-once.md`.
 
 ## Larger files
 
-A larger file is read in windows (`cheatstore.h`, `cheatindex.h`), and each
-window is parsed alone. A folder split by a window's edge shows as a folder
-row in each window, each with its own part of the cheats, as a split choice
-group does. Inside an open folder the list doesn't step to the next window
-at its ends: the window steps happen at the top only. Folder names are
-looked up per window, so the 127-name cap counts a window's names, not the
-file's.
+Until v0.10 a larger file was shown a window at a time, a folder split by
+a window's edge showing as a folder row in each. The list (above) shows the
+whole file as one: headings are the file's (127 at most), and a run of
+variants that crosses a window's edge is one choice row too (each window's
+edge cheats keep their shape in the list).

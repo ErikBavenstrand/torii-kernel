@@ -286,11 +286,13 @@ struct cheatfile_work {
 	// The hashes of the OK cheats' tables and patches decoded so far, open
 	// addressed (0 empty): a later cheat with one of them is CHEATFILE_SAME
 	u32 seen[CHEATFILE_SEEN_SLOTS];
-	// The cheat decoded last, and its shape (0 unless OK): a variant's test
+	// The cheat decoded last, and its shape (0 unless OK): a variant's test.
+	// A shape is what an OK cheat's code writes where, values left out.
 	u32 last, last_shape;
 	struct cheat_op ops[CHEATFILE_OPS_MAX];
 	u32 prog[CHEATFILE_PROG_MAX];
 	struct cheat_patch *patches;  // the patch room's (cheatfile_patch_room)
+	u32 first_shape;  // the first cheat's shape, once decoded (the last's is last_shape)
 };
 
 // Where every cheatfile_work's ROM patches go: CHEATFILE_PATCHES_MAX of them
@@ -351,6 +353,9 @@ u32 cheatfile_group(const struct cheatfile *f, u32 i, u32 *end);
 // Bulbasaur" and "Wild Pokemon - Ivysaur"); 0 if under 3. *own: the bytes
 // they share, past which each name's own part starts, 0 without a name.
 u32 cheatfile_group_name(const struct cheatfile *f, u32 start, u32 end, u32 *own);
+// 1 if c ends a word in a cheat's name: a space or a mark that joins a
+// name to its variant's part
+int cheatfile_name_break(char c);
 // Where a name of len bytes has its own part ("Bulbasaur"), past the own
 // bytes it shares and the marks after them; 0 (the whole name) if nothing is left
 u32 cheatfile_own_part(const char *name, u32 len, u32 own);

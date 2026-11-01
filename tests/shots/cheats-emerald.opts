@@ -1,0 +1,40 @@
+# A cheat file past one read on the Cheats screen (source/cheatlist.h):
+# Pokémon Emerald's golden set (477 cheats, 198 KB: read in windows), on
+# Hello. The first visit decodes it once and keeps its list; the screen
+# lists the whole file as one, every heading whole with its count (list).
+# R three times: to Pokémon, Battle, then Wild, its Species and Level runs
+# one row each (wild); A on Species opens its 386 choices (species), R a
+# page on (paged), A picks one and goes back to the row, its pick at the
+# right (chosen). B leaves; opened again, the list is its cache's at once
+# (again).
+#! settings 28=1
+#! sd-file /torii/cheats/Hello.cht 0 "cheats/gba/Pokemon - Emerald Version (USA, Europe).cht"
+-p 30:nav_test_action:2113929225
+-w "nav: test hook 9 "
+-w "nav: home ready"
+-k @8:RIGHT -k @12:-
+-k @20:A -k @24:-
+-w "nav: page gba ready"
+-k @8:RIGHT -k @12:- -k @20:RIGHT -k @24:- -k @32:RIGHT -k @36:-
+-k @80:START -k @84:-
+-w "screen ready: game-popup"
+-k @12:DOWN -k @16:- -k @24:DOWN -k @28:-
+-k @48:A -k @52:-
+-w "screen ready: cheats"
+-s @24:list.png
+-k @32:R -k @36:- -k @48:R -k @52:- -k @64:R -k @68:- -k @80:R -k @84:-
+-s @112:wild.png
+-k @120:A -k @124:-
+-s @152:species.png
+-k @160:R -k @164:-
+-s @192:paged.png
+-k @200:A -k @204:-
+-s @232:chosen.png
+-k @240:B -k @246:-
+-w "screen ready: games"
+-k @30:START -k @34:-
+-w "screen ready: game-popup"
+-k @12:DOWN -k @16:- -k @24:DOWN -k @28:-
+-k @48:A -k @52:-
+-w "screen ready: cheats"
+-s @24:again.png
