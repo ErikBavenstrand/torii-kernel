@@ -32,7 +32,9 @@ git log, not here.
   opens it, as A first talks to what is in front (0a00ed28, 12f49636).
 - **Fixed:** Emerald's menu PC no longer leaves an impassable PC drawn
   beside or under the player on logging off: it runs its own copy of the
-  game's PC script, without the PC screen's effects (a2e9e164).
+  game's PC script, without the PC screen's effects; during a Battle
+  Frontier or Tent challenge it isn't opened, as a Pokémon boxed then
+  would be duplicated (a2e9e164, c7b350d6).
 - **Fixed:** Emerald's Pokérus when caught no longer wipes where every new
   Pokémon was met: only a caught one gets Pokérus, the game's own way
   (3daf5c67).
