@@ -57,9 +57,7 @@ const char *const lang_en[STR_COUNT] = {
 	"Slot {1} \302\267 empty",  // state.row_empty
 	"Slot {1} \302\267 not kept yet",  // state.row_unkept
 	"Slot {1}",  // state.slot
-	"{1} {2}",  // state.when
 	"Saving the save state",  // state.keeping
-	"No save states yet.\nSave one from the in-game menu.",  // state.none
 	"The save state wasn't kept:\nthe card didn't take it.",  // state.not_kept
 	"This state can't be read",  // state.unreadable
 	"This state is another game's",  // state.other_game
@@ -500,18 +498,12 @@ const char *const lang_en[STR_COUNT] = {
 	"Play",  // games.pop_play
 	"Favourite",  // games.pop_fav
 	"Rename",  // games.pop_rename
-	"Original name",  // games.pop_unname
-	"Hide box art",  // games.pop_art
 	"Game info",  // games.pop_info
 	"Saves",  // games.pop_saves
 	"Screenshots",  // games.pop_shots
 	"Cheats",  // games.pop_cheats
-	"Load state",  // games.pop_states
 	"Remove",  // games.pop_unrecent
 	"Delete",  // games.pop_delete
-	"Show box art",  // games.art_show
-	"Remove own art",  // games.art_remove
-	"The card didn't take the change.",  // games.art_failed
 	"default",  // games.boot_default
 	"clean",  // games.boot_clean
 	"addons",  // games.boot_addons

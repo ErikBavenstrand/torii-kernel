@@ -1960,7 +1960,7 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 				// the slot to start in when one was asked for
 				if (gl_rts_on == 1) {
 					progress_step(NULL, LAUNCH_SAVE, LAUNCH_STATES);
-					// A slot the game popup's Load state picked that doesn't
+					// A slot asked for (NAV_TEST_STATE) that doesn't
 					// read, or is another game's, or newer: the player says
 					// whether the game starts anyway, without it
 					int st = ingame_states_launch(launch_save.rom, launch_save.rec.slot, pfilename,

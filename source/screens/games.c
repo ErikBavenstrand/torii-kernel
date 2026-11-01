@@ -1426,7 +1426,8 @@ static int row_still(u32 i)
 // --- Rename ----------------------------------------------------------------------------
 // A game's display name, kept in /torii/names.txt (its file stays): the
 // keyboard starts from the name it shows, and OK writes the new one; its
-// own name again (what it shows without one) takes its line out.
+// own name again (what it shows without one), or no name, takes its line
+// out, and the lists show its No-Intro or file name again.
 
 static const char *rename_submit(void *ctx, const char *name)
 {
@@ -1436,7 +1437,7 @@ static const char *rename_submit(void *ctx, const char *name)
 		gamename_clean_title(games.name, crc);
 	else
 		gamename_clean(games.name, games.pick);
-	int own = strcmp(name, games.name) == 0;
+	int own = !*name || strcmp(name, games.name) == 0;
 	if (!gamename_store_set(games.pick, own ? NULL : name))
 		return gamename_store_full() ? S(STR_RENAME_NAMES_FULL) : S(STR_RENAME_NAME_FAILED);
 	library_named(games.pick, own ? NULL : name);  // its row moves to its new place at once
@@ -1466,7 +1467,7 @@ static void rename_game(u32 row)
 	games.rename_console = library_flags(rec) & LIB_F_CONSOLE;
 	snprintf(games.ask, sizeof(games.ask), "%s", library_display(rec));
 	const struct rename_ask ask = {
-		registry_items[games.item].icon16, games.ask, NULL, RENAME_GAME_MAX, 0, rename_submit, 0, 0, 0, 0};
+		registry_items[games.item].icon16, games.ask, NULL, RENAME_GAME_MAX, 0, rename_submit, 0, 0, 0, 0, 1};
 	int renamed = rename_run(&ask);
 	reshow(row);
 	if (renamed && up()) {
@@ -1475,37 +1476,6 @@ static void rename_game(u32 row)
 		show_position();
 		show_facts();
 	}
-}
-
-// Original name: the game's own name goes from names.txt, so the lists
-// show its No-Intro or file name again
-static void unname_game(u32 row)
-{
-	ui_popup_close();
-	if (!gamename_store_set(games.pick, NULL)) {
-		dialog_message(games.title, S(STR_RENAME_NAME_FAILED), DIALOG_ERROR);
-		reshow(row);
-		return;
-	}
-	tlog("games: %s: its own name dropped", games.pick);
-	library_named(games.pick, NULL);
-	reshow(row);
-	if (up()) {
-		games.cursor = pick_row(row);
-		ui_list_set_cursor(list_node(), games.cursor);
-		show_position();
-		show_facts();
-	}
-}
-
-// The Box art row: hides the game's art (an empty custom art file), or
-// removes its own art or the hiding (BOXART_CUSTOM_*, as the row found it)
-static void art_game(u32 row, u32 was)
-{
-	ui_popup_close();
-	if (!boxart_set_custom(games.pick, was == BOXART_CUSTOM_NONE ? BOXART_CUSTOM_HIDDEN : BOXART_CUSTOM_NONE))
-		dialog_message(games.title, S(STR_GAMES_ART_FAILED), DIALOG_ERROR);
-	reshow(row);
 }
 
 static void boot_with_addon(u32 hard);
@@ -1528,79 +1498,6 @@ static void saves_game(u32 row, u32 boot)
 		play_as(boot, 0);
 		action_slot_chosen(0);  // returned: it did not start
 	}
-	reshow(row);
-}
-
-// Load state (v0.8): the game's save states for its current save slot, a
-// popup of them titled Load state beside the row (the newest first: the
-// slot's number and how long ago), then the game started with addons in the
-// one picked (its start loads it).
-// The slot picked, 0 for none; its rows on the stack, gone before a launch.
-static u32 states_pick(u32 row)
-{
-	struct gamerec rec;
-	struct statestore_list list;
-	char label[STATESTORE_SLOTS][16], when[STATESTORE_SLOTS][32];
-	struct ui_pop_item items[STATESTORE_SLOTS];
-	u8 slot[STATESTORE_SLOTS];
-	gamesave_record_read(games.pick, &rec);
-	u32 n = 0;
-	if (statestore_scan(games.pick, rec.slot, &list))
-		while (n < STATESTORE_SLOTS) {
-			u32 best = 0;
-			for (u32 t = 1; t <= STATESTORE_SLOTS; t++) {
-				int taken = 0;
-				for (u32 k = 0; k < n; k++)
-					taken |= slot[k] == t;
-				if (list.slot[t].have && !taken &&
-				    (!best || list.slot[t].order > list.slot[best].order))
-					best = t;
-			}
-			if (!best)
-				break;
-			const struct statestore_slot *e = &list.slot[best];
-			snprintf(label[n], sizeof(label[n]), "%lu", (unsigned long)best);  // its date fills the row
-			// How long ago, as Recent says it; the date when the clock
-			// can't tell (unset, or the state is from its future)
-			u32 then = userdata_clock_time(userdata_unix_time(e->when.year, e->when.month, e->when.day,
-									  e->when.hour, e->when.min, e->when.sec));
-			userdata_ago_text(when[n], sizeof(when[n]), then);
-			if (!when[n][0] && e->when.year && e->when.month >= 1 && e->when.month <= 12) {
-				char date[24], time[8];
-				lang_date(date, sizeof(date), e->when.day, e->when.month);
-				snprintf(time, sizeof(time), "%02u:%02u", (unsigned)e->when.hour % 100,
-					 (unsigned)e->when.min % 100);
-				SF(when[n], sizeof(when[n]), STR_STATE_WHEN, LS(date), LS(time));
-			}
-			items[n] = (struct ui_pop_item){label[n], when[n], 0};
-			slot[n++] = (u8)best;
-		}
-	tlog("states: popup: %lu for %s (%s)", (unsigned long)n, games.pick, rec.slot);
-	if (!n) {
-		dialog_message(NULL, S(STR_STATE_NONE), DIALOG_INFO);
-		reshow(row);
-		return 0;
-	}
-	struct ui_popup popup = {S(STR_GAMES_POP_STATES), 0, items, (u8)n, 0, NULL};
-	if (!up() || !ui_popup_open(list_node(), node(N_HINTS), &popup))
-		return 0;
-	tlog_debug("screen ready: state-popup %s", games.title);
-	s32 pick = ui_popup_choose();
-	ui_popup_close();
-	return pick < 0 || (pick & (UI_POP_LEFT | UI_POP_RIGHT)) ? 0 : slot[pick];
-}
-
-static void states_game(u32 row)
-{
-	u32 slot = states_pick(row);
-	if (!slot)
-		return;
-	tlog("games: start %s in its save state slot %lu", games.pick, (unsigned long)slot);
-	action_state_slot_set(slot);
-	action_slot_chosen(1);  // the save slot whose states these are
-	boot_with_addon(0);
-	action_slot_chosen(0);  // returned: it did not start
-	action_state_slot_set(0);
 	reshow(row);
 }
 
@@ -1661,23 +1558,8 @@ static void popup_run(u32 i)
 			snprintf(games.cheats, sizeof(games.cheats), "%lu", (unsigned long)listed);
 		popup_add(LANG_POP_CHEATS, listed >= 0 ? games.cheats : 0, 0);
 	}
-	if (gba && Read_SET_info(assress_v_rts) == 1)
-		popup_add(LANG_POP_STATES, 0, 0);
 	u32 fav_item = games.popup.count;
 	popup_add(LANG_POP_FAV, fav ? S(STR_GAMES_ON) : S(STR_GAMES_OFF), 0);
-	// Box art (List + art: where it shows), Original name before Rename,
-	// so Rename stays third from the bottom
-	u32 art = BOXART_CUSTOM_NONE, art_item = LANG_POP_ITEMS;
-	if (games.art && !nor && g.rec != LIBRARY_NONE) {
-		art = boxart_custom(games.pick);
-		art_item = games.popup.count;
-		popup_add(LANG_POP_ART, 0, 0);
-		if (art != BOXART_CUSTOM_NONE)
-			games.items[art_item].text =
-				S(art == BOXART_CUSTOM_HIDDEN ? STR_GAMES_ART_SHOW : STR_GAMES_ART_REMOVE);
-	}
-	if (!nor && g.rec != LIBRARY_NONE && (library_flags(g.rec) & LIB_F_CUSTOM))
-		popup_add(LANG_POP_UNNAME, 0, 0);
 	if (!nor && g.rec != LIBRARY_NONE)
 		popup_add(LANG_POP_RENAME, 0, 0);  // a name in names.txt, for games the lists name
 	popup_add(LANG_POP_INFO, 0, 0);
@@ -1743,8 +1625,7 @@ static void popup_run(u32 i)
 		}
 		// A favourite dropped leaves the Favourites page before a launch
 		// that may come back (Game info and Rename list the page again)
-		if (fav != fav_was && games.kind == KIND_FAV && action != LANG_POP_INFO && action != LANG_POP_RENAME &&
-		    action != LANG_POP_UNNAME && action != LANG_POP_ART)
+		if (fav != fav_was && games.kind == KIND_FAV && action != LANG_POP_INFO && action != LANG_POP_RENAME)
 			relist(i, NULL);
 		switch (action) {
 		case LANG_POP_PLAY:
@@ -1763,17 +1644,8 @@ static void popup_run(u32 i)
 			shots_run_game(games.pick);  // in the page's place, as the cheat screen
 			reshow(i);
 			return;
-		case LANG_POP_STATES:
-			states_game(i);
-			return;
 		case LANG_POP_RENAME:
 			rename_game(i);
-			return;
-		case LANG_POP_UNNAME:
-			unname_game(i);
-			return;
-		case LANG_POP_ART:
-			art_game(i, art);
 			return;
 		default:
 			return;

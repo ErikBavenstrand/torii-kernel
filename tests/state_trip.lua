@@ -17,7 +17,7 @@
 --   reset             the menu's Reset game (the game from its start)
 --   torii             the menu's Back to Torii; the run goes on in the kernel
 --   autoload:NAME     the game was launched into a state (a slot from the
---                     game popup's Load state): wait for the stub's load at
+--                     tests' hook, NAV_TEST_STATE): wait for the stub's load at
 --                     the game's start, then NAME's replay, compared with the
 --                     digests TRIP_IN holds
 --

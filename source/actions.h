@@ -79,7 +79,7 @@ int action_game_saves(const char *path, char *rom, u32 rom_size, u32 *bytes);
 void action_slot_chosen(int on);
 // The save state slot (1 to 8, statestore.h) the next launches start in, the
 // game's start loading it; 0: none (the caller clears it once the launch
-// returns), as the game popup's Load state sets it
+// returns), as the tests' hook (NAV_TEST_STATE) sets it
 void action_state_slot_set(u32 slot);
 u32 action_state_slot(void);
 // The game's name Play with shows (a list's display name) for the launches

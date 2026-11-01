@@ -17,7 +17,7 @@ three power-ons:
    longer, then load it at the next fade or transition; save c, Reset game,
    play the game's start again, and load c there; save d into slot 2, then
    Back to Torii, whose boot files slot 2 on the card.
-2. The game launched into slot 2 (the game popup's Load state: the state put
+2. The game launched into slot 2 (a launch into a save state: the state put
    back from the card, loaded at the game's start): d's frames again; then
    save e into slot 3, and Back to Torii.
 3. The game launched into slot 3: e again; then Load state in game, e again.

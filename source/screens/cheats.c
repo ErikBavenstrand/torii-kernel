@@ -1356,7 +1356,7 @@ static u32 cs_code(u32 at, int fill)
 		// new one its "Code N"; Cancel goes back to the keypad, the code
 		// as typed
 		const struct rename_ask name = {
-			cs.icon, was, NULL, RENAME_GAME_MAX, 0, name_submit, 0, S(STR_CHEATS_NAME_TITLE), 1, 0};
+			cs.icon, was, NULL, RENAME_GAME_MAX, 0, name_submit, 0, S(STR_CHEATS_NAME_TITLE), 1, 0, 0};
 		if (rename_run(&name))
 			break;
 	}
@@ -1392,7 +1392,7 @@ static u32 cs_rename(u32 at)
 	char was[sizeof(cs.name)];
 	memcpy(was, cs.name, sizeof(was));
 	const struct rename_ask name = {
-		cs.icon, was, NULL, RENAME_GAME_MAX, 0, name_submit, 0, S(STR_CHEATS_RENAME_TITLE), 0, 0};
+		cs.icon, was, NULL, RENAME_GAME_MAX, 0, name_submit, 0, S(STR_CHEATS_RENAME_TITLE), 0, 0, 0};
 	if (!rename_run(&name))
 		return row;  // cancelled, or the name as it was
 	u32 r = cheatstore_rename(at, cs.name);
@@ -1536,7 +1536,7 @@ static u32 cs_edit_guide(u32 at)
 	char was[sizeof(cs.name)];
 	cheatfile_guide(&s->file, at, was, sizeof(was));
 	const struct rename_ask ask = {
-		cs.icon, was, NULL, CHEATFILE_GUIDE_MAX, 0, guide_submit, 0, S(STR_CHEATS_GUIDE_TITLE), 0, 1};
+		cs.icon, was, NULL, CHEATFILE_GUIDE_MAX, 0, guide_submit, 0, S(STR_CHEATS_GUIDE_TITLE), 0, 1, 0};
 	if (!rename_run(&ask))
 		return row;  // cancelled, or as it was
 	u32 r = cheatstore_set_guide(at, cs.name);

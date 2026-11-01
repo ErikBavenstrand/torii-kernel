@@ -10,10 +10,10 @@
 #              as /torii/states/<rom>/Main/2.state; the next launch puts it
 #              in cart SRAM, and Load state there gives the frames after the
 #              save again. An old /RTS state becomes slot 1, once.
-#   popup      The game popup's Load state lists the slots and starts the
-#              game in the one picked: the frames after the save again.
-#   unreadable The popup's Load state on a slot whose data doesn't read
-#              asks first: B goes back, A starts the game from its start.
+#   popup      A launch into a slot (the tests' hook, nav_state_launch):
+#              the frames after the save again.
+#   unreadable A launch into a slot whose data doesn't read asks first: B
+#              goes back, A starts the game from its start.
 #   shadow     Load state where the game's write-only display registers
 #              differ from the state's (Pokémon Emerald's intro on the real
 #              cart: its windows 0 by 0 blacked out the overworld loaded
@@ -241,22 +241,17 @@ popup)
   out=$(save_and_quit 2 boot 2>"$cart/log")
   grep -q '3.state: .* written' "$cart/log" || fail "slot 3 wasn't filed: $(grep states "$cart/log" | tail -3)"
   saved=$(hashes "$out" 1)
-  # The Recent list's popup: Play, Saves, Cheats, Load state; its slots, A:
-  # the game starts in slot 3
+  # The game started in slot 3
   # shellcheck disable=SC2046 # option lists
-  out=$(NAV_SHOWN="recent gba" boot $(NAV_SHOWN="recent gba" nav_game_menu recent 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @36:DOWN -k @40:- \
-    -k @48:A -k @52:- -w "screen ready: state-popup" -k @12:A -k @16:- \
-    -w "launch: starting the game" -H @1:@400 -f 9000 2>"$cart/log")
+  out=$(boot $(nav_state_launch /Game.gba 3) -w "launch: starting the game" -H @1:@400 -f 9000 2>"$cart/log")
   log=$(cat "$cart/log")
-  grep -q 'games: start /Game.gba in its save state slot 3' <<<"$log" ||
-    fail "the popup didn't start slot 3: $(grep -E 'states|games:|ready' <<<"$log" | tail -5)"
   grep -q "states: slot 3 in cart SRAM from .*, loaded at the game's start" <<<"$log" || fail "not loaded at the start"
   same "$saved" "$(hashes "$out" 1)" "the game started in slot 3" >/dev/null
-  echo "PASS: states popup: the game popup's Load state starts the game in the slot picked"
+  echo "PASS: states popup: a launch into a slot starts the game in it"
   ;;
 unreadable)
-  # Slot 3 on the card with its head whole and its data not: the popup
-  # lists it, and starting in it asks first. B: back, no launch; A: the
+  # Slot 3 on the card with its head whole and its data not: starting in it
+  # asks first. B: back, no launch; A: the
   # game from its start
   save_and_quit 2 boot >/dev/null 2>"$cart/log"
   grep -q '3.state: .* written' "$cart/log" || fail "slot 3 wasn't filed: $(grep states "$cart/log" | tail -3)"
@@ -266,8 +261,7 @@ unreadable)
   mcopy -o -i "$cart/sd.img" "$state" ::/torii/states/Game.gba/Main/3.state
   for key in B A; do
     # shellcheck disable=SC2046 # option lists
-    NAV_SHOWN="recent gba" boot $(NAV_SHOWN="recent gba" nav_game_menu recent 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- \
-      -k @36:DOWN -k @40:- -k @48:A -k @52:- -w "screen ready: state-popup" -k @12:A -k @16:- \
+    boot $(nav_state_launch /Game.gba 3) \
       -w "screen ready: dialog" -s @4:"$cart/dialog.png" -k @12:$key -k @16:- -h @200 -f 9000 >/dev/null 2>"$cart/log" ||
       fail "$key: no question: $(grep -E 'states|launch|ready' "$cart/log" | tail -4)"
     log=$(cat "$cart/log")

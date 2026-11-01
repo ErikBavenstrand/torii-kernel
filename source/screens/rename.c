@@ -725,7 +725,7 @@ static void ok(void)
 		kb.e.caret = (u16)n;
 	}
 	field_changed();
-	if (!n && !kb.ask->lines) {
+	if (!n && !kb.ask->lines && !kb.ask->empty) {
 		message(S(STR_RENAME_EMPTY));
 	} else if (rename_edit_chars(&kb.e) > kb.e.max) {
 		char text[sizeof(kb.msg)];

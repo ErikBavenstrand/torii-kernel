@@ -8,7 +8,7 @@
 //	/torii/art/custom/<name>.bin     custom art by the game's file name,
 //	                                 extension included ("Foo (USA).gba.bin",
 //	                                 `just art-add`); an empty one hides
-//	                                 the game's art (the popup's Hide box art)
+//	                                 the game's art
 //
 // Names match without ASCII case, as FAT does. Each file is one id: a hash
 // of its kind and key, never 0, so the cover cache (engine/cover.h) holds a
