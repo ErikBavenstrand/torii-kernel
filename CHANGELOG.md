@@ -35,6 +35,9 @@ git log, not here.
   written into free ROM) now fit about 23,000 patches where 4,096 did, and a
   cheat may have 4,096. The cheat screen shows the room in percent, and
   the cheat list's cache is built again once (ad7b48e9).
+- **Changed:** Emerald's Money cheats are all Torii code; Shopping costs 1
+  is now a ROM patch, so the shop's list shows 1 apiece and selling pays
+  as before (58efaeb9, 2b084478).
 - **Changed:** Emerald's menu has Trade evolution (Kadabra, Machoke,
   Graveler, Haunter and the held-item trades, by the game's own evolution
   scene), and Gifts gives the events' Jirachi and Celebi (b38e591e).
