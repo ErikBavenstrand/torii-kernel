@@ -461,53 +461,45 @@ TICKETS = [  # name, item, the ferry flag its event sets (FLAG_ENABLE_SHIP_*)
 ]
 
 
-def item_menu():
-    m = Menus(0x08F00000, UNUSED_MENUS[:2])
-    s = m.s
-    s.label("main")
-    s.cmd("lockall")
-    m.menu(
-        "cats",
-        [(c, "mart" + str(i)) for i, c in enumerate(MART)]
-        + [("DECORATIONS", "decor"), ("TICKETS", "tickets")],
-        "done",
-    )
-    s.label("done")
-    s.cmd("releaseall")
-    s.cmd("end")
-    for i in range(len(MART)):
-        s.label("mart" + str(i))
-        s.cmd("pokemart", ("p", "list" + str(i)))
-        s.goto("cats")
-    s.label("decor")  # Lilycove's decoration counter, with every decoration
-    s.cmd("pokemartdecoration", ("p", "decorations"))
-    s.goto("cats")
-    m.menu(
-        "tickets", [(n, "tk" + str(i)) for i, (n, _, _) in enumerate(TICKETS)], "cats"
-    )
-    for i, (_, item, flag) in enumerate(TICKETS):
-        s.label("tk" + str(i))
-        s.cmd("setflag", ("h", flag))
-        s.cmd("checkitem", ("h", ITEM[item]), ("h", 1))
-        s.when(VAR_RESULT, 1, "have")  # one is enough: the flag is what opens the ferry
-        s.cmd("setorcopyvar", ("h", VAR_8000), ("h", ITEM[item]))
-        s.cmd("setorcopyvar", ("h", VAR_8001), ("h", 1))
-        s.cmd("callstd", ("b", 0))  # STD_OBTAIN_ITEM: "Obtained the EON TICKET!"
-        s.goto("tickets")
-    s.label("have")
-    s.say(m.t("You have it, and the ferry will take you."))
-    s.goto("tickets")
-    s.align(2)
-    for i, items in enumerate(MART.values()):
-        s.label("list" + str(i))
-        for it in items:
-            s.h(ITEM[it])
-        s.h(0)
-    s.label("decorations")
-    for d in range(1, NUM_DECORATIONS + 1):
-        s.h(d)
-    s.h(0)  # DECOR_NONE
-    return m.blob(), s.addr("main")
+SHOP = 0x08F00000  # tools/golden/shop.c's routine, then its shelves' table
+SHOP_TABLE = 0x08F00400
+SHOP_HOOKS = (
+    0x080DFE0C,
+    0x080E10E8,
+)  # the literals of Task_BuyMenu (CB2_InitBuyMenu, BuyMenuReturnToItemList)
+TASK_BUY_MENU = 0x080E0AC9
+
+
+def shop():
+    """Every shop's Buy list with more shelves on L and R (tools/golden/shop.c):
+    a Poké Mart's the item categories, a decoration shop's every decoration.
+    The routine, its table (two kinds of shop: a count and 15 lists each) and
+    the lists, as ROM patches; the hook is the two literals that set the
+    Buy list's task."""
+    code = (Path(__file__).with_name("shop.bin")).read_bytes()
+    assert len(code) <= SHOP_TABLE - SHOP, "shop.bin runs into its table"
+    lists = [[ITEM[it] for it in items] for items in MART.values()]
+    decor = [list(range(1, NUM_DECORATIONS + 1))]
+    kinds = [lists, decor]
+    at = SHOP_TABLE + len(kinds) * 4 * 16
+    data, body = b"", b""
+    for shelves in kinds:
+        assert len(shelves) <= 15
+        ptrs = []
+        for items in shelves:
+            ptrs.append(at + len(body))
+            body += b"".join(v.to_bytes(2, "little") for v in items + [0])
+        data += len(shelves).to_bytes(4, "little")
+        data += b"".join(v.to_bytes(4, "little") for v in ptrs + [0] * (15 - len(ptrs)))
+    blob = code + b"\xff" * (SHOP_TABLE - SHOP - len(code)) + data + body
+    blob += b"\xff" * (len(blob) & 1)
+    patches = [
+        (SHOP + i, int.from_bytes(blob[i : i + 2], "little"))
+        for i in range(0, len(blob), 2)
+    ]
+    for a in SHOP_HOOKS:
+        patches += [(a, (SHOP | 1) & 0xFFFF), (a + 2, SHOP >> 16)]
+    return patches
 
 
 TOWNS = [  # name, map group, map number, x, y: the heal locations (outside each Pokémon Center)
@@ -596,7 +588,7 @@ GIFTS = [  # name, species, level (0: an egg)
 
 
 def field_menu():
-    m = Menus(0x08F08000, UNUSED_MENUS[2:])
+    m = Menus(0x08F08000, UNUSED_MENUS)
     s = m.s
     s.label("main")
     s.cmd("lockall")
@@ -677,9 +669,29 @@ def field_menu():
     s.goto("gifts")
     m.menu(
         "unlock",
-        [("ALL BADGES", "ub"), ("ALL SYMBOLS", "us"), ("POKéDEX", "ud")],
+        [
+            ("ALL BADGES", "ub"),
+            ("ALL SYMBOLS", "us"),
+            ("POKéDEX", "ud"),
+            ("TICKETS", "tickets"),
+        ],
         "field",
     )
+    m.menu(
+        "tickets", [(n, "tk" + str(i)) for i, (n, _, _) in enumerate(TICKETS)], "unlock"
+    )
+    for i, (_, item, flag) in enumerate(TICKETS):
+        s.label("tk" + str(i))
+        s.cmd("setflag", ("h", flag))
+        s.cmd("checkitem", ("h", ITEM[item]), ("h", 1))
+        s.when(VAR_RESULT, 1, "have")  # one is enough: the flag is what opens the ferry
+        s.cmd("setorcopyvar", ("h", VAR_8000), ("h", ITEM[item]))
+        s.cmd("setorcopyvar", ("h", VAR_8001), ("h", 1))
+        s.cmd("callstd", ("b", 0))  # STD_OBTAIN_ITEM: "Obtained the EON TICKET!"
+        s.goto("tickets")
+    s.label("have")
+    s.say(m.t("You have it, and the ferry will take you."))
+    s.goto("tickets")
     for tag, flags, msg in (
         ("ub", range(0x867, 0x86F), "All 8 badges are yours."),  # FLAG_BADGE01-08_GET
         ("us", range(0x8C4, 0x8D2), "All 14 Frontier symbols are yours."),
@@ -798,18 +810,14 @@ def cheats():
     def add(folder, name, code, guide, keys="always"):
         out.append(Cheat(folder, f"{folder}: {name}", code, guide, keys))
 
-    # The menus (D9, D15-D23)
-    items, items_at = item_menu()
-    code = Code(AR)
-    trigger(code, [(keys("L", "R", "B"), items_at)])
-    code = Mixed(items, code)
+    # The shop (D9, D20-D22): no menu, more shelves in the game's own shops
     out.append(
         Cheat(
             "Menus",
-            "Menus: Item shop (L+R+B)",
-            code,
-            "L+R+B opens a shop of every item and decoration at game prices; the event tickets are free. B goes back. "
-            "Pick before you play.",
+            "Menus: Every item in shops (L/R)",
+            vba(*Mixed(shop(), None).lines),
+            "In a shop's Buy list, L and R change the shelf: a Poké Mart's Medicine, Balls, Training, TMs & HMs, "
+            "Held items, Berries, Valuables; a decoration shop's every decoration. Game prices. Tickets: field menu.",
             None,
         )
     )
@@ -822,7 +830,7 @@ def cheats():
             "Menus",
             "Menus: Field menu (L+R+A)",
             code,
-            "L+R+A opens it (face away from people): PC, Heal, Warp, Legends, Gifts, Moves, Unlock. "
+            "L+R+A opens it (face away from people): PC, Heal, Warp, Legends, Gifts, Moves, Unlock (badges, symbols, Pokédex, event tickets). "
             "Pick before you play.",
             None,
         )

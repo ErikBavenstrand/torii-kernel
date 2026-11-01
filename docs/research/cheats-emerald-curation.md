@@ -38,23 +38,23 @@ Every cheat we have (GameHacking, plus libretro's three of its own), grouped. "P
 
 | # | Cheat | Buttons | Proposal | Note | Decision |
 | --- | --- | --- | --- | --- | --- |
-| 18 | All Berries (Part 1) |  | test | write 02002Dxx, outside the save blocks (a bag menu buffer?); parts must go together | drop: the item shop (L+R+B) sells every item |
-| 19 | All Berries (Part 2) |  | test | write 02002Dxx, outside the save blocks (a bag menu buffer?); parts must go together | drop: the item shop (L+R+B) sells every item |
-| 20 | All Decorations (Part 1) |  | test | write 02002Dxx, outside the save blocks (a bag menu buffer?); parts must go together | drop: the item shop (L+R+B) sells every item |
-| 21 | All Decorations (Part 2) |  | test | write 02002Dxx, outside the save blocks (a bag menu buffer?); parts must go together | drop: the item shop (L+R+B) sells every item |
-| 22 | All Hold Items (Part 1) |  | test | write 02002Dxx, outside the save blocks (a bag menu buffer?); parts must go together | drop: the item shop (L+R+B) sells every item |
-| 23 | All Hold Items (Part 2) |  | test | write 02002Dxx, outside the save blocks (a bag menu buffer?); parts must go together | drop: the item shop (L+R+B) sells every item |
-| 24 | All Mail |  | test | write 02002Dxx, outside the save blocks (a bag menu buffer?); parts must go together | drop: the item shop (L+R+B) sells every item |
-| 25 | All Misc Items (Part 1) |  | test | write 02002Dxx, outside the save blocks (a bag menu buffer?); parts must go together | drop: the item shop (L+R+B) sells every item |
-| 26 | All Misc Items (Part 2) |  | test | write 02002Dxx, outside the save blocks (a bag menu buffer?); parts must go together | drop: the item shop (L+R+B) sells every item |
-| 27 | All Pokeballs |  | test | write 02002Dxx, outside the save blocks (a bag menu buffer?); parts must go together | drop: the item shop (L+R+B) sells every item |
-| 28 | All TM's/HM's (Part 1) |  | test | write 02002Dxx, outside the save blocks (a bag menu buffer?); parts must go together | drop: the item shop (L+R+B) sells every item |
-| 29 | All TM's/HM's (Part 2) |  | test | write 02002Dxx, outside the save blocks (a bag menu buffer?); parts must go together | drop: the item shop (L+R+B) sells every item |
-| 30 | Aurora Ticket |  | keep (golden) | own PC slots | replaced: item shop TICKETS (ticket and ferry flag) |
+| 18 | All Berries (Part 1) |  | test | write 02002Dxx, outside the save blocks (a bag menu buffer?); parts must go together | drop: the shops sell every item (L/R in Buy) |
+| 19 | All Berries (Part 2) |  | test | write 02002Dxx, outside the save blocks (a bag menu buffer?); parts must go together | drop: the shops sell every item (L/R in Buy) |
+| 20 | All Decorations (Part 1) |  | test | write 02002Dxx, outside the save blocks (a bag menu buffer?); parts must go together | drop: the shops sell every item (L/R in Buy) |
+| 21 | All Decorations (Part 2) |  | test | write 02002Dxx, outside the save blocks (a bag menu buffer?); parts must go together | drop: the shops sell every item (L/R in Buy) |
+| 22 | All Hold Items (Part 1) |  | test | write 02002Dxx, outside the save blocks (a bag menu buffer?); parts must go together | drop: the shops sell every item (L/R in Buy) |
+| 23 | All Hold Items (Part 2) |  | test | write 02002Dxx, outside the save blocks (a bag menu buffer?); parts must go together | drop: the shops sell every item (L/R in Buy) |
+| 24 | All Mail |  | test | write 02002Dxx, outside the save blocks (a bag menu buffer?); parts must go together | drop: the shops sell every item (L/R in Buy) |
+| 25 | All Misc Items (Part 1) |  | test | write 02002Dxx, outside the save blocks (a bag menu buffer?); parts must go together | drop: the shops sell every item (L/R in Buy) |
+| 26 | All Misc Items (Part 2) |  | test | write 02002Dxx, outside the save blocks (a bag menu buffer?); parts must go together | drop: the shops sell every item (L/R in Buy) |
+| 27 | All Pokeballs |  | test | write 02002Dxx, outside the save blocks (a bag menu buffer?); parts must go together | drop: the shops sell every item (L/R in Buy) |
+| 28 | All TM's/HM's (Part 1) |  | test | write 02002Dxx, outside the save blocks (a bag menu buffer?); parts must go together | drop: the shops sell every item (L/R in Buy) |
+| 29 | All TM's/HM's (Part 2) |  | test | write 02002Dxx, outside the save blocks (a bag menu buffer?); parts must go together | drop: the shops sell every item (L/R in Buy) |
+| 30 | Aurora Ticket |  | keep (golden) | own PC slots | replaced: field menu Unlock > TICKETS (ticket and ferry flag) |
 | 31 | Have All Pokeballs |  | keep (golden) | standalone | drop: the item shop |
 | 32 | Have All TMs/HMs |  | keep (golden) | standalone | drop: the item shop |
-| 33 | Have Old Sea Map |  | keep (golden) | own PC slots | replaced: item shop TICKETS (ticket and ferry flag) |
-| 34 | Mystic Ticket |  | keep (golden) | own PC slots | replaced: item shop TICKETS (ticket and ferry flag) |
+| 33 | Have Old Sea Map |  | keep (golden) | own PC slots | replaced: field menu Unlock > TICKETS (ticket and ferry flag) |
+| 34 | Mystic Ticket |  | keep (golden) | own PC slots | replaced: field menu Unlock > TICKETS (ticket and ferry flag) |
 
 ## 5 Pokédex & Pokémon
 
@@ -261,7 +261,7 @@ Every cheat we have (GameHacking, plus libretro's three of its own), grouped. "P
 
 | Folder | Cheats |
 | --- | --- |
-| Menus | Item shop (L+R+B): Marts of Medicine, Balls, Training, TMs & HMs, Held items, Berries, Valuables and Decorations (Lilycove's counter, all 120) at game prices, and the four event tickets free with their ferry flags. Field menu (L+R+A): PC, Heal, Warp (16 towns, 17 dungeons, 5 islands), Legends (respawn 11), Gifts (Hoenn and Johto starters, Beldum, Castform, Lileep, Anorith, Wynaut egg), Moves (relearner), Unlock (badges, Frontier symbols, Pokédex); L+R+A alone opens it (the L+R+direction shortcuts were dropped, so the row shows one combination) |
+| Menus | Every item in shops: in any shop's Buy list, L and R change the shelf, the shop's own first: a Poké Mart's Medicine, Balls, Training, TMs & HMs, Held items, Berries and Valuables, a decoration shop's all 120 decorations, at game prices (no menu, no trigger: see below). Field menu (L+R+A): PC, Heal, Warp (16 towns, 17 dungeons, 5 islands), Legends (respawn 11), Gifts (Hoenn and Johto starters, Beldum, Castform, Lileep, Anorith, Wynaut egg), Moves (relearner), Unlock (badges, Frontier symbols, Pokédex, the four event tickets with their ferry flags); L+R+A alone opens it (the L+R+direction shortcuts were dropped, so the row shows one combination) |
 | Money | Max money, Max coins (Torii's keyed lines), Max Battle Points, Shopping costs 1 |
 | Pokémon | Shiny, Perfect IVs, Max friendship, Max EVs, Vitamins up to 255, Nature (25), Gender (2), Pokérus when caught, Eggs hatch fast, Everstone always passes nature, Day Care eggs fast |
 | Battle | One-hit KO, Infinite HP, Infinite PP, No trainer challenges, EXP x2/x3/x5/x10/x255, EXP shared with the party, Every ball catches, Pokémon always obey |
@@ -269,7 +269,7 @@ Every cheat we have (GameHacking, plus libretro's three of its own), grouped. "P
 | Overworld | Instant text, Run and bike anywhere, Mirage Island always there, Fly to any town, Free Day Care, Walk through walls (hold R), Field moves without badges, Gym leader rematches, Any Pokémon in the Frontier |
 | Minigames | Endless Safari Zone, Safari Pokémon never flee, Level 80 Pokéblock, Quick contests, Max contest score, Full Soot Sack |
 
-How they're built (D1, D7): CodeBreaker for RAM writes, Action Replay v3 raw for ROM patches and save-block pointer writes, Torii's raw lines only for money and coins (XORed with the save's key). No master codes, nothing encrypted. Nothing writes an item slot: items come from the game's own Mart and "Obtained" scripts, so nothing in the bag or PC is overwritten (D9, D10). The menus are game scripts, strings and menu tables written into the ROM's free space (from `0x08F00000`) at launch, on Emerald's unused multichoice menus, started by a RAM trigger only while the player is free to move; walk-through-walls, the Pokédex and the new Pokémon's personality are small Thumb routines (`tools/golden/walls.s` and `pid.s`, over the unused `Unused_AdjustBgMosaic`, and `dex.s`). Shiny, Nature and Gender share `pid.s`: each cheat carries the same routine and hook in `CreateBoxMon` (wild, gift and egg Pokémon, not trainers') and sets only its own switch in free ROM (`0x08F1F000`), so any of them work together; AnyGBA's shiny patch and the old nature and gender patches each set the personality alone and undid the others.
+How they're built (D1, D7): CodeBreaker for RAM writes, Action Replay v3 raw for ROM patches and save-block pointer writes, Torii's raw lines only for money and coins (XORed with the save's key). No master codes, nothing encrypted. Nothing writes an item slot: items come from the game's own Mart and "Obtained" scripts, so nothing in the bag or PC is overwritten (D9, D10). The shop (2026-11-01, replacing the L+R+B item menu, whose RAM trigger started a script under whatever the game was doing) is `tools/golden/shop.c`, built by `tools/golden/build.sh` into `shop.bin` at `0x08F00000` with its shelves' table at `0x08F00400`: it stands in for `Task_BuyMenu` (the two literals that set the Buy list's task point to it) and, on L or R with no fade under way, points `sMartInfo.itemList` at the next shelf and leaves the list as `Task_ExitBuyMenu` does, but into `CB2_InitBuyMenu` again, so the game itself frees and rebuilds the list; its one variable, the shop's own list, is at `0x0203FF18`. Tested on the emulated cart: a Poké Mart and a decoration shop round both ways, a purchase, 210 switches mashed through the fades, the heap the same block for block after 96. The field menu is game scripts, strings and menu tables written into the ROM's free space (from `0x08F08000`) at launch, on Emerald's unused multichoice menus, started by a RAM trigger only while the player is free to move; walk-through-walls, the Pokédex and the new Pokémon's personality are small Thumb routines (`tools/golden/walls.s` and `pid.s`, over the unused `Unused_AdjustBgMosaic`, and `dex.s`). Shiny, Nature and Gender share `pid.s`: each cheat carries the same routine and hook in `CreateBoxMon` (wild, gift and egg Pokémon, not trainers') and sets only its own switch in free ROM (`0x08F1F000`), so any of them work together; AnyGBA's shiny patch and the old nature and gender patches each set the personality alone and undid the others.
 
 `python3 tools/golden/emerald.py > "cheats/gba/Pokemon - Emerald Version (USA, Europe).cht"` rebuilds it. The file is for Torii only (the owner, 2026-10-31): mGBA and RetroArch can't read it (the menus' code lines pass mGBA's 512 characters), and every cheat is tested on Torii's emulated cart.
 
@@ -295,7 +295,7 @@ On the emulated cart with the real ROM (CRC32 `1F1C08FB`) and a 100% save (Proje
 | Infinite HP | 209/209 through a Lv 100 Machamp's attacks; without it, fainted |
 | Every ball catches, Pokérus | a full-HP Lv 100 Ralts caught with one Great Ball, Pokérus set |
 | Walk through walls | blocked without R; through the Pokémon Center counter with R |
-| Item shop, Shopping costs 1 | the 8 categories, the TM Mart; TM01 for "₽1", money 329,622 to 329,621, TM01 4 to 5 |
+| Shops (L/R), Shopping costs 1 | the shelves, the TM Mart; TM01 for "₽1", money 329,622 to 329,621, TM01 4 to 5 |
 | Tickets | "Obtained the EON TICKET!"; the ferry flag set; a second pick says you have it |
 | Field menu | Heal, PC, Warp (Oldale, Sky Pillar, Southern Island's dock), Legends (Regirock's defeated and hidden flags cleared, Regice's not), Gifts ("Jack received TREECKO!"), Moves (the relearner), Unlock (badges, symbols; the Pokédex's bits restored from zero) |
 | Quick contests, Max contest score | a Normal Cool contest: results after the first round, first place with full stars; without them, still in the appeals |
