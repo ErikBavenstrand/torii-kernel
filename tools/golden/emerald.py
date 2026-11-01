@@ -606,6 +606,8 @@ LEGENDS = [  # name, flags to clear, where it waits: as each lair's map script s
         [0x1BE],
         None,
     ),  # FLAG_DEFEATED_KYOGRE: in Marine Cave, while its rain lasts
+    # The Regis' rows also open their way in, as the Sealed Chamber and each
+    # braille puzzle do (REGI_OPEN)
     ("REGIROCK", [0x1BB, 0x3A7], "in the DESERT RUINS"),  # defeated, hidden
     ("REGICE", [0x1BC, 0x3A8], "in the ISLAND CAVE"),
     ("REGISTEEL", [0x1BD, 0x3A9], "in the ANCIENT TOMB"),
@@ -620,6 +622,13 @@ LEGENDS = [  # name, flags to clear, where it waits: as each lair's map script s
     ("LUGIA", [0x1DD, 0x91, 0x320], "deep in NAVEL ROCK"),  # defeated, caught, hidden
     ("HO-OH", [0x1DC, 0x92, 0x321], "atop NAVEL ROCK"),
 ]
+# FLAG_REGI_DOORS_OPENED (the routes' entrances) and the chamber's own
+# FLAG_SYS_*_PUZZLE_COMPLETED (its inner wall)
+REGI_OPEN = {
+    "REGIROCK": [0xE4, 0x8B0],
+    "REGICE": [0xE4, 0x8B1],
+    "REGISTEEL": [0xE4, 0x8B2],
+}
 VAR_ROAMER_POKEMON = (
     0x40D5  # the roaming one: 0 Latias, 1 Latios (Southern Island has the other)
 )
@@ -1081,9 +1090,9 @@ def gifts_section(m, back):
 
 @section(
     "Legends",
-    "Brings back a legendary Pokémon you defeated or caught, in its lair. GROUDON and KYOGRE wait "
-    "in a cave on the route the menu names, while its sun or rain lasts. The roaming LATIAS or "
-    "LATIOS roams again.",
+    "Brings back a legendary Pokémon you defeated or caught, in its lair (a REGI's opened). "
+    "GROUDON and KYOGRE wait in a cave on the route named, while its weather lasts. The roaming "
+    "LATIAS or LATIOS roams again.",
 )
 def legends_section(m, back):
     s = m.s
@@ -1099,6 +1108,8 @@ def legends_section(m, back):
         s.label(f"lg{i}")
         for f in flags:
             s.cmd("clearflag", ("h", f))
+        for f in REGI_OPEN.get(name, []):
+            s.cmd("setflag", ("h", f))
         if name in ("GROUDON", "KYOGRE"):
             # As the Weather Institute's scientist does after the credits
             # (CreateAbnormalWeatherEvent): it picks Groudon's sun while
@@ -1181,8 +1192,7 @@ def tickets_section(m, back):
 @section(
     "Unlock",
     "All 8 badges, all 14 Frontier symbols, every town on the FLY map (and the Battle Frontier), "
-    "a complete National Pokédex, the three Regi chambers opened, the Running Shoes, or Mystery "
-    "Gift on the title screen.",
+    "or a complete National Pokédex.",
 )
 def unlock_section(m, back):
     s = m.s
@@ -1193,9 +1203,6 @@ def unlock_section(m, back):
             ("FRONTIER SYMBOLS", "us"),
             ("FLY SPOTS", "uf"),
             ("POKéDEX", "ud"),
-            ("REGI CHAMBERS", "ur"),
-            ("RUNNING SHOES", "un"),
-            ("MYSTERY GIFT", "um"),
         ],
         back,
     )
@@ -1211,23 +1218,6 @@ def unlock_section(m, back):
             [*range(0x86F, 0x87F), 0x8A8],
             "FLY takes you to every town\nand the BATTLE FRONTIER.",
         ),  # FLAG_VISITED_* (the region map's), FLAG_LANDMARK_BATTLE_FRONTIER
-        (
-            "ur",
-            [0xE4, 0x8B0, 0x8B1, 0x8B2],
-            "All three REGI chambers\nare open, their walls too.",
-        ),  # FLAG_REGI_DOORS_OPENED (the Sealed Chamber's: the routes' entrances),
-        # FLAG_SYS_REGIROCK/REGICE/REGISTEEL_PUZZLE_COMPLETED (each inner wall)
-        (
-            "un",
-            [0x8C0, 0x112],
-            "Hold B to run in the\nRUNNING SHOES.",
-        ),  # FLAG_SYS_B_DASH, FLAG_RECEIVED_RUNNING_SHOES
-        (
-            "um",
-            [0x8DB],
-            "MYSTERY GIFT is on the\ntitle screen's menu.",
-        ),  # FLAG_SYS_MYSTERY_GIFT_ENABLE, as EnableMysteryGift sets it (and
-        # its e-Reader screen, with no Wireless Adapter)
     ):
         s.label(tag)
         for f in flags:
