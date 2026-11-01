@@ -420,9 +420,14 @@ static u16 glide_key(u16 key, u32 old, u32 cursor)
 	return cursor > old ? key & down : cursor < old ? key & up : 0;
 }
 
+static s32 scroll_for(u8 node, const struct list_state *st, u32 cursor, s32 from);
+
 // One frame of a glide: the spring's goal runs with the cursor's speed; once
-// the key is let go (or another direction restarts it), it brakes
-static void glide(struct list_state *st)
+// the key is let go (or another direction restarts it), it brakes: on the
+// cursor's row with its context, or (UI_LIST_SCROLL) with the cursor's row
+// at the top, where the cursor's own moves put it, or the next UP or DOWN
+// would move only the cursor, the view short of the end
+static void glide(u8 node, struct list_state *st)
 {
 	const InputState *in = ui_input();
 	u16 key = st->glide_key;
@@ -439,7 +444,10 @@ static void glide(struct list_state *st)
 	}
 	if (!rate) {
 		s32 at = st->base + FIX_ROUND(st->spring);
-		st->target = ring_glide_stop(&st->ring, row, st->target, at, st->glide_speed, SPRING_BRAKE, st->rows);
+		st->target = config(node)->flags & UI_LIST_SCROLL
+				     ? scroll_for(node, st, row, st->target)
+				     : ring_glide_stop(&st->ring, row, st->target, at, st->glide_speed, SPRING_BRAKE,
+						       st->rows);
 		st->glide_key = 0;
 		st->braking = 1;
 		motion_spring_omega(st->motion, SPRING_BRAKE);
@@ -1142,7 +1150,7 @@ static void list_update(u8 node, u32 dt)
 	} else if (st->page == PAGE_NONE) {
 		autoscroll(node, st, dt);
 		if (st->glide_key)
-			glide(st);
+			glide(node, st);
 		s32 want = st->base + FIX_ROUND(st->spring), max = ring_max_scroll(&st->ring, st->rows);
 		st->braking = st->braking && motion_running(st->motion);
 		if (st->glide_key || st->braking)

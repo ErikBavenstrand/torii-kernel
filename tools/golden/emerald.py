@@ -899,7 +899,7 @@ def cheats():
             vba(*Mixed(field + field_hook(), None).lines),
             "Hold L and R, press A where nothing is in front of you: PC, Heal, Warp, Legends, Gifts, Moves, "
             "Unlock (badges, symbols, Pokédex, event tickets).",
-            None,
+            "hold L+R+A",  # field.c's (ROM patches only): shown, never a gate
         )
     )
 
@@ -1194,7 +1194,7 @@ def cheats():
         "Walk through walls (hold R)",
         vba(*Mixed(walls(), None).lines),
         "Hold R to walk through walls, people and water. Let go only on normal ground; if stuck, hold R and walk back.",
-        "launch",
+        "hold R",  # the routine's own (ROM patches only): shown, never a gate
     )
     add(
         "Overworld",

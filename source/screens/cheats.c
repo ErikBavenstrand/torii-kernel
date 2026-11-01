@@ -195,6 +195,7 @@ static struct {
 	u16 box_from, box_to;  // the Guide page's text: the activation box's bytes
 	u16 rule_at;      // and its divider's line (CHEATSTORE_DETAIL: none)
 	u16 name_end;     // the page's text past the cheat's name (its heading)
+	u16 sub_from, sub_to;  // and the heading the cheat is under, faint
 	u8 box_icon;      // the box's icon: ART_ICON8_*
 	u8 key_w;         // px from a detail's label to its value
 	char new_name[16];  // a new code's name until the user gives one
@@ -258,6 +259,19 @@ static void as_cheat(const struct cheatlist_entry *e, struct cheatfile_cheat *c)
 	c->patches = e->patches;
 	c->picked = (e->flags & CHEATLIST_PICKED) != 0;
 	c->number = e->number;
+}
+
+// The buttons cheat c is used with, as the screen shows them: how it is
+// activated, but for one that only patches the ROM (set at launch) whose
+// file names buttons, its own routine's (the field menu's L+R+A): those,
+// which never gate it
+static u16 shown_keys(const struct cheatfile_cheat *c)
+{
+	u16 act = cheatfile_activation(c);
+	u32 mode = cheatkeys_mode(c->keys);
+	if (act == CHEATKEYS_AT_LAUNCH && (mode == CHEATKEYS_HOLD || mode == CHEATKEYS_PRESS))
+		return c->keys;
+	return act;
 }
 
 // Entry g's name into cs.text, its bytes in *len; "(no name)" without one
@@ -432,7 +446,7 @@ static int cs_fetch(void *ctx, u32 i, struct ui_item *out)
 		out->mark_ink = c.status == CHEATFILE_OK ? 0 : UI_ROLE_DIM;
 	}
 	// A Hold or Press cheat's buttons at the right, dim, after the keys' icon
-	if (cheatkeys_tag(cheatfile_activation(&c), cs.tag, sizeof(cs.tag))) {
+	if (cheatkeys_tag(shown_keys(&c), cs.tag, sizeof(cs.tag))) {
 		out->detail = cs.tag;
 		out->dot = ART_ICON8_KEYS + 1;
 	}
@@ -494,19 +508,17 @@ static const char *add_reason(void)
 	}
 }
 
-// The hint bar's line for cheat c, which A may pick: how it is activated if
-// it takes buttons, else a ROM patch's note, else when it is set at launch;
-// NULL for one always on
+// The hint bar's line for cheat c, which A may pick: its buttons if it
+// takes some, else when it is set at launch if it runs in game too; NULL
+// for one always on, or one that only patches the ROM (its Guide page says)
 static const char *cs_activation_note(const struct cheatfile_cheat *c)
 {
-	u16 act = cheatfile_activation(c);
+	u16 act = shown_keys(c);
 	u32 mode = cheatkeys_mode(act);
 	if (mode == CHEATKEYS_HOLD || mode == CHEATKEYS_PRESS || (mode == CHEATKEYS_LAUNCH && !c->patches)) {
 		cheatkeys_sentence(act, cs.note, sizeof(cs.note));
 		return cs.note;
 	}
-	if (c->status == CHEATFILE_OK && c->patches)
-		return S(STR_CHEATS_NOR);
 	return NULL;
 }
 
@@ -876,6 +888,8 @@ static int gv_paint(void *ctx, const struct ui_paint *p)
 			s += 2;
 			len -= 2;
 		}
+	} else if (start >= cs.sub_from && start < cs.sub_to) {
+		ink = UI_ROLE_FAINT;
 	} else if (kind == UI_READ_KEY || kind == UI_READ_MORE) {
 		if (kind == UI_READ_KEY) {
 			u32 tab = 0;
@@ -987,11 +1001,11 @@ static void detail_pair(u32 *n, u32 label, const char *value)
 	detail_line(n, value);
 }
 
-// Cheat at's page: its name as the heading; the box with a greyed cheat's
-// reason, else how it is activated; its guide and a divider under it; then
-// Code, its lines, and Details: whether it is on, its format, its share of
-// the budget (or that it runs once) and its ROM patches, each a label and
-// its value
+// Cheat at's page, top down: its name (past its heading's), its heading
+// faint under it, the box with a greyed cheat's reason, else its buttons or
+// how it is activated, its guide and a divider under it, Details (whether
+// it is on, its format, its share of the budget or that it runs once, its
+// ROM patches; each a label and its value), then its code last
 static void detail_text(u32 at)
 {
 	struct cheatstore *s = cheatstore();
@@ -999,16 +1013,25 @@ static void detail_text(u32 at)
 	const struct cheatfile_cheat *c = &s->cheats[at];
 	const struct torii_font *font = ui_theme()->body;
 	char line[96];
-	u32 n = 0, len;
+	u32 n = 0, len, hlen = 0;
 	const char *name = cheat_name(c, &len);
+	const char *head = cheatfile_folder_name(f, c, &hlen);
+	u32 skip = head ? cheatfile_folder_part(name, len, head, hlen) : 0;
 	detail_add(&n, "# ", 2);
-	detail_add(&n, name, len);
+	detail_add(&n, name + skip, len - skip);
 	detail_add(&n, "\n", 1);
 	cs.name_end = (u16)n;
+	cs.sub_from = cs.sub_to = (u16)CHEATSTORE_DETAIL;
+	if (head && hlen) {
+		cs.sub_from = (u16)n;
+		detail_add(&n, head, hlen);
+		detail_add(&n, "\n", 1);
+		cs.sub_to = (u16)n;
+	}
 	u32 why = cheatfile_why(f, at);
 	const char *box = why != CHEATFILE_PICKABLE ? cs_reason(c, why) : NULL;
 	cs.box_icon = ART_ICON8_INFO;
-	if (!box && cheatkeys_sentence(cheatfile_activation(c), cs.note, sizeof(cs.note))) {
+	if (!box && cheatkeys_sentence(shown_keys(c), cs.note, sizeof(cs.note))) {
 		box = cs.note;
 		cs.box_icon = ART_ICON8_KEYS;
 	}
@@ -1025,17 +1048,7 @@ static void detail_text(u32 at)
 		cs.rule_at = (u16)n;
 		detail_add(&n, "\n", 1);
 	}
-	// The code: lines between its '+'s, but a pointer's offset's
 	detail_add(&n, "# ", 2);
-	detail_line(&n, S(STR_CHEATS_SECTION_CODE));
-	const char *code = f->text + c->code;
-	u32 code_len = cheatfile_code_len(c);
-	for (u32 i = 0, from = 0; i <= code_len; i++)
-		if (i == code_len || (code[i] == '+' && !cheat_plus_joins(code + from, code_len - from, i - from))) {
-			code_line(&n, code + from, i - from);
-			from = i + 1;
-		}
-	detail_add(&n, "\n# ", 3);
 	detail_line(&n, S(STR_CHEATS_SECTION_DETAILS));
 	// The labels' column: past the widest, as the language has them
 	static const u16 labels[] = {STR_CHEATS_LABEL_STATE, STR_CHEATS_LABEL_FORMAT, STR_CHEATS_LABEL_FRAME,
@@ -1067,6 +1080,16 @@ static void detail_text(u32 at)
 			detail_pair(&n, STR_CHEATS_LABEL_ROM, line);
 		}
 	}
+	// The code last: lines between its '+'s, but a pointer's offset's
+	detail_add(&n, "\n# ", 3);
+	detail_line(&n, S(STR_CHEATS_SECTION_CODE));
+	const char *code = f->text + c->code;
+	u32 code_len = cheatfile_code_len(c);
+	for (u32 i = 0, from = 0; i <= code_len; i++)
+		if (i == code_len || (code[i] == '+' && !cheat_plus_joins(code + from, code_len - from, i - from))) {
+			code_line(&n, code + from, i - from);
+			from = i + 1;
+		}
 }
 
 // Wraps the page's text from byte from up to byte to (its end if sooner;

@@ -166,10 +166,12 @@ def value(raw):
 # The keys Torii adds to a cheat (source/cheatfile.h), kept as they are:
 # cheatN_format, a format to decode it in (quoted), cheatN_user, a code
 # typed on the cart, and cheatN_renamed, a database cheat named on the cart
-# (bare bools); cheatN_folder, the heading the Cheats screen shows it under
-# (quoted; set in the file, never on the cart, so a merge takes the
-# database's when it has one)
-KEPT_KEYS = ("format", "user", "renamed", "folder")
+# (bare bools); cheatN_folder, the heading the Cheats screen shows it under,
+# cheatN_keys, its buttons ("hold L+Select"), and cheatN_guide, how to use
+# it (quoted; set in the source or on the cart: a merge takes the source's
+# when it has one, else the card's, so a guide given on the cart stays)
+KEPT_KEYS = ("format", "user", "renamed", "folder", "keys", "guide")
+SOURCE_KEYS = ("folder", "keys", "guide")
 BARE_KEYS = ("enable", "user", "renamed")
 # A code's digits left for the user to fill in (cheatcode.c's is_mark)
 PLACEHOLDER = re.compile(r"[?XxYyZz]")
@@ -348,8 +350,9 @@ def merge(database, old, keep_all=True):
             kept = getattr(was, "extra", {})
             name = was[0] if is_true(kept.get("renamed", "")) else desc
             mine = {**extra, **kept}
-            if "folder" in extra:
-                mine["folder"] = extra["folder"]
+            for k in SOURCE_KEYS:
+                if k in extra:
+                    mine[k] = extra[k]
             out.append(Cheat(name, code, was[2], mine))
         else:
             out.append(Cheat(desc, code, enabled, extra))

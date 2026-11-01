@@ -34,6 +34,7 @@ const char *const lang_en[STR_COUNT] = {
 	"format",  // hint.format
 	"Loading the game",  // launch.loading_game
 	"Patching the game",  // launch.patching
+	"Preparing cheats",  // launch.cheats
 	"Writing to NOR",  // launch.writing
 	"Not enough room in NOR",  // launch.nor_full
 	"Too big to start from the SD card (over 32 MB). Write it to NOR instead.",  // launch.file_overflow

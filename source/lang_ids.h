@@ -4,7 +4,7 @@
 #define TORII_LANG_IDS_H
 
 #define LANG_FORMAT 2
-#define LANG_KEY_HASH 0x0D09C264u
+#define LANG_KEY_HASH 0xD8880572u
 #define LANG_PACK_MAX 0x10000u
 #define LANG_LAUNCH_MAX 0x2000u
 #define LANG_ENGLISH_ID 0xE1E1u
@@ -41,6 +41,7 @@ enum lang_id {
 	STR_HINT_FORMAT,
 	STR_LAUNCH_LOADING_GAME,
 	STR_LAUNCH_PATCHING,
+	STR_LAUNCH_CHEATS,
 	STR_LAUNCH_WRITING,
 	STR_LAUNCH_NOR_FULL,
 	STR_LAUNCH_FILE_OVERFLOW,
@@ -852,6 +853,6 @@ enum lang_id {
 };
 
 // The ids below this are the launch's (lang_before_launch)
-#define STR_LAUNCH_END 183
+#define STR_LAUNCH_END 184
 
 #endif

@@ -288,6 +288,28 @@ class Merge(unittest.TestCase):
         self.assertEqual((own, stale), (0, 0))
         self.assertEqual(merged[0][:2], ("Cash", "02001510:0063"))
 
+    def test_keys_and_guide_kept(self):
+        """cheatN_keys and cheatN_guide are read, written and kept through a
+        merge: the source's over the card's, the card's where the source has
+        none (a guide given on the cart)"""
+        old = cheats.parse_cht(
+            'cheat0_desc = "Warp"\ncheat0_code = "32001000 0009"\n'
+            'cheat0_keys = "hold L"\ncheat0_guide = "Mine"\n'
+            'cheat1_desc = "HP"\ncheat1_code = "32001004 0063"\ncheat1_guide = "On the cart"\n'
+        )
+        self.assertEqual(old[0].extra, {"keys": "hold L", "guide": "Mine"})
+        database = [
+            cheats.Cheat("Warp", "32001000 0009", False, {"keys": "hold L+R", "guide": "Hold L and R.\\nThen walk."}),
+            cheats.Cheat("HP", "32001004 0063", False),
+        ]
+        merged, _, _ = cheats.merge(database, old)
+        self.assertEqual(merged[0].extra, {"keys": "hold L+R", "guide": "Hold L and R.\\nThen walk."})
+        self.assertEqual(merged[1].extra, {"guide": "On the cart"})
+        text = cheats.format_cht(merged)
+        self.assertIn('cheat0_keys = "hold L+R"\n', text)
+        self.assertIn('cheat0_guide = "Hold L and R.\\nThen walk."\n', text)
+        self.assertEqual(cheats.parse_cht(text), merged)
+
     def test_folder_kept(self):
         """cheatN_folder is read, written after the cheat's other lines and
         kept through a merge: the database's folder over the card's, the

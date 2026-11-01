@@ -15,9 +15,11 @@
 #include "ingame.h"
 #include "ingame_abi.h"
 #include "namesdb.h"
+#include "lang.h"
 #include "tlog.h"
 #include "engine/cycles.h"
 #include "engine/psram.h"
+#include "ui/dialog.h"
 
 extern u8 pReadCache[];
 
@@ -2001,6 +2003,28 @@ void cheatstore_launch_none(void)
 	ingame_cheats_clear();
 }
 
+// A launch's progress, once making its cheats ready has taken
+// LAUNCH_PROGRESS_AFTER frames (a long file, no list cache yet): a dialog
+// until the loader's own, so the screen never seems to hang; quick ones
+// show nothing
+#define LAUNCH_PROGRESS_AFTER 6
+static struct {
+	const char *title;
+	u32 began;
+	u8 shown;
+} launch_ui EWRAM_BSS;
+
+static void launch_progress(u32 done, u32 total)
+{
+	if (!launch_ui.shown) {
+		if (torii_frames - launch_ui.began < LAUNCH_PROGRESS_AFTER)
+			return;
+		dialog_progress_begin(launch_ui.title, S(STR_LAUNCH_CHEATS));
+		launch_ui.shown = 1;
+	}
+	dialog_progress_set(done, total ? total : 1, NULL);
+}
+
 // A launch decodes the picked cheats
 static int launch_wants(u32 i, void *ctx)
 {
@@ -2019,6 +2043,7 @@ static int launch_pass(const char *rom_path, int quick)
 	kept.n = kept.names_used = 0;
 	if (!cheatstore_read(rom_path))
 		return 1;
+	launch_progress(0, 1);  // a long file's read may have taken a while already
 	struct cheatstore *cs = cheatstore();
 	struct cheatfile *f = &cs->file;
 	if (quick)
@@ -2046,7 +2071,8 @@ static int launch_pass(const char *rom_path, int quick)
 			i = cheatfile_next(f, &cs->work);
 			if (i < 0)
 				break;
-			decoded++;
+			if (!(++decoded & 7))
+				launch_progress(start + (u32)i, cheatstore_window_start(last_window + 1u));
 			const struct cheatfile_cheat *c = &cs->cheats[i];
 			if (cs->sparse && c->picked && !sparse_check((u32)i)) {
 				tlog_error("cheats: %s: cheat %u isn't as its cache says: the launch decodes in full",
@@ -2154,6 +2180,12 @@ void cheatstore_launch(const char *rom_path, u32 psram_bytes)
 		write_patches(rom_path, psram_bytes);
 		return;
 	}
+	const char *slash = strrchr(rom_path, '/');
+	launch_ui.title = slash ? slash + 1 : rom_path;
+	launch_ui.began = torii_frames;
+	launch_ui.shown = 0;
 	if (!launch_pass(rom_path, 1))
 		launch_pass(rom_path, 0);
+	if (launch_ui.shown)
+		dialog_progress_end();
 }
