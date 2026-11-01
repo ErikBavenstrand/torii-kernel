@@ -3793,11 +3793,11 @@ cheat473_guide = "Fly to any town, even ones you haven't visited."
 cheat473_enable = false
 
 cheat474_desc = "Overworld: Free Day Care"
-cheat474_code = "820375E2 0000"
-cheat474_format = "CodeBreaker"
+cheat474_code = "0806FE9E:2400+0806FEA0:46C046C0"
+cheat474_format = "Torii"
 cheat474_folder = "Overworld"
-cheat474_keys = "always"
-cheat474_guide = "Taking a Pokémon back from the Day Care is free. The lady still names a price."
+cheat474_keys = "launch"
+cheat474_guide = "Taking a Pokémon back from the Day Care costs nothing."
 cheat474_enable = false
 
 cheat475_desc = "Overworld: Walk through walls (hold R)"
@@ -3817,15 +3817,15 @@ cheat476_guide = "Use Cut, Surf, Fly and the other field moves from the POKéMON
 cheat476_enable = false
 
 cheat477_desc = "Overworld: Gym leader rematches"
-cheat477_code = "40305D8C 000A0B01+40305D8C 000A0C01+40305D8C 000A0D01+40305D8C 000A0E01+40305D8C 000A0F01+40305D8C 000A1001+40305D8C 000A1101+40305D8C 000A1201"
-cheat477_format = "PARv3 raw"
+cheat477_code = "[03005D8C]+0A0B:01+[03005D8C]+0A0C:01+[03005D8C]+0A0D:01+[03005D8C]+0A0E:01+[03005D8C]+0A0F:01+[03005D8C]+0A10:01+[03005D8C]+0A11:01+[03005D8C]+0A12:01"
+cheat477_format = "Torii"
 cheat477_folder = "Overworld"
 cheat477_keys = "always"
-cheat477_guide = "Run it once, then talk to any gym leader for a rematch (a double battle). Needs the game beaten."
+cheat477_guide = "Talk to a gym leader you've beaten for a rematch: a double battle, their team stronger each time."
 cheat477_enable = false
 
 cheat478_desc = "Overworld: Any Pokémon in the Frontier"
-cheat478_code = "081A3F44:42A8+081B8648:46C0"
+cheat478_code = "081A3F32:E00F+081B8630:E00B"
 cheat478_format = "Torii"
 cheat478_folder = "Overworld"
 cheat478_keys = "launch"

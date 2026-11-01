@@ -1690,8 +1690,10 @@ def cheats():
     add(
         "Overworld",
         "Free Day Care",
-        cb(CB.write16(0x020375E2, 0)),
-        "Taking a Pokémon back from the Day Care is free. The lady still names a price.",
+        # PrepareDaycareCostStringForSelectedMon: cost = 0, not 100 + 100 a level
+        rom_code([(0x0806FE9E, 0x2400), (0x0806FEA0, 0x46C0), (0x0806FEA2, 0x46C0)]),
+        "Taking a Pokémon back from the Day Care costs nothing.",
+        "launch",
     )
     add(
         "Overworld",
@@ -1710,13 +1712,15 @@ def cheats():
     add(
         "Overworld",
         "Gym leader rematches",
-        ar(*(AR.write_ptr(1, SB1, 1, 0x9CA + i) for i in range(65, 73))),
-        "Run it once, then talk to any gym leader for a rematch (a double battle). Needs the game beaten.",
+        # trainerRematches[REMATCH_ROXANNE..REMATCH_JUAN]: each leader ready
+        vba(*(f"[03005D8C]+{0x9CA + i:04X}:01" for i in range(65, 73))),
+        "Talk to a gym leader you've beaten for a rematch: a double battle, their team stronger each time.",
     )
     add(
         "Overworld",
         "Any Pokémon in the Frontier",
-        rom_code([(0x081A3F44, 0x42A8), (0x081B8648, 0x46C0)]),
+        # AppendIfValid and GetBattleEntryEligibility skip gFrontierBannedSpecies
+        rom_code([(0x081A3F32, 0xE00F), (0x081B8630, 0xE00B)]),
         "Legendaries and any other Pokémon may enter every Battle Frontier facility.",
         "launch",
     )
