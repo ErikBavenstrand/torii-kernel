@@ -2286,7 +2286,7 @@ static int ext_load(void)
 	}
 	if (s == session()->ext_check)
 		return 1;
-	debug_print("ingame: the cheat search's code didn't load whole");
+	debug_print("ingame: the extension (the lists' and the search's code) didn't load whole");
 	ext_unload();
 	return 0;
 }

@@ -592,6 +592,8 @@ static void cs_moved(u32 to)
 	cs.cursor = to;
 	cs.cur_value = row_value(to);
 	heads_above(to, &h);
+	if (ROW_KIND(cs.cur_value) == ROW_ADD)
+		h = 0;  // + Add code ends the list, under no heading: the game's name
 	if (cs.group == CHEATFILE_NONE && !cs.only && h != cs.place) {
 		cs.place = (u8)h;
 		cs_retitle();  // the heading the cursor is under names the place

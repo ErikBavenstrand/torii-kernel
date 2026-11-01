@@ -599,11 +599,15 @@ static int cache_write(void)
 	UINT put;
 	int ok = f_open(fil, path, FA_WRITE | FA_CREATE_ALWAYS) == FR_OK;
 	if (ok) {
+		cutpoint("cheats: the list's cache opened");
 		memcpy(buf, &h, sizeof(h));
 		ok = f_write(fil, buf, sizeof(h), &put) == FR_OK && put == sizeof(h);
+		cutpoint("cheats: the list's cache head written");
 		memset(&o, 0, sizeof(o));
-		while (ok && (n = cache_fill(&o, buf, sizeof(cs->part))) > 0)
+		while (ok && (n = cache_fill(&o, buf, sizeof(cs->part))) > 0) {
 			ok = f_write(fil, buf, n, &put) == FR_OK && put == n;
+			cutpoint("cheats: a part of the list's cache written");
+		}
 		ok &= f_close(fil) == FR_OK;
 		cutpoint("cheats: the list's cache written");
 	}
