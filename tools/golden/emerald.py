@@ -815,24 +815,15 @@ def cheats():
     )
     field, at = field_menu()
     code = Code(AR)
-    trigger(
-        code,
-        [
-            (keys("L", "R", "A"), at["main"]),
-            (keys("L", "R", "UP"), at["heal"]),
-            (keys("L", "R", "DOWN"), at["pc"]),
-            (keys("L", "R", "LEFT"), at["warp"]),
-            (keys("L", "R", "RIGHT"), at["moves"]),
-        ],
-    )
+    trigger(code, [(keys("L", "R", "A"), at["main"])])
     code = Mixed(field, code)
     out.append(
         Cheat(
             "Menus",
             "Menus: Field menu (L+R+A)",
             code,
-            "L+R+A opens it (face away from people): PC, Heal, Warp, Legends, Gifts, Moves, Unlock. Shortcuts: "
-            "L+R+Up heal, L+R+Down PC, L+R+Left warp, L+R+Right moves. Pick before you play.",
+            "L+R+A opens it (face away from people): PC, Heal, Warp, Legends, Gifts, Moves, Unlock. "
+            "Pick before you play.",
             None,
         )
     )

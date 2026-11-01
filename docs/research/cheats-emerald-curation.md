@@ -159,7 +159,7 @@ Every cheat we have (GameHacking, plus libretro's three of its own), grouped. "P
 | 101 | Access Birchs Bag [Press L+R+Up] | R+L+Up | keep |  | drop |
 | 102 | Access Deco Shop [Press L+A+Select] | Select+A+L | keep |  | drop |
 | 103 | Access MOD Shop [Press L+A+Select] | Select+A+L | keep |  | drop |
-| 104 | Access PC [Press B+Select] | Select+B | keep |  | replaced: field menu PC (L+R+Down) |
+| 104 | Access PC [Press B+Select] | Select+B | keep |  | replaced: field menu PC (L+R+A) |
 | 105 | Install Match Call [Press Select+R+Up] | Select+R+Up | keep |  | drop |
 | 106 | Install PokeNAV [Press Select+R+Down] | Select+R+Down | keep |  | drop |
 
@@ -261,7 +261,7 @@ Every cheat we have (GameHacking, plus libretro's three of its own), grouped. "P
 
 | Folder | Cheats |
 | --- | --- |
-| Menus | Item shop (L+R+B): Marts of Medicine, Balls, Training, TMs & HMs, Held items, Berries, Valuables and Decorations (Lilycove's counter, all 120) at game prices, and the four event tickets free with their ferry flags. Field menu (L+R+A): PC, Heal, Warp (16 towns, 17 dungeons, 5 islands), Legends (respawn 11), Gifts (Hoenn and Johto starters, Beldum, Castform, Lileep, Anorith, Wynaut egg), Moves (relearner), Unlock (badges, Frontier symbols, Pokédex); L+R+Up heals, +Down PC, +Left warp, +Right moves |
+| Menus | Item shop (L+R+B): Marts of Medicine, Balls, Training, TMs & HMs, Held items, Berries, Valuables and Decorations (Lilycove's counter, all 120) at game prices, and the four event tickets free with their ferry flags. Field menu (L+R+A): PC, Heal, Warp (16 towns, 17 dungeons, 5 islands), Legends (respawn 11), Gifts (Hoenn and Johto starters, Beldum, Castform, Lileep, Anorith, Wynaut egg), Moves (relearner), Unlock (badges, Frontier symbols, Pokédex); L+R+A alone opens it (the L+R+direction shortcuts were dropped, so the row shows one combination) |
 | Money | Max money, Max coins (Torii's keyed lines), Max Battle Points, Shopping costs 1 |
 | Pokémon | Shiny, Perfect IVs, Max friendship, Max EVs, Vitamins up to 255, Nature (25), Gender (2), Pokérus when caught, Eggs hatch fast, Everstone always passes nature, Day Care eggs fast |
 | Battle | One-hit KO, Infinite HP, Infinite PP, No trainer challenges, EXP x2/x3/x5/x10/x255, EXP shared with the party, Every ball catches, Pokémon always obey |
@@ -297,7 +297,7 @@ On the emulated cart with the real ROM (CRC32 `1F1C08FB`) and a 100% save (Proje
 | Walk through walls | blocked without R; through the Pokémon Center counter with R |
 | Item shop, Shopping costs 1 | the 8 categories, the TM Mart; TM01 for "₽1", money 329,622 to 329,621, TM01 4 to 5 |
 | Tickets | "Obtained the EON TICKET!"; the ferry flag set; a second pick says you have it |
-| Field menu | Heal, PC (and L+R+Down), Warp (Oldale, Sky Pillar, Southern Island's dock; L+R+Left), Legends (Regirock's defeated and hidden flags cleared, Regice's not), Gifts ("Jack received TREECKO!"), Moves (L+R+Right, the relearner), Unlock (badges, symbols; the Pokédex's bits restored from zero) |
+| Field menu | Heal, PC, Warp (Oldale, Sky Pillar, Southern Island's dock), Legends (Regirock's defeated and hidden flags cleared, Regice's not), Gifts ("Jack received TREECKO!"), Moves (the relearner), Unlock (badges, symbols; the Pokédex's bits restored from zero) |
 | Quick contests, Max contest score | a Normal Cool contest: results after the first round, first place with full stars; without them, still in the appeals |
 
 | No trainer challenges | Route 102's Rick, his defeat flag cleared: he challenges in the control; with it the player walks past |

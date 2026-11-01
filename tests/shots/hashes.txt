@@ -71,9 +71,9 @@ cheats-choices/picked 6301418D254C8A88
 cheats-choices/pickone 52762342367B135A
 cheats-choices/run 0D10995FF04B548A
 cheats-clean/clean 019FE0D843B177D1
-cheats-emerald/again 657AB339A1645221
+cheats-emerald/again F1DE62F618FEBADD
 cheats-emerald/chosen 6DFE4CED414348D0
-cheats-emerald/list 8D220DC547527370
+cheats-emerald/list 5FA032856A35E3B4
 cheats-emerald/paged A2A3169BC1754B05
 cheats-emerald/species 50CB53199F72B519
 cheats-emerald/wild E34FE3F11384DA1F
@@ -387,7 +387,7 @@ info/frames 7-20 D61FE540933194E3
 info-about/about FD38FEA4E7DD3B19
 info-about/about-2 B2BB5362EC400E99
 info-about/about-end 958CA4E7A2A59D25
-info-about/cheats 7DAD25B8EAB0EE3F
+info-about/cheats 611D62F2E4218FAD
 info-about/help 4BC6CDF3580262CD
 info-about/ingame 81E1319CA00321FB
 info-about/saves 02471FDB9F0539CB
@@ -829,7 +829,7 @@ sv-home/frames 10-12 0B2C673E7DF2D87B
 sv-info-about/about 5D08D94DF26F5978
 sv-info-about/about-2 725C9630DD4601E4
 sv-info-about/about-end D71F05D7CB63FC50
-sv-info-about/cheats 9CCC4E07BFE89EE0
+sv-info-about/cheats 3D339E50B24A8E1A
 sv-info-about/help 3BC7CD2B37E2A5C4
 sv-info-about/ingame DDB28EBFE4F83070
 sv-info-about/saves 02B258CE41672BE6
