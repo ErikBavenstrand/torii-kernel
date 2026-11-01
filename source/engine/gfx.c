@@ -516,10 +516,10 @@ u32 gfx_commit_vram(u32 byte_cap, u32 last_line)
 		done += gfx_commit_queue(byte_cap - done, last_line);
 		if (!queue_count || queue[queue_head].kind != QUEUE_COPY2D)
 			return done;
-		u32 moved = commit_2d(byte_cap - done, last_line);
-		done += moved;
-		if (queue_count && queue[queue_head].kind == QUEUE_COPY2D)
-			return done;  // out of time or bytes
+		u32 head = queue_head;
+		done += commit_2d(byte_cap - done, last_line);
+		if (queue_head == head)
+			return done;  // out of time or bytes (the next strided copy goes on)
 	}
 }
 

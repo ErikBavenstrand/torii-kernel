@@ -15,7 +15,7 @@ diag-page 147086
 diag-psram-menu 20963
 diag-psram-slow 25429
 diag-row38 9525
-diag-scroll 117673
+diag-scroll 131770
 fields-move 54715
 games-artlist 180404
 games-move 104363
@@ -27,6 +27,7 @@ nor-move 96128
 popup-draw 168173
 popup-motion 93953
 popup-move 139253
+popup-scroll 174695
 rename-key 129338
 row-copy14 6628
 sd-count 113981

@@ -1,0 +1,20 @@
+# The game popup scrolled (source/ui/ui_popup.c) on Recent's first game,
+# whose 8 items show 7 rows: each step lands whole in one frame (the rows
+# that stay move in VRAM; the incoming row, the highlights and the bar are
+# drawn), down past the last row, then UP from the first item to the last
+# (a jump of two rows). Every frame is hashed: a half-drawn one fails.
+#! settings 28=1
+-w "nav: home ready"
+-k @8:A -k @12:-
+-w "nav: page recent ready"
+-k @8:START -k @12:-
+-w "screen ready: game-popup"
+-s @30:open.png
+-k @40:DOWN -k @44:- -k @52:DOWN -k @56:- -k @64:DOWN -k @68:- -k @76:DOWN -k @80:-
+-k @88:DOWN -k @92:- -k @100:DOWN -k @104:- -k @112:DOWN -k @116:-
+-s @124:bottom.png
+-k @130:DOWN -k @134:-
+-s @146:top.png
+-k @150:UP -k @154:-
+-s @166:wrapped.png
+-H @38:@166

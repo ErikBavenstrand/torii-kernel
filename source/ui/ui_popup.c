@@ -154,12 +154,15 @@ static const struct popup_look {
 // --- Pens ----------------------------------------------------------------
 //
 // Drawing clipped to lines [ya, yb) of a canvas, into a window whose line
-// 0 is canvas line line0: the whole canvas, or a band of it.
+// 0 is canvas line line0 and whose column 0 is canvas x x0: the whole
+// canvas, a band of it, or a band of a few tile columns (which gets only
+// the text that starts in it).
 
 struct pen {
 	const struct text_window *win;
 	s32 line0;
 	s32 ya, yb;
+	s32 x0;
 };
 
 enum {
@@ -171,6 +174,7 @@ enum {
 static void pen_fill(const struct pen *p, s32 x, s32 y, s32 w, s32 h, u32 role)
 {
 	s32 a = y > p->ya ? y : p->ya, b = y + h < p->yb ? y + h : p->yb;
+	x -= p->x0;
 	if (x < 0) {
 		w += x;
 		x = 0;
@@ -220,7 +224,7 @@ static void card_lines(const struct pen *p, s32 x, s32 y, s32 w, s32 h)
 {
 	u32 r = ui_theme()->look.card_radius;
 	s32 rr = (s32)r, sx = look.shadow_x, sy = look.shadow_y;
-	pen_fill(p, 0, p->ya, p->win->width * 8, p->yb - p->ya, UI_ROLE_NONE);
+	pen_fill(p, p->x0, p->ya, p->win->width * 8, p->yb - p->ya, UI_ROLE_NONE);
 	pen_round(p, x + 1, y + 1, w - 2, h - 2, r ? r - 1 : 0, UI_ROLE_FLOAT);
 	// The hairline: a pixel in from the outside at each row of the corners
 	// (wider where the corner turns), the top and bottom rows, the sides
@@ -286,12 +290,12 @@ static void pen_card(const struct pen *p, s32 x, s32 y, s32 w, s32 h)
 	struct pen q = *p;
 	if (top > p->ya) {
 		q.yb = top < p->yb ? top : p->yb;
-		pen_fill(&q, 0, q.ya, p->win->width * 8, q.yb - q.ya, UI_ROLE_NONE);
+		pen_fill(&q, p->x0, q.ya, p->win->width * 8, q.yb - q.ya, UI_ROLE_NONE);
 	}
 	if (bottom < p->yb) {
 		q.ya = bottom > p->ya ? bottom : p->ya;
 		q.yb = p->yb;
-		pen_fill(&q, 0, q.ya, p->win->width * 8, q.yb - q.ya, UI_ROLE_NONE);
+		pen_fill(&q, p->x0, q.ya, p->win->width * 8, q.yb - q.ya, UI_ROLE_NONE);
 	}
 	q.ya = top > p->ya ? top : p->ya;
 	q.yb = bottom < p->yb ? bottom : p->yb;
@@ -325,6 +329,7 @@ static void pen_text(const struct pen *p, const struct torii_font *font, s32 x, 
 		x += (s32)(clip > line.extent ? (clip - line.extent) / 2 : 0);
 	else if (align == PEN_RIGHT)
 		x -= (s32)line.extent;
+	x -= p->x0;
 	if (x >= 0)
 		text_draw_line(p->win, font, (u32)x, (u32)(y - p->line0), ink, &line);
 }
@@ -334,6 +339,7 @@ static void pen_text(const struct pen *p, const struct torii_font *font, s32 x, 
 static void pen_text_from(const struct pen *p, const struct torii_font *font, s32 x, s32 y, u32 clip, u32 ink,
 			  const char *s, u32 skip)
 {
+	x -= p->x0;
 	if (!s || !*s || !clip || x < 0 || y < p->ya || y + font->line_height > p->yb)
 		return;
 	struct text_line line;
@@ -344,6 +350,7 @@ static void pen_text_from(const struct pen *p, const struct torii_font *font, s3
 
 static void pen_icon8(const struct pen *p, s32 x, s32 y, u32 id, u32 ink)
 {
+	x -= p->x0;
 	if (x >= 0 && y >= p->ya && y + 8 <= p->yb)
 		ui_icon8(p->win, (u32)x, (u32)(y - p->line0), id, ink);
 }
@@ -389,35 +396,79 @@ static void canvas_whole(u8 node, const struct canvas *c, render_fn render)
 {
 	const struct ui_node *n = ui_node(node);
 	struct text_window win = {tile_addr(node, c->first), (u8)(n->w / 8), (u8)(n->h / 8)};
-	struct pen p = {&win, 0, 0, n->h};
+	struct pen p = {&win, 0, 0, n->h, 0};
 	render(node, &p);
 }
 
-// Draws lines [ya, yb) of the canvas into a band and queues its copy over
-// them: 0 to try again next frame
-static int canvas_band(u8 node, const struct canvas *c, s32 ya, s32 yb, render_fn render)
+// The band words lines [ya, yb) of cols tile columns take
+static u32 band_words(s32 ya, s32 yb, u32 cols)
+{
+	return ya < yb ? cols * (((u32)yb + 7) / 8 - (u32)ya / 8) * 8 : 0;
+}
+
+// 1 once every band queued before has been copied (the band is empty)
+static int band_free(void)
+{
+	if (band_used && gfx_queue_done(band_ticket))
+		band_used = 0;
+	return !band_used;
+}
+
+// Draws lines [ya, yb) of tile columns [col, col + cols) of the canvas into
+// a band and queues its copy over them: 0 to try again next frame
+static int canvas_cols(u8 node, const struct canvas *c, s32 ya, s32 yb, u32 col, u32 cols, render_fn render)
 {
 	const struct ui_node *n = ui_node(node);
-	u32 tw = (u32)n->w / 8, th = (u32)n->h / 8;
+	u32 th = (u32)n->h / 8;
 	ya = ya < 0 ? 0 : ya;
 	yb = yb > n->h ? n->h : yb;
 	if (ya >= yb)
 		return 1;
-	u32 ty0 = (u32)ya / 8, bt = ((u32)yb + 7) / 8 - ty0, words = tw * bt * 8;
-	if (band_used && gfx_queue_done(band_ticket))
-		band_used = 0;
+	u32 ty0 = (u32)ya / 8, bt = ((u32)yb + 7) / 8 - ty0, words = band_words(ya, yb, cols);
+	band_free();
 	if (band_used + words > BAND_WORDS || gfx_queue_len() >= GFX_QUEUE_CAP - 2) {
 		ui_wake();
 		return 0;
 	}
-	struct text_window win = {band_buf + band_used, (u8)tw, (u8)bt};
-	struct pen p = {&win, (s32)ty0 * 8, ya, yb};
+	struct text_window win = {band_buf + band_used, (u8)cols, (u8)bt};
+	struct pen p = {&win, (s32)ty0 * 8, ya, yb, (s32)col * 8};
 	render(node, &p);
-	if (!gfx_queue_copy2d(tile_addr(node, c->first) + ya, th * 32, win.tiles + (ya - (s32)ty0 * 8), bt * 32,
-			      (u32)(yb - ya) * 4, tw))
+	if (!gfx_queue_copy2d(tile_addr(node, c->first) + col * th * 8 + ya, th * 32, win.tiles + (ya - (s32)ty0 * 8),
+			      bt * 32, (u32)(yb - ya) * 4, cols))
 		return 0;
 	band_used += words;
 	band_ticket = gfx_queue_ticket();
+	return 1;
+}
+
+// The same, every column
+static int canvas_band(u8 node, const struct canvas *c, s32 ya, s32 yb, render_fn render)
+{
+	return canvas_cols(node, c, ya, yb, 0, (u32)ui_node(node)->w / 8, render);
+}
+
+// The copies canvas_shift queues for lines [ya, yb) moved by dy
+static u32 shift_copies(s32 ya, s32 yb, s32 dy)
+{
+	return dy <= 0 ? 1 : (u32)(yb - ya + dy - 1) / (u32)dy;
+}
+
+// Queues the canvas's lines [ya, yb) moved by dy lines (in VRAM, the
+// tile columns from col on): up in one copy (the DMA runs forward), down in copies of dy
+// lines from the bottom, so none reads lines another has written. In
+// bounds; 0 if the queue took none (it has room for shift_copies first).
+static int canvas_shift(u8 node, const struct canvas *c, s32 ya, s32 yb, s32 dy, u32 col)
+{
+	const struct ui_node *n = ui_node(node);
+	u32 th = (u32)n->h / 8, tw = (u32)n->w / 8 - col;
+	u32 *col0 = tile_addr(node, c->first) + col * th * 8;
+	if (dy < 0)
+		return gfx_queue_copy2d(col0 + ya + dy, th * 32, col0 + ya, th * 32, (u32)(yb - ya) * 4, tw);
+	for (s32 b = yb; b > ya; b -= dy) {
+		s32 a = b - dy > ya ? b - dy : ya;
+		if (!gfx_queue_copy2d(col0 + a + dy, th * 32, col0 + a, th * 32, (u32)(b - a) * 4, tw))
+			return 0;
+	}
 	return 1;
 }
 
@@ -508,6 +559,8 @@ static struct {
 	u8 rows;      // items it shows
 	u8 titled;    // it shows its title (it has one, and room for it)
 	u16 redraw;   // rows to draw again, a bit each (row 0: the first shown)
+	u8 vfirst;    // the first item the card's tiles show (first once drawn)
+	u8 bar;       // the scroll bar to draw again
 	// A title too long for the card scrolls, as a list's cut name does
 	// (the theme's marquee_*): TQ_*, px scrolled, frames to wait, and its
 	// line to draw again
@@ -894,10 +947,14 @@ static int popup_event(u8 node, const struct ui_event *e)
 				first = to;
 			else if (to >= first + pp.rows)
 				first = to - pp.rows + 1;
-			if (first != pp.first)
-				pp.redraw = (u16)((1u << pp.rows) - 1);  // every row moves
-			else
-				pp.redraw |= (u16)(1u << (pp.cursor - first) | 1u << (to - first));
+			// The rows still to draw move with the rows; the draw moves
+			// the rest in VRAM (popup_scroll)
+			u32 bits = first > pp.first ? (u32)pp.redraw >> (first - pp.first)
+						    : (u32)pp.redraw << (pp.first - first);
+			if (pp.cursor >= first && pp.cursor < first + pp.rows)
+				bits |= 1u << (pp.cursor - first);
+			bits |= 1u << (to - first);
+			pp.redraw = (u16)(bits & ((1u << pp.rows) - 1));
 			pp.first = (u8)first;
 			pp.cursor = (u8)to;
 			popup_hints();
@@ -970,12 +1027,74 @@ static void popup_update(u8 node, u32 dt)
 	int moving = r->dir != 0;
 	// Rows a draw left for lack of band room (a scroll redraws them all):
 	// a draw can't keep its own node dirty, so the update asks again
-	if (pp.redraw && pp.menu && ((struct popup_state *)ui_node_state(node))->c.mapped)
+	if ((pp.redraw || pp.bar || pp.first != pp.vfirst) && pp.menu &&
+	    ((struct popup_state *)ui_node_state(node))->c.mapped)
 		ui_dirty(node, 1);
 	if (run_tick(r, dt, &ui_theme()->motion.popup_open, &ui_theme()->motion.popup_close) && moving) {
 		popup_overlay(r->open);  // open: no window, plane 0 everywhere
 		measure("popup-motion");
 	}
+}
+
+// The tile columns of the scroll bar (its thumb is 3 px wide)
+static void bar_cols(u8 node, u32 *col, u32 *cols)
+{
+	s32 bx = look.pop_x + look.pop_w - look.pop_bar_r - ui_node(node)->x;
+	*col = (u32)(bx - 1) / 8;
+	*cols = (u32)(bx + 1) / 8 - *col + 1;
+}
+
+// A scroll since the last draw: the rows that stay moved in VRAM, and the
+// rows coming in, the rows whose highlight changed and the bar marked, all
+// to be queued in this pass so they land in one VBlank (a scroll that
+// redrew every row took 4 frames, showing a part of each). A jump of the
+// whole card, or one whose rows don't fit the band, draws every row the
+// plain way. 0 to try again next frame.
+static int popup_scroll(u8 node, const struct canvas *c)
+{
+	s32 k = (s32)pp.first - (s32)pp.vfirst, y = ui_node(node)->y;
+	u32 n = (u32)(k < 0 ? -k : k), all = (1u << pp.rows) - 1;
+	if (n >= pp.rows) {
+		pp.redraw = (u16)all;
+		pp.vfirst = pp.first;
+		pp.bar = 0;  // each row's band has its part of the bar
+		return 1;
+	}
+	// Coming in, and the row the edge row moved to (the card's corners and
+	// shadow may turn in the edge rows' lines)
+	u32 in = k > 0 ? (((1u << n) - 1) << (pp.rows - n)) | (1u << (pp.rows - 1 - n)) : ((1u << n) - 1) | (1u << n);
+	u32 need = (pp.redraw | in) & all;
+	u32 tw = (u32)ui_node(node)->w / 8, col, cols, words = 0, copies = 0;
+	bar_cols(node, &col, &cols);
+	for (u32 row = 0; row < pp.rows; row++)
+		if ((need >> row & 1) && (!row || !(need >> (row - 1) & 1))) {
+			u32 end = row + 1;
+			while (end < pp.rows && (need >> end & 1))
+				end++;
+			words += band_words(row_top(row) - y, row_top(end) - y, tw);
+			copies++;
+		}
+	s32 ya = row_top(k > 0 ? n : 0) - y, yb = row_top(k > 0 ? pp.rows : pp.rows - n) - y;
+	s32 dy = -k * (s32)look.pop_pitch;
+	words += band_words(row_top(0) - y, row_top(pp.rows) - y, cols);
+	copies += 1 + shift_copies(ya, yb, dy);
+	if (words > BAND_WORDS) {
+		pp.redraw = (u16)all;
+		pp.vfirst = pp.first;
+		pp.bar = 0;
+		return 1;
+	}
+	if (!band_free() || gfx_queue_len() + copies > GFX_QUEUE_CAP - 2) {
+		ui_wake();
+		return 0;
+	}
+	// From the first column a row draws in: the notch, left of it, stays
+	if (!canvas_shift(node, c, ya, yb, dy, (u32)(look.pop_x + look.pop_pill_in - ui_node(node)->x) / 8))
+		return 0;
+	pp.redraw = (u16)need;
+	pp.vfirst = pp.first;
+	pp.bar = 1;
+	return 1;
 }
 
 static void popup_draw(u8 node)
@@ -986,6 +1105,8 @@ static void popup_draw(u8 node)
 		canvas_map(node, &st->c, UI_BANK_NORMAL);  // not shown yet: straight into the map
 		pp.pop.drawn_frame = frame_count();
 		pp.redraw = 0;
+		pp.vfirst = pp.first;
+		pp.bar = 0;
 		measure("popup-draw");
 		return;
 	}
@@ -1004,24 +1125,46 @@ static void popup_draw(u8 node)
 		}
 		return;
 	}
+	s32 y = ui_node(node)->y;
+	int scrolled = pp.first != pp.vfirst;
+	if (scrolled && !popup_scroll(node, &st->c)) {
+		ui_dirty(node, 1);
+		return;
+	}
+	// The rows to draw, each run of them in one band (as many rows as fit)
+	for (u32 row = 0; row < pp.rows;) {
+		if (!(pp.redraw >> row & 1)) {
+			row++;
+			continue;
+		}
+		u32 end = row + 1;
+		while (end < pp.rows && (pp.redraw >> end & 1) &&
+		       band_words(row_top(row) - y, row_top(end + 1) - y, ui_node(node)->w / 8u) <= BAND_WORDS)
+			end++;
+		if (!canvas_band(node, &st->c, row_top(row) - y, row_top(end) - y, popup_render)) {
+			ui_dirty(node, 1);
+			return;
+		}
+		pp.redraw &= (u16) ~(((1u << (end - row)) - 1) << row);
+		measure(scrolled ? "popup-scroll" : "popup-move");
+		row = end;
+	}
+	if (pp.bar) {
+		u32 col, cols;
+		bar_cols(node, &col, &cols);
+		if (!canvas_cols(node, &st->c, row_top(0) - y, row_top(pp.rows) - y, col, cols, popup_render)) {
+			ui_dirty(node, 1);
+			return;
+		}
+		pp.bar = 0;
+	}
 	if (pp.tq_redraw && pp.titled && pp.menu) {
 		// The title's line, scrolled on
-		s32 a = pp.top + look.pop_title_y - ui_node(node)->y;
+		s32 a = pp.top + look.pop_title_y - y;
 		if (canvas_band(node, &st->c, a, a + (s32)ui_theme()->body->line_height, popup_render))
 			pp.tq_redraw = 0;
 		else
 			ui_dirty(node, 1);
-	}
-	for (u32 row = 0; row < pp.rows; row++) {
-		if (!(pp.redraw >> row & 1))
-			continue;
-		if (!canvas_band(node, &st->c, row_top(row) - ui_node(node)->y,
-				 row_top(row) + look.pop_pitch - ui_node(node)->y, popup_render)) {
-			ui_dirty(node, 1);
-			break;
-		}
-		pp.redraw &= (u16) ~(1u << row);
-		measure("popup-move");
 	}
 }
 
@@ -1051,6 +1194,7 @@ static int card_open(u8 list, u8 hints, u32 h, int quiet)
 	pp.row_y0 = (s16)(r0 < r1 ? r0 : pp.notch_y);
 	pp.row_y1 = (s16)(r0 < r1 ? r1 : pp.notch_y);
 	pp.redraw = 0;
+	pp.bar = 0;
 	pp.key = 0;
 	s16 rect[4];
 	card_rect(look.pop_x - (s32)k, top, look.pop_w + (s32)k, (s32)h, rect);
@@ -1091,6 +1235,7 @@ int ui_popup_open(u8 list, u8 hints, const struct ui_popup *popup)
 	pp.cursor = popup->cursor < popup->count ? popup->cursor : 0;
 	pp.rows = (u8)(popup->count < UI_POPUP_ROWS ? popup->count : UI_POPUP_ROWS);
 	pp.first = (u8)(pp.cursor >= pp.rows ? pp.cursor - pp.rows + 1 : 0);
+	pp.vfirst = pp.first;
 	pp.pop.hint_count = 0;
 	pp.pop.hinted = 0;
 	popup_hints();
