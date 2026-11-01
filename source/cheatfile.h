@@ -53,13 +53,25 @@
 #define CHEATFILE_CYCLES_MAX (CHEAT_LOAD_MAX - CHEAT_LOAD(CHEAT_COST_CALL))
 #define CHEATFILE_PROG_MAX (CHEATFILE_BYTES_MAX / 4)  // a cheat's table words
 #define CHEATFILE_OPS_MAX 256      // a cheat's decoded ops
-// A cheat's ROM patches (4 KB of ROM data): they are decoded straight into
+// A cheat's ROM patches (8 KB of ROM data): they are decoded straight into
 // the patch room (cheatfile_patch_room), not into ops
-#define CHEATFILE_PATCHES_MAX 2048
-// The picked cheats' ROM patches together: what a launch keeps for the game
-// (cheatstore.h's CHEATSTORE_ROM_PATCHES, in cart SRAM), 8 KB of ROM data
-#define CHEATFILE_PICKED_PATCHES_MAX 4096
-_Static_assert(CHEATFILE_PICKED_PATCHES_MAX >= CHEATFILE_PATCHES_MAX, "any one legal cheat fits");
+#define CHEATFILE_PATCHES_MAX 4096
+// What a launch keeps of the picked cheats' ROM patches for the game, in
+// cart SRAM (cheatstore.h's CHEATSTORE_ROM_PATCH_UNITS): runs of patches
+// at consecutive halfwords, each a CHEATFILE_RUN_HEAD_BYTES head (where, how
+// many, whose) and its values (CHEATFILE_RUN_VALUE_BYTES each, twice that
+// for a masked run). A cheat's share of it, cheatfile_patch_units, counts
+// CHEATFILE_PATCH_UNIT bytes: a block of ROM data costs little more than
+// its bytes, a scattered patch its head too.
+#define CHEATFILE_RUN_HEAD_BYTES 8
+#define CHEATFILE_RUN_VALUE_BYTES 2
+#define CHEATFILE_PATCH_UNIT 16
+#define CHEATFILE_PICKED_PATCH_UNITS 3072  // 48 KB
+_Static_assert((CHEATFILE_PATCHES_MAX * (CHEATFILE_RUN_HEAD_BYTES + 2 * CHEATFILE_RUN_VALUE_BYTES) +
+		CHEATFILE_PATCH_UNIT - 1) /
+			       CHEATFILE_PATCH_UNIT <=
+		       CHEATFILE_PICKED_PATCH_UNITS,
+	       "any one legal cheat fits");
 #define CHEATFILE_NONE 0xFFFFFFFFu  // no such line (or cheat)
 #define CHEATFILE_VALUE_MAX 0xFFFF  // a longer value isn't read: its line counts for nothing
 // but a code's, up to this: 2,048 Action Replay ROM patch codes take 74 KB
@@ -85,7 +97,7 @@ enum cheatfile_why {
 	CHEATFILE_WHY_UNREADABLE,
 	CHEATFILE_WHY_EDIT,  // a placeholder
 	CHEATFILE_WHY_CANT_RUN,
-	CHEATFILE_WHY_PATCHES,  // its ROM patches don't fit beside the picked cheats' (CHEATFILE_PICKED_PATCHES_MAX)
+	CHEATFILE_WHY_PATCHES,  // its ROM patches don't fit beside the picked cheats' (CHEATFILE_PICKED_PATCH_UNITS)
 	CHEATFILE_WHY_ROOM,     // its enable line would take the text past CHEATFILE_TEXT_MAX
 	CHEATFILE_WHY_NOTHING,  // it changes nothing
 	CHEATFILE_WHY_SAME,     // an earlier cheat does the same
@@ -107,7 +119,8 @@ struct cheatfile_cheat {
 	u16 cost;            // its cycles a frame, at most (OK only)
 	u16 keys;            // cheatN_keys' value (cheatkeys.h), 0: no line or not a value
 	u32 bytes : 13;      // its share of the interpreter's table once decoded (OK only)
-	u32 patches : 12;    // ROM patches once decoded (OK only; at most CHEATFILE_PATCHES_MAX)
+	u32 patches : 12;    // its ROM patches' share of a launch's keep once decoded (OK only):
+			     // cheatfile_patch_units
 	u32 folder : 7;      // cheatN_folder's (the last line's): its entry in the file's folders + 1, 0 none
 	u32 hash;            // its table part's and patches' hash once decoded (OK only; else 0)
 	u8 picked : 1;       // now
@@ -156,7 +169,11 @@ static inline u32 cheatfile_code_len(const struct cheatfile_cheat *c)
 	return c->code_len | (u32)c->code_hi << 16;
 }
 
-_Static_assert(CHEATFILE_PATCHES_MAX < 1u << 12, "a cheat's patches fit their bits");
+_Static_assert((CHEATFILE_PATCHES_MAX * (CHEATFILE_RUN_HEAD_BYTES + 2 * CHEATFILE_RUN_VALUE_BYTES) +
+		CHEATFILE_PATCH_UNIT - 1) /
+			       CHEATFILE_PATCH_UNIT <
+		       1u << 12,
+	       "a cheat's patch units fit their bits");
 _Static_assert(CHEATFILE_BYTES_MAX < 1u << 13, "a cheat's bytes fit their bits");
 
 // A folder's name (cheatN_folder's value) is 1 to CHEATFILE_FOLDER_MAX
@@ -301,6 +318,15 @@ struct cheatfile_work {
 // work's own room in pReadCache has no space for them). Set it before
 // decoding.
 void cheatfile_patch_room(struct cheat_patch *at, void (*put)(struct cheat_patch *dst, const struct cheat_patch *src));
+
+// What n ROM patches at p take of a launch's keep, in CHEATFILE_PATCH_UNIT
+// bytes: a run per stretch of patches at consecutive halfwords with one kind
+// of mask (cheatfile_run_masked), as a launch keeps them
+u32 cheatfile_patch_units(const struct cheat_patch *p, u32 n);
+// 1 if patch p goes in a masked run (its mask isn't the whole halfword's)
+int cheatfile_run_masked(const struct cheat_patch *p);
+// 1 if patch p carries on the run patch prev is in
+int cheatfile_run_goes_on(const struct cheat_patch *prev, const struct cheat_patch *p);
 
 // Starts decoding f's cheats from the first
 void cheatfile_begin(struct cheatfile_work *w);

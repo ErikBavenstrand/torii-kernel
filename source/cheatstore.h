@@ -322,8 +322,9 @@ int cheatstore_drop(void);
 // its budget and the ROM patches kept (a cheat that doesn't fit either is
 // left out whole, logged: never its table part without its patches, or
 // some of its patches); gl_cheat_count gets the cheats that run in game and
-// gl_cheat_patches their ROM patches' count, at most CHEATSTORE_ROM_PATCHES,
-// kept in cart SRAM page 0xF0 (cartlog.h's CARTLOG_CHEAT_PATCHES): the
+// gl_cheat_patches their ROM patches' count, kept as runs (cheatfile.h) in
+// at most CHEATSTORE_ROM_PATCH_UNITS of cart SRAM page 0xF0 (cartlog.h's
+// CARTLOG_CHEAT_PATCHES): the
 // game's load takes PSRAM, where the text is, and all of pReadCache, and
 // EWRAM has no room for them. With psram_bytes, the game is in PSRAM
 // (that many bytes) and the kept ROM patches of the same ROM's first pass are
@@ -333,8 +334,12 @@ int cheatstore_drop(void);
 // The first pass also writes the in-game list (source/ingame.h: the picks
 // shown, up to INGAME_CHEATS, in file order, each with its activation) to
 // cart SRAM.
-#define CHEATSTORE_ROM_PATCHES CHEATFILE_PICKED_PATCHES_MAX
+#define CHEATSTORE_ROM_PATCH_UNITS CHEATFILE_PICKED_PATCH_UNITS
 void cheatstore_launch(const char *rom_path, u32 psram_bytes);
+// A larger file's picks in the window decoded now, as decoded: what each
+// takes of the budget, for the index (an older kernel's counted patches,
+// not cheatfile_patch_units). The cheat list's build calls it.
+void cheatstore_picks_from_model(void);
 extern u32 gl_cheat_patches;
 // No cheats for this launch: the table, the patches and the in-game list
 void cheatstore_launch_none(void);

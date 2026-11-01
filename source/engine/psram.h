@@ -23,7 +23,7 @@
 //	          128 KB; a game's cheat file's text (cheatstore.h),
 //	          PSRAM_CHEATS_BASE, 192 KB; a cheat's ROM patches as it
 //	          decodes (cheatfile_patch_room), PSRAM_CHEAT_PATCHES_BASE,
-//	          16 KB; the rest (44 KB) reserved
+//	          32 KB; the rest (28 KB) reserved
 //	5 MB      /torii/names.db (namesdb.h), up to PSRAM_NAMES_DB_BYTES
 //	6.75 MB   the CRC cache's table (namesdb.h), NAMES_CACHE_BYTES
 //	7.5 MB    box art's lookups (boxart.c): the set of art files on the card
@@ -80,7 +80,7 @@
 // cheatfile_patch_room), past the text's odd-end byte; cheatstore.c asserts
 // they end below the names database
 #define PSRAM_CHEAT_PATCHES_BASE (PSRAM_CHEATS_BASE + PSRAM_CHEATS_BYTES + 4)
-#define PSRAM_CHEAT_PATCHES_BYTES 0x4000u
+#define PSRAM_CHEAT_PATCHES_BYTES 0x8000u
 // Recent and the favourites (userdata_store.c), up to the cover cache
 #define PSRAM_USERDATA_BYTES 0x00080000u
 #define PSRAM_USERDATA_BASE (PSRAM_ASSET_BASE - PSRAM_USERDATA_BYTES)

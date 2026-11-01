@@ -407,6 +407,27 @@ static struct cheat_patches room_patches(void)
 	return ps;
 }
 
+int cheatfile_run_masked(const struct cheat_patch *p)
+{
+	return p->mask != 0xFFFF;
+}
+
+int cheatfile_run_goes_on(const struct cheat_patch *prev, const struct cheat_patch *p)
+{
+	return p->offset == prev->offset + 2 && cheatfile_run_masked(p) == cheatfile_run_masked(prev);
+}
+
+u32 cheatfile_patch_units(const struct cheat_patch *p, u32 n)
+{
+	u32 bytes = 0;
+	for (u32 i = 0; i < n; i++) {
+		if (!i || !cheatfile_run_goes_on(&p[i - 1], &p[i]))
+			bytes += CHEATFILE_RUN_HEAD_BYTES;
+		bytes += CHEATFILE_RUN_VALUE_BYTES << cheatfile_run_masked(&p[i]);
+	}
+	return (bytes + CHEATFILE_PATCH_UNIT - 1) / CHEATFILE_PATCH_UNIT;
+}
+
 void cheatfile_begin(struct cheatfile_work *w)
 {
 	w->patches = patch_room.at;
@@ -611,7 +632,7 @@ s32 cheatfile_next(struct cheatfile *f, struct cheatfile_work *w)
 		w->n_prog = w->n_patches = w->cost = 0;
 	c->bytes = (u16)(w->n_prog * 4);
 	c->cost = (u16)w->cost;
-	c->patches = (u16)w->n_patches;
+	c->patches = (u16)cheatfile_patch_units(w->patches, w->n_patches);
 	if (c->status == CHEATFILE_OK && c->picked) {
 		f->bytes += c->bytes;
 		f->cost += c->cost;
@@ -947,7 +968,7 @@ u32 cheatfile_why(const struct cheatfile *f, u32 i)
 		if (f->bytes + f->more_bytes + c->bytes > CHEATFILE_BYTES_MAX ||
 		    f->cost + f->more_cost + c->cost > CHEATFILE_CYCLES_MAX)
 			return CHEATFILE_WHY_FULL;
-		if (f->patches + f->more_patches + c->patches > CHEATFILE_PICKED_PATCHES_MAX)
+		if (f->patches + f->more_patches + c->patches > CHEATFILE_PICKED_PATCH_UNITS)
 			return CHEATFILE_WHY_PATCHES;
 		return len_flipped(f, c) > CHEATFILE_TEXT_MAX ? CHEATFILE_WHY_ROOM : CHEATFILE_PICKABLE;
 	case CHEATFILE_BIG:

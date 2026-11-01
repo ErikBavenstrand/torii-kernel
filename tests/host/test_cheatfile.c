@@ -475,44 +475,57 @@ void test_cheatfile_budget(void)
 	CHECK_EQ(cheats[1].status, CHEATFILE_BIG);
 }
 
-// The ROM patches a launch keeps (CHEATFILE_PICKED_PATCHES_MAX): a pick that
-// would pass them is refused, so a launch never has to leave part of a cheat
-// out
+// The ROM patches a launch keeps (CHEATFILE_PICKED_PATCH_UNITS of
+// CHEATFILE_PATCH_UNIT bytes, as runs): a pick that would pass them is
+// refused, so a launch never has to leave part of a cheat out. A scattered
+// patch costs a run's head (10 bytes), a block of them little more than
+// their bytes.
 void test_cheatfile_patches_budget(void)
 {
-	static char text[110000];
-	static const u32 n[6] = {2048, 1000, 1000, 50, 48, 2049};
+	static char text[150000];
+	// Scattered (every other halfword), but the last: one block
+	static const u32 n[6] = {4096, 800, 30, 18, 4097, 100};
+	static const u32 units[6] = {2560, 500, 19, 12, 0, 13};
 	char *p = text;
 	for (u32 c = 0; c < 6; c++) {
 		p += sprintf(p, "cheat%u_code = \"", (unsigned)c);
 		for (u32 i = 0; i < n[c]; i++)
-			p += sprintf(p, "%s08%u%05X:4770", i ? "+" : "", (unsigned)c, (unsigned)(i * 2));
+			p += sprintf(p, "%s08%u%05X:4770", i ? "+" : "", (unsigned)c, (unsigned)(i * (c == 5 ? 2 : 4)));
 		p += sprintf(p, "\"\n");
 	}
 	load_str(text);
-	for (u32 c = 0; c < 5; c++) {
+	for (u32 c = 0; c < 6; c++) {
+		if (c == 4)
+			continue;
 		CHECK_EQ(cheats[c].status, CHEATFILE_OK);
-		CHECK_EQ(cheats[c].patches, n[c]);
+		CHECK_EQ(cheats[c].patches, units[c]);
 	}
-	CHECK_EQ(cheats[5].status, CHEATFILE_BIG);  // one past a cheat's 2,048
-	for (u32 c = 0; c < 3; c++)
+	CHECK_EQ(cheats[4].status, CHEATFILE_BIG);  // one past a cheat's 4,096
+	for (u32 c = 0; c < 2; c++)
 		CHECK(cheatfile_toggle(&file, c));
-	CHECK_EQ(file.patches, 4048);
-	CHECK_EQ(cheatfile_why(&file, 3), CHEATFILE_WHY_PATCHES);  // 4,098 of 4,096
-	CHECK(!cheatfile_toggle(&file, 3));
-	CHECK_EQ(cheatfile_why(&file, 4), CHEATFILE_PICKABLE);  // 4,096 exactly
-	CHECK(cheatfile_toggle(&file, 4));
-	CHECK_EQ(file.patches, CHEATFILE_PICKED_PATCHES_MAX);
+	CHECK_EQ(file.patches, 3060);
+	CHECK_EQ(cheatfile_why(&file, 2), CHEATFILE_WHY_PATCHES);  // 3,079 of 3,072
+	CHECK(!cheatfile_toggle(&file, 2));
+	CHECK_EQ(cheatfile_why(&file, 3), CHEATFILE_PICKABLE);  // 3,072 exactly
+	CHECK(cheatfile_toggle(&file, 3));
+	CHECK_EQ(file.patches, CHEATFILE_PICKED_PATCH_UNITS);
+	CHECK_EQ(cheatfile_why(&file, 5), CHEATFILE_WHY_PATCHES);
 	CHECK(cheatfile_toggle(&file, 1));  // dropped: room again
-	CHECK_EQ(file.patches, 3096);
-	CHECK_EQ(cheatfile_why(&file, 3), CHEATFILE_PICKABLE);
+	CHECK_EQ(file.patches, 2572);
+	CHECK_EQ(cheatfile_why(&file, 2), CHEATFILE_PICKABLE);
 	// Decoded again, the running total holds
 	cheatfile_begin(&work);
 	while (cheatfile_next(&file, &work) >= 0)
 		;
-	CHECK_EQ(file.patches, 3096);
-	CHECK_EQ(CHEATFILE_PATCHES_MAX, 2048);
-	CHECK_EQ(CHEATFILE_PICKED_PATCHES_MAX, 4096);
+	CHECK_EQ(file.patches, 2572);
+	CHECK_EQ(CHEATFILE_PATCHES_MAX, 4096);
+	CHECK_EQ(CHEATFILE_PICKED_PATCH_UNITS, 3072);
+	// Runs: a masked patch takes its mask too, and a change of mask kind
+	// or a gap starts a run
+	struct cheat_patch ps[4] = {{0x100, 1, 0xFFFF}, {0x102, 2, 0xFFFF}, {0x104, 3, 0x00FF}, {0x108, 4, 0xFFFF}};
+	CHECK_EQ(cheatfile_patch_units(ps, 2), 1);  // 8 + 2 + 2
+	CHECK_EQ(cheatfile_patch_units(ps, 3), 2);  // and 8 + 4
+	CHECK_EQ(cheatfile_patch_units(ps, 4), 3);  // and 8 + 2: 34 bytes
 }
 
 // One cheat of 2,048 Action Replay v3 ROM patch codes and a key-gated write:
@@ -533,7 +546,7 @@ void test_cheatfile_long_code(void)
 	CHECK_EQ(file.count, 2);
 	CHECK_EQ(cheatfile_code_len(&cheats[0]), code_len);
 	CHECK_EQ(cheats[0].status, CHEATFILE_OK);
-	CHECK_EQ(cheats[0].patches, 2048);
+	CHECK_EQ(cheats[0].patches, (8 + 2048 * 2 + 15) / 16);  // one run of 2,048 halfwords: 257 units
 	CHECK_EQ(cheats[0].bytes, 4 * (1 + 3 + 2));  // the header, the key test and its write
 	CHECK_EQ(cheats[1].status, CHEATFILE_OK);
 	// A desc past 64 KB isn't read

@@ -93,9 +93,9 @@ cheats-guide/hold 3299175281C351DA
 cheats-guide/list 4F446AD70B88F6FB
 cheats-guide/locked E8B5CD7117B6A371
 cheats-guide/long 6DAC7B23FDA423CD
-cheats-guide/none CAEEB8AB939050D3
+cheats-guide/none 222EAFCA85D24DAD
 cheats-guide/scrolled 5C02971F675F6656
-cheats-menu/guide CAEEB8AB939050D3
+cheats-menu/guide 222EAFCA85D24DAD
 cheats-menu/menu 7BECF2943C800F0E
 cheats-menu/only 5EC2A57E4A9EF90A
 cheats-menu/rom 7DC46C409F55A4E2
@@ -768,9 +768,9 @@ sv-cheats-guide/hold 7B86306B8A9A23D2
 sv-cheats-guide/list AA961562181DC3FE
 sv-cheats-guide/locked 512ED4519693E418
 sv-cheats-guide/long 07E521B422C34EE5
-sv-cheats-guide/none C46B6F9621C4224F
+sv-cheats-guide/none ABE959D4B23D1C17
 sv-cheats-guide/scrolled 86AD74514AD62D39
-sv-cheats-menu/guide C46B6F9621C4224F
+sv-cheats-menu/guide ABE959D4B23D1C17
 sv-cheats-menu/menu 765002ED53013AD6
 sv-cheats-menu/only 46743BB66C6FFE75
 sv-cheats-menu/rom 14B8D119B236C743

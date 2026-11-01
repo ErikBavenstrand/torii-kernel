@@ -553,7 +553,7 @@ const char *const lang_en[STR_COUNT] = {
 	"Same as a cheat above",  // cheats.why_same
 	"Master code for the codes below",  // cheats.why_master
 	"Too much: needs {1}%, {2}% left",  // cheats.full
-	"Too many ROM patches: {1}, {2} left",  // cheats.patches
+	"Too many ROM patches: needs {1}%, {2}% left",  // cheats.patches
 	"ROM patch: no NOR games",  // cheats.nor
 	"(no name)",  // cheats.unnamed
 	"Reading cheats",  // cheats.reading
@@ -629,7 +629,7 @@ const char *const lang_en[STR_COUNT] = {
 	", detected",  // cheats.detail_detected
 	"Not read",  // cheats.detail_unknown
 	"{1}% of the cheats' budget",  // cheats.budget
-	"{1} at launch{2}",  // cheats.rom
+	"At launch, {1}% of their room{2}",  // cheats.rom
 	" (not for NOR games)",  // cheats.detail_nor
 	"Once, at launch",  // cheats.detail_runs
 	"On, at every launch with addons",  // cheats.detail_picked

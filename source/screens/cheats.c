@@ -486,9 +486,11 @@ static const char *cs_reason(const struct cheatfile_cheat *c, u32 why)
 		return cs.reason;
 	}
 	if (why == CHEATFILE_WHY_PATCHES) {
-		u32 all = f->patches + f->more_patches;
-		u32 left = all < CHEATFILE_PICKED_PATCHES_MAX ? CHEATFILE_PICKED_PATCHES_MAX - all : 0;
-		SF(cs.reason, sizeof(cs.reason), STR_CHEATS_PATCHES, LN(c->patches), LN(left));
+		// The kept patches' room (cheatfile_patch_units): what this one
+		// needs of it and what the picks leave
+		u32 used = percent(f->patches + f->more_patches, CHEATFILE_PICKED_PATCH_UNITS);
+		SF(cs.reason, sizeof(cs.reason), STR_CHEATS_PATCHES,
+		   LN(percent(c->patches, CHEATFILE_PICKED_PATCH_UNITS)), LN(used < 100 ? 100 - used : 0));
 		return cs.reason;
 	}
 	if (why >= CHEATFILE_WHYS)
@@ -1086,7 +1088,8 @@ static void detail_text(u32 at)
 			detail_pair(&n, STR_CHEATS_LABEL_RUNS, S(STR_CHEATS_DETAIL_RUNS));
 		}
 		if (c->patches) {
-			SF(line, sizeof(line), STR_CHEATS_ROM, LN(c->patches), LS(S(STR_CHEATS_DETAIL_NOR)));
+			SF(line, sizeof(line), STR_CHEATS_ROM, LN(percent(c->patches, CHEATFILE_PICKED_PATCH_UNITS)),
+			   LS(S(STR_CHEATS_DETAIL_NOR)));
 			detail_pair(&n, STR_CHEATS_LABEL_ROM, line);
 		}
 	}

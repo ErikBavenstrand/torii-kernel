@@ -493,7 +493,7 @@ u32 cheatlist_why(const struct cheatlist_entry *e)
 		if (f->bytes + f->more_bytes + e->bytes > CHEATFILE_BYTES_MAX ||
 		    f->cost + f->more_cost + e->cost > CHEATFILE_CYCLES_MAX)
 			return CHEATFILE_WHY_FULL;
-		if (f->patches + f->more_patches + e->patches > CHEATFILE_PICKED_PATCHES_MAX)
+		if (f->patches + f->more_patches + e->patches > CHEATFILE_PICKED_PATCH_UNITS)
 			return CHEATFILE_WHY_PATCHES;
 		return CHEATFILE_PICKABLE;
 	case CHEATFILE_NEW:
@@ -862,6 +862,7 @@ static int build(void)
 		}
 		decode_model(cheatstore_window_start(k), total);
 		cheatlist_from_model(cheatstore_window_start(k), 0);
+		cheatstore_picks_from_model();
 	}
 	if (!cheatlist_build_end())
 		return 0;

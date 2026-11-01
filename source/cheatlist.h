@@ -50,7 +50,7 @@
 #include "cheatfile.h"
 
 #define CHEATLIST_EXT ".cdc"
-#define CHEATLIST_MAGIC 0x32434443u  // "CDC2": with checkpoints
+#define CHEATLIST_MAGIC 0x33434443u  // "CDC3": entries' patches as cheatfile_patch_units
 #define CHEATLIST_PAGE 0x3000
 #define CHEATLIST_MAX 16384          // entries: every window's cheats (CHEATSTORE_WINDOWS of CHEATINDEX_CHEATS)
 #define CHEATLIST_HEADINGS CHEATFILE_FOLDERS  // file-wide headings (cheatN_folder); past them a cheat is in none
