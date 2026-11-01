@@ -1708,7 +1708,7 @@ static void Boot_NOR_game(u32 show_offset, u32 file_select, u32 key_L)
 	ingame_states_none();
 	if (pNorFS[show_offset + file_select].have_patch && pNorFS[show_offset + file_select].have_RTS) {
 		progress_step(NULL, LAUNCH_NOR_SAVE, PROGRESS_FULL);
-		ingame_states_launch(launch_save.rom, launch_save.rec.slot, pfilename, 0, gamefilesize);
+		ingame_states_launch(launch_save.rom, launch_save.rec.slot, pfilename, gamefilesize);
 	}
 
 	FAT_table_buffer[0x1F4 / 4] = SET_PARAMETER_MODE;
@@ -1956,27 +1956,11 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 			ingame_probe_prepare(GAMECODE);  // the in-game probe ROM's scratch file
 			tlog_flush();
 			if ((gl_reset_on == 1) || (gl_rts_on == 1) || (gl_sleep_on == 1) || (gl_cheat_on == 1)) {
-				// Torii (v0.8): the save states, as Boot_NOR_game's, and
-				// the slot to start in when one was asked for
+				// Torii (v0.8): the save states, as Boot_NOR_game's
 				if (gl_rts_on == 1) {
 					progress_step(NULL, LAUNCH_SAVE, LAUNCH_STATES);
-					// A slot asked for (NAV_TEST_STATE) that doesn't
-					// read, or is another game's, or newer: the player says
-					// whether the game starts anyway, without it
-					int st = ingame_states_launch(launch_save.rom, launch_save.rec.slot, pfilename,
-								      action_state_slot(), gamefilesize);
-					if (st != 1 &&
-					    !dialog_confirm(st == STATESTORE_OTHER_GAME ? S(STR_STATE_OTHER_GAME)
-							    : st == STATESTORE_NEWER    ? S(STR_STATE_NEWER)
-											: S(STR_STATE_UNREADABLE),
-							    S(STR_STATE_START_ANYWAY), DIALOG_ERROR)) {
-						tlog("launch: %s not started: its state slot %lu %s", pfilename,
-						     (unsigned long)action_state_slot(),
-						     st == STATESTORE_OTHER_GAME ? "is another game's"
-						     : st == STATESTORE_NEWER    ? "is of a newer format"
-										 : "doesn't read");
-						return 0;
-					}
+					ingame_states_launch(launch_save.rom, launch_save.rec.slot, pfilename,
+							     gamefilesize);
 				}
 				progress_step(NULL, LAUNCH_STATES, LAUNCH_STATES);
 				// Torii: the cache is used only for this ROM: its size and

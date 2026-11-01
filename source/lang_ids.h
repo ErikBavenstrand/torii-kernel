@@ -4,7 +4,7 @@
 #define TORII_LANG_IDS_H
 
 #define LANG_FORMAT 2
-#define LANG_KEY_HASH 0x16816117u
+#define LANG_KEY_HASH 0x457C9302u
 #define LANG_PACK_MAX 0x10000u
 #define LANG_LAUNCH_MAX 0x2000u
 #define LANG_ENGLISH_ID 0xE1E1u
@@ -66,10 +66,6 @@ enum lang_id {
 	STR_STATE_SLOT,
 	STR_STATE_KEEPING,
 	STR_STATE_NOT_KEPT,
-	STR_STATE_UNREADABLE,
-	STR_STATE_OTHER_GAME,
-	STR_STATE_NEWER,
-	STR_STATE_START_ANYWAY,
 	STR_STATE_SHOT_SAVING,
 	STR_STATE_SHOT_SAVING_ONE,
 	STR_STATE_SHOT_OF,
@@ -842,6 +838,6 @@ enum lang_id {
 };
 
 // The ids below this are the launch's (lang_before_launch)
-#define STR_LAUNCH_END 187
+#define STR_LAUNCH_END 183
 
 #endif

@@ -67,7 +67,7 @@ int statestore_path(char *out, const char *rom_path, const char *save_slot, u32 
 u32 statestore_scan(const char *rom_path, const char *save_slot, struct statestore_list *l);
 // The slot with the highest order in l, 0 for none
 u32 statestore_newest(const struct statestore_list *l);
-// Puts slot's state into the buffer, its tag (kept; autoload as asked) and
+// Puts slot's state into the buffer, its tag (kept, no autoload) and
 // its flag last; with no state there (or none that reads whole), the
 // buffer's flag is cleared. 1 if the buffer holds the slot's state.
 // rom_crc is the session's (ingame.h). Shows nothing.
@@ -81,7 +81,7 @@ void statestore_game(const u8 code[4], u32 version, u32 check, u32 head_known, u
 #define STATESTORE_NEWER (-2)
 // 1 if loaded; 0 if no copy reads whole; or a refusal above, the buffer
 // then holding no state either
-int statestore_load(const char *rom_path, const char *save_slot, u32 slot, u32 rom_crc, u32 autoload);
+int statestore_load(const char *rom_path, const char *save_slot, u32 slot, u32 rom_crc);
 // Files the buffer's state as slot (its tag says not kept), under a
 // progress dialog (open one first), then marks it kept and clears the
 // buffer's flag (statestore_buffer then says none). 1 if written.
