@@ -71,12 +71,12 @@ cheats-choices/picked 6301418D254C8A88
 cheats-choices/pickone 52762342367B135A
 cheats-choices/run 0D10995FF04B548A
 cheats-clean/clean 019FE0D843B177D1
-cheats-emerald/again C524005753174BD1
-cheats-emerald/chosen 6B5E07103200544C
-cheats-emerald/list E4F51D683A0D21A9
+cheats-emerald/again 7436F0623FA78A9D
+cheats-emerald/chosen 68E73E1433B4619B
+cheats-emerald/list 6F8E51CA2DC4CFC5
 cheats-emerald/paged 87C552CAFA257DCB
 cheats-emerald/species 40B3C71EA0ADADF7
-cheats-emerald/wild 93493E9465C9E356
+cheats-emerald/wild E1357AAF53B1E899
 cheats-folders/back EF47314CBB0B58F6
 cheats-folders/choices 97CB4184F457F65E
 cheats-folders/chosen 400CBEE29FF8452E
