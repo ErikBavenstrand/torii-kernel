@@ -37,8 +37,8 @@ git log, not here.
   the cheat list's cache is built again once (ad7b48e9).
 - **Changed:** Emerald's menu Unlock adds FLY SPOTS (every town and the
   Battle Frontier on the Fly map), and its Pokédex uses the game's own
-  switch, so the Pokédex opens in national mode; the Regi chambers, the
-  Running Shoes and Mystery Gift join (da35a18e, 1c1ccfa2).
+  switch, so the Pokédex opens in national mode (da35a18e). Legends'
+  Regis open their chambers, entrance and inner wall (58555da9).
 - **Changed:** Emerald's menu Warp keeps its 106 places as list values,
   with one shared script: the menu's ROM patches fall from 4,256 to 3,582
   (da35a18e).
