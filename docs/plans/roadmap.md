@@ -99,6 +99,7 @@ The UX reviews' open proposals (`docs/design/v0.5/ux-review.md`, `settings-ux-re
 - **compat selection:** choose compat runs by the functions each game runs, as `test` already does, in place of the hand-kept `NO_COMPAT` (`docs/research/dev-loop-speed.md`).
 - **Logs:** frame-timing summaries carry the log write's time, not the scroll's. They're DEBUG only, their table holds 8 names, and on a nearly full buffer they can push out older lines (`source/engine/cycles.c`, `tlog_flush`).
 - **Emulator:** the kernel install fills the last sector's tail with 0xFF where the real loader writes stale bytes, and `OMEGA_FPGA_VERSION` isn't validated.
+- **Flaky `tests/cheats.sh`** (2026-11-01, twice in `just check`, passed on rerun): in its 500-cheat step, the second visit from the game popup never reaches the cheat screen before frame 8000, and the script exits without its FAIL line in the log. Find what varies between runs (the clock isn't pinned) and why `fail` isn't printed.
 - **Font tests:** `tools/font_preview.py` needs the network for its candidates, and `tests/font_test.py` compiles with the host `cc`, not devkitARM.
 
 ### Cart checks (the owner, before every tag)

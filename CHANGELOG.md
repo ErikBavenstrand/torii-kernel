@@ -34,9 +34,12 @@ git log, not here.
   the five flutes join Medicine, and Mail is a mart of its own (89210d7e).
 - **Fixed:** Emerald's menu PC no longer leaves an impassable PC drawn
   beside or under the player on logging off: it runs its own copy of the
-  game's PC script, without the PC screen's effects; during a Battle
-  Frontier or Tent challenge it isn't opened, as a Pokémon boxed then
-  would be duplicated (a2e9e164, c7b350d6).
+  game's PC script, without the PC screen's effects (a2e9e164).
+- **Fixed:** Emerald's menu doesn't open during a Battle Frontier or Tent
+  challenge, whose party is the challenge's: a warp out and a save would
+  write it over the player's, a Pokémon boxed or given then would be lost
+  or doubled. A warp out of the Safari Zone ends Safari mode, as the gate
+  does (c7b350d6, fa4d4a97).
 - **Fixed:** Emerald's Pokérus when caught no longer wipes where every new
   Pokémon was met: only a caught one gets Pokérus, the game's own way
   (3daf5c67).
