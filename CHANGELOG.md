@@ -9,6 +9,9 @@ git log, not here.
 - **Changed:** the game popup drops Hide box art, Load state and Original
   name; deleting a game's whole name in Rename gives it its original name
   back (080b83ff).
+- **Removed:** starting a game straight into a save state, which only the
+  popup's Load state asked for; a launch still puts the newest state in cart
+  SRAM for the in-game menu's Load state (be6ff144).
 - **Fixed:** scrolling the game popup's list lags no more: a step redrew
   every row over four frames, and a cursor step showed a frame with no
   highlight. A scroll now moves the rows in VRAM and draws only what
