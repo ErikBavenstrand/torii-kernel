@@ -1227,12 +1227,14 @@ def resolve(game, cache, index, by_crc, args):
     crc = game.crc
     custom = custom_path(cache, crc)
     if custom.is_file():
+        # Its codes, formats, headings, buttons and guides; its picks and
+        # marks of the user's are the card's to keep, not the source's
         cheats = [
             Cheat(
                 c[0],
                 c[1],
                 False,
-                {"format": c.extra["format"]} if "format" in c.extra else {},
+                {k: c.extra[k] for k in ("format",) + SOURCE_KEYS if k in c.extra},
             )
             for c in parse_cht(decode(custom.read_bytes()))
         ]

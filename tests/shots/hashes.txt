@@ -401,13 +401,13 @@ info-read/scrolled 962D6F5D207EBCF6
 info-read/frames 0-1 4A3C36AFF8C9015F
 info-read/frames 2-2 AA292E3D79669121
 info-read/frames 3-3 BB853F93BE07CCE4
-info-read/frames 4-12 47778893E1D42B25
-info-read/frames 13-13 E3CD26BB27BB8B63
-info-read/frames 14-14 D1C9374F4927272E
-info-read/frames 15-15 28ADBF228F1A600F
-info-read/frames 16-16 5B2E365C0D66A459
-info-read/frames 17-17 5E20A6CD0C45D254
-info-read/frames 18-22 085FB729B4B5C0D4
+info-read/frames 4-13 47778893E1D42B25
+info-read/frames 14-14 E3CD26BB27BB8B63
+info-read/frames 15-15 D1C9374F4927272E
+info-read/frames 16-16 28ADBF228F1A600F
+info-read/frames 17-17 5B2E365C0D66A459
+info-read/frames 18-18 5E20A6CD0C45D254
+info-read/frames 19-22 085FB729B4B5C0D4
 ingame/back 95E628B049B4B4BB
 ingame/cheats FAD7274EE3C5F306
 ingame/menu 87B07917DB9CE95E
@@ -521,13 +521,13 @@ open/frames 2-3 3B4F9E4A462C284F
 open/frames 4-4 2A77D2108C1BB261
 open/frames 5-5 4A8509DD0A61E96C
 open/frames 6-6 4AA4E4599AF8238D
-open/frames 7-7 B61C11CDFD40360A
-open/frames 8-8 A1B93D666B143A29
-open/frames 9-9 778D7476DB85F881
-open/frames 10-10 B8B632D926E29B7C
-open/frames 11-11 D1A5ACEF614D4FAE
-open/frames 12-12 9C24308709921E87
-open/frames 13-13 8AA3DD2AB5C9E3F1
+open/frames 7-7 47778893E1D42B25
+open/frames 8-8 B61C11CDFD40360A
+open/frames 9-9 390E8BBED21EEEC1
+open/frames 10-10 CB9CB59B5A4F74B3
+open/frames 11-11 4E7C2BAE13CFEE00
+open/frames 12-12 78A3F942F712A646
+open/frames 13-13 5769EC468F550DF1
 open/frames 14-14 4F80990B3E0C1C79
 open/frames 15-24 FB15C1A231E27AD1
 open/frames 25-25 1CEF9341C65D3B69
@@ -577,15 +577,15 @@ sd-root/file-info 1D6589D91811BE54
 sd-root/folder EE84177EF9E20E06
 sd-root/popup A6E4DD27CD7ABFCF
 sd-root/root 66D9EF9ECDB9F295
-sd-root/frames 0-13 A631F775F98D658D
-sd-root/frames 14-14 B8B2CACF4F82DA7C
-sd-root/frames 15-15 4F83D6128AF52AC9
-sd-root/frames 16-16 A3CF81CED192DEF4
-sd-root/frames 17-17 057F5E890E1CE836
-sd-root/frames 18-18 77FF67C5CAC2B1DE
-sd-root/frames 19-19 A2C46D299D4933C2
-sd-root/frames 20-20 A3B05621660A0116
-sd-root/frames 21-24 EE84177EF9E20E06
+sd-root/frames 0-14 A631F775F98D658D
+sd-root/frames 15-15 B8B2CACF4F82DA7C
+sd-root/frames 16-16 4F83D6128AF52AC9
+sd-root/frames 17-17 A3CF81CED192DEF4
+sd-root/frames 18-18 057F5E890E1CE836
+sd-root/frames 19-19 77FF67C5CAC2B1DE
+sd-root/frames 20-20 A2C46D299D4933C2
+sd-root/frames 21-21 A3B05621660A0116
+sd-root/frames 22-24 EE84177EF9E20E06
 sd-show-all/root 91E7F1F38162CF14
 settings/bottom 3D629D8B9ADFD2E3
 settings/capture 362DB1C96A591BAC
@@ -841,13 +841,13 @@ sv-info-read/scrolled 80CCED26961285C4
 sv-info-read/frames 0-1 D9FE3C4E2FFE1B23
 sv-info-read/frames 2-2 129B3E8217360A31
 sv-info-read/frames 3-3 CB428F8E36F812E4
-sv-info-read/frames 4-13 47778893E1D42B25
-sv-info-read/frames 14-14 9AB36A81812C344D
-sv-info-read/frames 15-15 7FD139D2B34F48AC
-sv-info-read/frames 16-16 BC5479627E442E21
-sv-info-read/frames 17-17 EF92F8F4C5111C88
-sv-info-read/frames 18-18 A45932F70D549CC2
-sv-info-read/frames 19-22 C40A3328210C2C42
+sv-info-read/frames 4-14 47778893E1D42B25
+sv-info-read/frames 15-15 9AB36A81812C344D
+sv-info-read/frames 16-16 7FD139D2B34F48AC
+sv-info-read/frames 17-17 BC5479627E442E21
+sv-info-read/frames 18-18 EF92F8F4C5111C88
+sv-info-read/frames 19-19 A45932F70D549CC2
+sv-info-read/frames 20-22 C40A3328210C2C42
 sv-ingame/back 95E628B049B4B4BB
 sv-ingame/cheats 7987822347B68CAE
 sv-ingame/menu 57D18CD5F8C3A7F6
@@ -938,15 +938,15 @@ sv-sd-root/file-info FC513F8F793118C8
 sv-sd-root/folder E9E57D8E12310012
 sv-sd-root/popup 2160E7DAC9C7BC9E
 sv-sd-root/root AC5E545FBCB82818
-sv-sd-root/frames 0-13 7244182F01CA8F8C
-sv-sd-root/frames 14-14 107CB9662B3792D8
-sv-sd-root/frames 15-15 6BEA9291750B956A
-sv-sd-root/frames 16-16 39C329643960C142
-sv-sd-root/frames 17-17 D60E08D6B46C62C2
-sv-sd-root/frames 18-18 12B736F4E49983EA
-sv-sd-root/frames 19-19 4A942BCFAD004BCE
-sv-sd-root/frames 20-20 BD07B3F3E16596A2
-sv-sd-root/frames 21-24 E9E57D8E12310012
+sv-sd-root/frames 0-14 7244182F01CA8F8C
+sv-sd-root/frames 15-15 107CB9662B3792D8
+sv-sd-root/frames 16-16 6BEA9291750B956A
+sv-sd-root/frames 17-17 39C329643960C142
+sv-sd-root/frames 18-18 D60E08D6B46C62C2
+sv-sd-root/frames 19-19 12B736F4E49983EA
+sv-sd-root/frames 20-20 4A942BCFAD004BCE
+sv-sd-root/frames 21-21 BD07B3F3E16596A2
+sv-sd-root/frames 22-24 E9E57D8E12310012
 sv-settings/bottom D6D328D1012D7203
 sv-settings/capture 6CA0A96329D44999
 sv-settings/edit 2746D0D7654FE633

@@ -702,7 +702,8 @@ class Card(unittest.TestCase):
         custom.parent.mkdir(parents=True)
         custom.write_text(
             'cheats = 1\ncheat0_desc = "Own list"\ncheat0_code = "02000000:01"\n'
-            'cheat0_enable = true\ncheat0_format = "VBA"\n'
+            'cheat0_enable = true\ncheat0_format = "VBA"\ncheat0_folder = "Items"\n'
+            'cheat0_keys = "hold L"\ncheat0_guide = "Hold L."\ncheat0_user = true\n'
         )
         status, out, err = self.run_tool("--only", f"{CRC['FIRERED']:08x}")
         self.assertEqual(status, 0, err)
@@ -712,7 +713,19 @@ class Card(unittest.TestCase):
         )
         self.assertEqual(
             cheats.parse_cht(text),
-            [cheats.Cheat("Own list", "02000000:01", False, {"format": "VBA"})],
+            [  # its heading, buttons and guide kept; picks and marks the card's
+                cheats.Cheat(
+                    "Own list",
+                    "02000000:01",
+                    False,
+                    {
+                        "format": "VBA",
+                        "folder": "Items",
+                        "keys": "hold L",
+                        "guide": "Hold L.",
+                    },
+                )
+            ],
         )
         self.assertIn("1 GBA game: 1 written", out)
 

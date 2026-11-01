@@ -2,7 +2,7 @@
 # Clean boot test on the emulated cart: launch a ROM that never touches
 # memory, then check the kernel's launch reset left EWRAM and IWRAM all
 # zero, as some games expect, and WAITCNT at the BIOS's 0 (the menu runs at
-# 0x4018, source/waitcnt.h). Runs inside the torii-emu container after `just build`,
+# 0x4014, source/waitcnt.h). Runs inside the torii-emu container after `just build`,
 # `just emu-headless` and building tests/roms/idle.
 set -euo pipefail
 # shellcheck source=tests/carts.sh
@@ -36,7 +36,7 @@ dirty=$(grep -c ': .*[1-9A-F]' "$cart/ewram.txt" || true)
 dirty=$(grep -c ': .*[1-9A-F]' "$cart/iwram.txt" || true)
 [ "$dirty" = 0 ] || fail "$dirty IWRAM lines still hold data when the game starts: $(grep -m 3 ': .*[1-9A-F]' "$cart/iwram.txt")"
 
-grep -qx 'mem frame 90 04000204: 18 40' "$cart/ram.txt" || fail "WAITCNT in the menu isn't 0x4018"
+grep -qx 'mem frame 90 04000204: 14 40' "$cart/ram.txt" || fail "WAITCNT in the menu isn't 0x4014"
 grep -qx 'mem frame 400 04000204: 00 00' "$cart/ram.txt" || fail "the game started with WAITCNT $(grep 'frame 400 04000204' "$cart/ram.txt")"
 
 echo "PASS: EWRAM and IWRAM are clear, and WAITCNT 0, when a game starts"

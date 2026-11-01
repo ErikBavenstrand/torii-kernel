@@ -908,9 +908,15 @@ emulated cart can't tell, which the real cart's logs will:
   undefined instruction isn't known here (mGBA's HLE BIOS skips it), so
   a crash that disables IRQs, or loops inside the kernel's code, goes
   uncaught.
-- **WAITCNT:** the real cart reads NOR and PSRAM correctly at WS0 2/1 with
-  prefetch (cart test of 2026-10-18), so the menu runs at `0x4018`
-  (`source/waitcnt.h`). Untested at that speed, and kept at the BIOS's
+- **WAITCNT:** the menu runs at `0x4014`, WS0 3/1 with prefetch
+  (`source/waitcnt.h`), the speed games run PSRAM at. It ran at `0x4018`
+  (2/1) from v0.2: a 64 KB checksum read right on the cart of 2026-10-18,
+  but on 2026-11-01 a cheat file written from PSRAM at 2/1 came out with
+  bit 6 set at random, about once in 60 KB (`1` as `q`, `9` as `y`), at
+  other places in its two copies, each copy's CRC line matching its own
+  flipped text: the reads were wrong, not the card's writes. A launch
+  decoding cheats from such reads patched the game wrongly (Emerald froze
+  on a wild encounter with the personality routine picked). Untested at that speed, and kept at the BIOS's
   `0x0000`: writes to the control registers, transfers through the SD buffer
   at `0x09E00000`, NOR erases and writes, the RTC's serial lines, and
   launching, with its PSRAM writes. Games start at `0x0000`. In
