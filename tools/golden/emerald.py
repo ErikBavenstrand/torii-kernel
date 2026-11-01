@@ -86,7 +86,9 @@ def text(s):
 
 OP = {
     "end": 0x02,
+    "return": 0x03,
     "goto": 0x05,
+    "call": 0x04,
     "goto_if": 0x06,
     "call_if": 0x07,
     "callstd": 0x09,
@@ -125,6 +127,7 @@ SPECIAL = {  # indexes into gSpecials (0x081DBA64), counted from 0
     "ScriptMenu_CreatePCMultichoice": 0x109,
     "AccessHallOfFamePC": 0x10A,
     "CallFrontierUtilFunc": 0xEA,
+    "ExitSafariMode": 0xD1,
 }
 HOW_MAY_I_SERVE_YOU = 0x08272A2A  # gText_HowMayIServeYou past its "Welcome!" page
 # The game's PC (data/scripts/pc.inc), for the menu's copy of it
@@ -140,6 +143,7 @@ LANETTES_PC = 0x08271E3E  # EventScript_AccessLanettesPC
 # frontier_get FRONTIER_DATA_CHALLENGE_STATUS: CallFrontierUtilFunc's
 # FRONTIER_UTIL_FUNC_GET_DATA of data 0, the save's frontier.challengeStatus
 FRONTIER_UTIL_FUNC_GET_DATA, FRONTIER_DATA_CHALLENGE_STATUS = 1, 0
+FLAG_SYS_SAFARI_MODE = 0x88C
 
 
 class Blob:
@@ -619,6 +623,18 @@ def menu_base():
     s = m.s
     s.label("open")
     s.cmd("lockall")
+    # Never during a Battle Frontier or Battle Tent challenge: the party is
+    # then the challenge's (picked, or rented), the player's own kept in the
+    # save until it ends (frontier.challengeStatus is set from before the
+    # party changes until after it is back). A warp out, then a save, would
+    # write the challenge's party over the player's; a Pokémon boxed or
+    # given then would be lost or doubled when the party comes back.
+    s.cmd("setvar", ("h", VAR_8004), ("h", FRONTIER_UTIL_FUNC_GET_DATA))
+    s.cmd("setvar", ("h", VAR_8005), ("h", FRONTIER_DATA_CHALLENGE_STATUS))
+    s.cmd("special", ("h", SPECIAL["CallFrontierUtilFunc"]))
+    s.when(VAR_RESULT, 0, "main")
+    s.say(m.t("The menu can't be used\nduring a challenge."))
+    s.goto("done")
     m.list("main", [], "done", "empty", count=SLOTS)
     s.label("done")
     s.cmd("releaseall")
@@ -666,22 +682,9 @@ def pc_section(m, back):
     under the player facing down), and the menu opens away from any PC.
     Logging off goes back to the main list. The storage, the item PC and
     the Hall of Fame come back to the field into this copy, as into the
-    game's.
-
-    Never during a Battle Frontier or Battle Tent challenge: the party is
-    then the challenge's (picked, or rented), the player's own kept in the
-    save until it ends (frontier.challengeStatus is set from before the
-    party changes until after it is back), so a Pokémon put in a box then
-    would stay there beside the one the party gets back."""
+    game's. (The menu isn't opened during a Frontier challenge.)"""
     s = m.s
     s.label("pc")
-    s.cmd("setvar", ("h", VAR_8004), ("h", FRONTIER_UTIL_FUNC_GET_DATA))
-    s.cmd("setvar", ("h", VAR_8005), ("h", FRONTIER_DATA_CHALLENGE_STATUS))
-    s.cmd("special", ("h", SPECIAL["CallFrontierUtilFunc"]))
-    s.when(VAR_RESULT, 0, "pc_on")
-    s.say(m.t("The PC can't be used\nduring a challenge."))
-    s.goto(back)
-    s.label("pc_on")
     s.cmd("playse", ("h", SE_PC_ON))
     s.msgbox(TEXT_BOOT_UP_PC)
     s.label("pc_menu")  # EventScript_PCMainMenu
@@ -786,13 +789,23 @@ def warp_section(m, back):
         [(MAP_NAMES[n], f"wi{i}") for i, (n, *_) in enumerate(ISLANDS)],
         "warp",
     )
+    # Out of the Safari Zone as its gate does (ExitSafariMode): its flag
+    # left on would make battles outside Safari battles until its steps run out
+    s.label("leave")
+    s.cmd("checkflag", ("h", FLAG_SYS_SAFARI_MODE))
+    s.cmd("goto_if", ("b", 0), ("p", "left"))
+    s.cmd("special", ("h", SPECIAL["ExitSafariMode"]))
+    s.label("left")
+    s.cmd("return")
     for tag, rows in (("wt", TOWNS), ("wi", ISLANDS)):
         for i, (_, group, num, x, y) in enumerate(rows):
             s.label(f"{tag}{i}")
+            s.cmd("call", ("p", "leave"))
             s.cmd("warp", ("b", group), ("b", num), ("b", 0xFF), ("h", x), ("h", y))
             s.cmd("waitstate")
     for i, (_, group, num) in enumerate(DUNGEONS):
         s.label(f"wd{i}")
+        s.cmd("call", ("p", "leave"))
         s.cmd("warp", ("b", group), ("b", num), ("b", 0), ("h", 0xFFFF), ("h", 0xFFFF))
         s.cmd("waitstate")
     return "WARP", "warp"
