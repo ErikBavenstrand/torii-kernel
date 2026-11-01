@@ -75,8 +75,7 @@
 # after the kernel cleared its RAM, about frame 12, works: the menu waits
 # for them until it is up and still). nav_delete PATH, nav_nor_launch INDEX
 # [hard], nav_nor_delete and nav_nor_format run the other actions the same
-# way, and nav_state_launch PATH SLOT starts a GBA game with addons in its
-# save state slot SLOT for the save slot it uses.
+# way.
 
 _nav_item_words=(recent fav gba gbc gb nes sd nor settings info)
 
@@ -435,12 +434,6 @@ nav_nor_launch() {
   local index=$1
   shift
   _nav_hook 6 - "index=$index" "$@"
-}
-
-nav_state_launch() {
-  local path=$1 slot=$2
-  shift 2
-  _nav_hook 10 "$path" "index=$slot" "$@"
 }
 
 nav_nor_delete() { _nav_hook 7 - "$@"; }

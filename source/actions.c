@@ -85,19 +85,6 @@ void action_slot_chosen(int on)
 	slot_skip = on != 0;
 }
 
-// The save state the next launch starts in (the tests' hook, NAV_TEST_STATE)
-static u8 state_slot;
-
-void action_state_slot_set(u32 slot)
-{
-	state_slot = (u8)slot;
-}
-
-u32 action_state_slot(void)
-{
-	return state_slot;
-}
-
 static const char *launch_title;
 
 void action_launch_title(const char *title)

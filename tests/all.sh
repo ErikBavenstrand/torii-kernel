@@ -74,7 +74,6 @@ jobs=(
   "tests/state.sh"
   "tests/states.sh roundtrip"
   "tests/states.sh keep"
-  "tests/states.sh popup"
   "tests/states.sh unreadable"
   "tests/states.sh shadow"
   "tests/states.sh cut"

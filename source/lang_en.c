@@ -59,10 +59,6 @@ const char *const lang_en[STR_COUNT] = {
 	"Slot {1}",  // state.slot
 	"Saving the save state",  // state.keeping
 	"The save state wasn't kept:\nthe card didn't take it.",  // state.not_kept
-	"This state can't be read",  // state.unreadable
-	"This state is another game's",  // state.other_game
-	"This state needs a newer Torii",  // state.newer
-	"A starts the game anyway,\nfrom its start. B goes back.",  // state.start_anyway
 	"Saving screenshots",  // state.shot_saving
 	"Saving the screenshot",  // state.shot_saving_one
 	"{1} of {2}",  // state.shot_of

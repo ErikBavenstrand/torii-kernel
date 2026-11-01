@@ -31,14 +31,12 @@ void ingame_cheats_set(u32 count, u32 table);
 
 // The save states (P3, statestore.h) of a GBA launch with Save states on,
 // for the game at rom_path (file name rom_name) in its save slot: an old
-// /RTS state imported as slot 1 once, then slot (or the newest, for 0) put
-// in cart SRAM's buffer, to load at the game's start if slot isn't 0; the
-// slots' rows go in the session block. A state is loaded only into the game
-// it names (GAMECODE, GAMEHEAD and rom_bytes, the ROM file's size). 1 to go
-// on; if slot was asked for and didn't load, 0 (it didn't read) or
-// statestore_load's refusal (STATESTORE_OTHER_GAME, STATESTORE_NEWER).
+// /RTS state imported as slot 1 once, then the newest that loads put in
+// cart SRAM's buffer, for the in-game menu's Load state; the slots' rows go
+// in the session block. A state is loaded only into the game it names
+// (GAMECODE, GAMEHEAD and rom_bytes, the ROM file's size).
 // ingame_states_none: a launch without them (call it at a launch's start).
-int ingame_states_launch(const char *rom_path, const char *save_slot, const char *rom_name, u32 slot, u32 rom_bytes);
+void ingame_states_launch(const char *rom_path, const char *save_slot, const char *rom_name, u32 rom_bytes);
 void ingame_states_none(void);
 
 // At boot, once the card is up and the pending save copied: if cart SRAM

@@ -122,14 +122,14 @@ static void tag_clear(void)
 	buffer_io(TAG_AT, (u8 *)&tag, sizeof(tag), 1);
 }
 
-static void tag_set(u32 slot, u32 kept, u32 autoload, u32 rom_crc, u32 data_crc)
+static void tag_set(u32 slot, u32 kept, u32 rom_crc, u32 data_crc)
 {
 	struct ingame_state_tag tag;
 	memset(&tag, 0, sizeof(tag));
 	tag.magic = INGAME_STATE_TAG_MAGIC;
 	tag.slot = (u8)slot;
 	tag.kept = (u8)kept;
-	tag.autoload = (u8)autoload;
+	tag.autoload = 0;  // the stub's load at the game's start: nothing asks for it
 	tag.rom_crc = rom_crc;
 	tag.data_crc = data_crc;
 	buffer_io(TAG_AT, (u8 *)&tag, sizeof(tag), 1);
@@ -298,7 +298,7 @@ static int buffer_whose(u32 slot, u32 rom_crc)
 	return 1;
 }
 
-static int load_slot(const char *rom_path, const char *save_slot, u32 slot, u32 rom_crc, u32 autoload)
+static int load_slot(const char *rom_path, const char *save_slot, u32 slot, u32 rom_crc)
 {
 	struct statestore_list l;
 	char *path = work()->path;
@@ -318,10 +318,9 @@ static int load_slot(const char *rom_path, const char *save_slot, u32 slot, u32 
 			statestore_buffer_clear();
 			return whose;
 		}
-		tag_set(slot, 1, autoload, rom_crc, tag.data_crc);
+		tag_set(slot, 1, rom_crc, tag.data_crc);
 		flag_set(1);  // EZ-Flash's flag cleared, as after an unpacking
-		tlog("states: slot %lu already in cart SRAM%s", (unsigned long)slot,
-		     autoload ? ", loaded at the game's start" : "");
+		tlog("states: slot %lu already in cart SRAM", (unsigned long)slot);
 		return 1;
 	}
 	flag_set(0);
@@ -337,10 +336,9 @@ static int load_slot(const char *rom_path, const char *save_slot, u32 slot, u32 
 			refused = refused ? refused : whose;
 			continue;
 		}
-		tag_set(slot, 1, autoload, rom_crc, data_crc);
+		tag_set(slot, 1, rom_crc, data_crc);
 		flag_set(1);
-		tlog("states: slot %lu in cart SRAM from %s%s", (unsigned long)slot, path,
-		     autoload ? ", loaded at the game's start" : "");
+		tlog("states: slot %lu in cart SRAM from %s", (unsigned long)slot, path);
 		return 1;
 	}
 	statestore_buffer_clear();  // a copy that failed its CRC or its check left its chunks, and its tag
@@ -494,7 +492,7 @@ static int import_rts(const char *rom_path, const char *save_slot, const char *r
 		return 0;
 	}
 	tlog("states: %s becomes slot 1 of %s", path, rom_path);
-	tag_set(1, 0, 0, rom_crc, 0);
+	tag_set(1, 0, rom_crc, 0);
 	flag_set(1);
 	if (!keep_slot(rom_path, save_slot, 1))
 		return 0;
@@ -517,11 +515,11 @@ static int import_rts(const char *rom_path, const char *save_slot, const char *r
 // At the menu's wait states (a launch runs at the BIOS's): the packing, the
 // unpacking and cart SRAM's bytes take a third of the time. SetRampage and
 // the card's driver set their own.
-int statestore_load(const char *rom_path, const char *save_slot, u32 slot, u32 rom_crc, u32 autoload)
+int statestore_load(const char *rom_path, const char *save_slot, u32 slot, u32 rom_crc)
 {
 	u16 waitcnt = REG_WAITCNT_CART;
 	REG_WAITCNT_CART = WAITCNT_MENU;
-	int r = load_slot(rom_path, save_slot, slot, rom_crc, autoload);
+	int r = load_slot(rom_path, save_slot, slot, rom_crc);
 	REG_WAITCNT_CART = waitcnt;
 	return r;
 }
