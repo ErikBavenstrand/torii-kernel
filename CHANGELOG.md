@@ -6,11 +6,12 @@ git log, not here.
 
 ## Unreleased
 
-- **Added:** Torii code, a superset of VBA's address:value lines: tests
-  (= ! < > * ~ and @buttons) covering the next line or a { } block with
-  an ELSE, bit clears and adds, and a switch ($ADDRESS) that the
-  interpreter keeps set while the cheat is on, so ROM cheats built on one
-  toggle in game. The keypad types its symbols; docs/torii-code.md (85b2e77c).
+- **Added:** Torii code, a superset of VBA's address:value lines (VBA
+  cheats run as before): tests (= ! < > and signed << >>, bit tests * ~,
+  @buttons held, @@buttons pressed) covering the next line or a { } block
+  with an ELSE, and bit clears and adds. The keypad types its symbols and
+  names a block left open; the details page indents blocks;
+  docs/torii-code.md (85b2e77c, 54a428ab).
 - **Fixed:** the menu reads the cart at WS0 3/1, not 2/1 (cd48ee2e). At 2/1 a
   real cart read PSRAM with bit 6 set at random, about once in 60 KB: a
   cheat file written from it came out with digits flipped, and a launch
