@@ -1422,10 +1422,10 @@ def cheats():
     add(
         "Money",
         "Shopping costs 1",
-        # While a shop is open (sShopData set), its totalCost (past its four
-        # 0x800-byte tilemap buffers) is 1, whatever the quantity
-        vba("02039F70!00000000", "[02039F70]+2000:00000001"),
-        "Every purchase costs 1 in total, however many you buy. The list still shows the normal prices.",
+        vba(*Mixed(shop_costs_1(), None).lines),
+        "Every item and decoration in a shop costs 1 apiece, as the list shows. Selling pays as "
+        "before.",
+        "launch",
     )
 
     # Pokémon (D24-D26)
@@ -1776,6 +1776,25 @@ def personality(setting, value):
         + [(0x08067C74 + 2 * i, h) for i, h in enumerate(hook)]
         + [(0x08F1F000 + setting, value)]
     )
+
+
+def shop_costs_1():
+    """The shop's prices, 1 each: in its list (BuyMenuPrintPriceInList), as an
+    item is chosen (Task_BuyMenu) and as its quantity changes
+    (Task_BuyHowManyDialogueHandleInput). Each bl GetItemPrice returns 1,
+    and the bl IsPokeNewsActive after it (Slateport's sale, which halves
+    prices) 0, so a sale never makes it 0; a decoration's price load is 1.
+    Selling reads the price elsewhere and is left alone."""
+    price, no_sale = (0x2001, 0x46C0), (0x2000, 0x46C0)  # movs r0, #1 / #0; nop
+    out = []
+    for bl_price in (0x080E0136, 0x080E0B58, 0x080E0DB4):
+        out += [(bl_price, price[0]), (bl_price + 2, price[1])]
+        out += [(bl_price + 8, no_sale[0]), (bl_price + 10, no_sale[1])]
+    out += [
+        (0x080E016C, 0x2101),
+        (0x080E0B8E, 0x2001),
+    ]  # ldrh r1/r0, [.., #20]: movs r1/r0, #1
+    return out
 
 
 def instant_text():

@@ -105,11 +105,11 @@ cheat12_guide = "Keeps your Battle Points (BP), the Battle Frontier's prize mone
 cheat12_enable = false
 
 cheat13_desc = "Money: Shopping costs 1"
-cheat13_code = "02039F70!00000000+[02039F70]+2000:00000001"
+cheat13_code = "080E0136:2001+080E0138:46C0+080E013E:2000+080E0140:46C0+080E016C:2101+080E0B58:46C02001+080E0B60:46C02000+080E0B8E:2001+080E0DB4:46C02001+080E0DBC:46C02000"
 cheat13_format = "Torii"
 cheat13_folder = "Money"
-cheat13_keys = "always"
-cheat13_guide = "Every purchase costs 1 in total, however many you buy. The list still shows the normal prices."
+cheat13_keys = "launch"
+cheat13_guide = "Every item and decoration in a shop costs 1 apiece, as the list shows. Selling pays as before."
 cheat13_enable = false
 
 cheat14_desc = "Pokémon: Shiny"
