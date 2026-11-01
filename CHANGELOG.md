@@ -35,6 +35,9 @@ git log, not here.
   written into free ROM) now fit about 23,000 patches where 4,096 did, and a
   cheat may have 4,096. The cheat screen shows the room in percent, and
   the cheat list's cache is built again once (ad7b48e9).
+- **Changed:** Emerald's menu has Trade evolution (Kadabra, Machoke,
+  Graveler, Haunter and the held-item trades, by the game's own evolution
+  scene), and Gifts gives the events' Jirachi and Celebi (b38e591e).
 - **Changed:** Emerald's menu Unlock adds FLY SPOTS (every town and the
   Battle Frontier on the Fly map), and its Pokédex uses the game's own
   switch, so the Pokédex opens in national mode (da35a18e). Legends'
