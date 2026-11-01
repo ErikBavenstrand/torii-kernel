@@ -15,6 +15,13 @@ git log, not here.
   cheat edited becomes your own), puts a cheat under a heading (an existing
   or a new one) and adds a code under the heading you're in; A on the Guide
   page edits the guide (8f6c5abf).
+- **Faster:** launching a game with cheats decodes only the picks, each
+  from a checkpoint of the decoder the cheat list's cache keeps every 32
+  cheats, instead of every cheat up to the last pick; each cheat so decoded
+  is checked against the cache, and any difference decodes in full
+  (2f07be27, 70fda739). A 900-cheat file with its pick last launches in 51
+  frames, not 87; Back to Torii gains the same. The cheat file is read from
+  the card once, not scanned and then read again (2f07be27).
 - **Fixed:** a guide too long for the keyboard is refused instead of cut
   on save; a failed write to PSRAM no longer leaves the list out of step
   with the file; the cheat list's cache can't point a name outside its
