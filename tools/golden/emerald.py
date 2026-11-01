@@ -1041,7 +1041,7 @@ def cheats():
     add(
         "Pokémon",
         "Pokérus when caught",
-        rom_code([(0x0806B0F4, 0x7029)]),
+        rom_code(pokerus()),
         "Pokémon you catch have Pokérus: they earn double EVs.",
         "launch",
     )
@@ -1343,6 +1343,27 @@ def instant_text():
         (0x080047AA, 0xD01B),  # beq: the printer is done
         (0x080047AC, 0xE004),  # b: RENDER_UPDATE runs the callback
         (0x080047AE, 0x46C0),
+    ]
+
+
+POKERUS = 0x080478B8  # tools/golden/pokerus.c, over Unused_ApplyRandomDmgMultiplier (0x3C bytes)
+POKERUS_CALL = 0x080566CE  # Cmd_givecaughtmon's bl GiveMonToPlayer
+
+
+def pokerus():
+    """A caught Pokémon has Pokérus (tools/golden/pokerus.c): the routine,
+    and the catch's call to GiveMonToPlayer sent through it"""
+    code = Path(__file__).with_name("pokerus.bin").read_bytes()
+    assert len(code) <= 0x3C, "pokerus.bin runs past Unused_ApplyRandomDmgMultiplier"
+    code += b"\0" * (len(code) & 1)
+    off = POKERUS - (POKERUS_CALL + 4)
+    assert -(1 << 22) <= off < 1 << 22, "out of a bl's reach"
+    return [
+        (POKERUS + i, int.from_bytes(code[i : i + 2], "little"))
+        for i in range(0, len(code), 2)
+    ] + [
+        (POKERUS_CALL, 0xF000 | (off >> 12) & 0x7FF),
+        (POKERUS_CALL + 2, 0xF800 | (off >> 1) & 0x7FF),
     ]
 
 

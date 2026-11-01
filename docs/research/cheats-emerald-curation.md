@@ -293,7 +293,7 @@ On the emulated cart with the real ROM (CRC32 `1F1C08FB`) and a 100% save (Proje
 | Max EVs | HP EVs 58 to 81: the 510 total filled |
 | Vitamins | Protein on 103 Attack EVs: "It won't have any effect" in the control; raised to 113 with it; four Proteins: 126, stopping at the game's 510 in all (the owner keeps the real limits: 255 a stat, 510 in all). `PokemonUseItemEffects`' two 100-a-stat checks patched |
 | Infinite HP | 209/209 through a Lv 100 Machamp's attacks; without it, fainted |
-| Every ball catches, Pokérus | a full-HP Lv 100 Ralts caught with one Great Ball, Pokérus set |
+| Every ball catches, Pokérus | a full-HP Lv 100 Ralts caught with one Great Ball, Pokérus set; since 2026-11-01 (`tools/golden/pokerus.c`, over the unused `Unused_ApplyRandomDmgMultiplier`, called in place of `GiveMonToPlayer` from `Cmd_givecaughtmon`, so only a caught Pokémon) a Mew caught with a Great Ball: Pokérus 0x12, met in Mauville at Lv 100. The old one-halfword patch turned `SetBoxMonData`'s met-location store into a Pokérus store of whatever r1 held: every new Pokémon lost its met location |
 | Walk through walls | blocked without R; through the Pokémon Center counter with R |
 | Shop, Shopping costs 1 | the Medicine and Balls marts; TM01 for "₽1", money 329,622 to 329,621, TM01 4 to 5 |
 | Tickets | "Obtained the EON TICKET!"; the ferry flag set; a second pick says you have it |
