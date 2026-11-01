@@ -19,6 +19,10 @@ git log, not here.
   DOWN was held, and the next key moved nothing; a launch whose cheats take
   long to make ready shows Preparing cheats instead of a still screen
   (00cc5c26, 01941b71).
+- **Changed:** Emerald's golden cheats have one L+R+A menu: Menu: Open with
+  L+R+A, plus a cheat for each section it lists (Heal, PC, Shop, Warp,
+  Gifts, Legends, Tickets, Unlock), as the game's scrolling list with page
+  jumps. The Shop opens the game's own marts; Moves is gone (0a00ed28).
 
 ## v0.9.15
 
