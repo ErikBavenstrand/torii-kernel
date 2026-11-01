@@ -817,13 +817,13 @@ void test_cheatfile_add(void)
 
 	// A new file: nothing yet
 	load_cap("", 512);
-	CHECK_EQ(cheatfile_add(&file, &room, "First", "02001000:63", CHEAT_FMT_VBA, &at), CHEATFILE_EDIT_OK);
+	CHECK_EQ(cheatfile_add(&file, &room, "First", "02001000:63", CHEAT_FMT_TORII, &at), CHEATFILE_EDIT_OK);
 	CHECK(text_is("cheats = 1\n"
 		      "\n"
 		      "cheat0_desc = \"First\"\n"
 		      "cheat0_code = \"02001000:63\"\n"
 		      "cheat0_enable = false\n"
-		      "cheat0_format = \"VBA\"\n"
+		      "cheat0_format = \"Torii\"\n"
 		      "cheat0_user = true\n"));
 	CHECK_EQ(at, 0);
 	CHECK_EQ(file.count, 1);
@@ -1322,6 +1322,7 @@ void test_cheatfile_keys_guide(void)
 	CHECK_EQ(cheatfile_guide(&file, 1, g, sizeof(g)), 0);
 	CHECK(!strcmp(g, ""));
 	CHECK_EQ(cheats[2].act, CHEATKEYS_AT_LAUNCH);
+	CHECK_EQ(cheats[2].format, CHEAT_FMT_TORII);  // "VBA", Torii code's name before
 
 	// Set (a line added after the code line), replaced, cleared; picks kept
 	CHECK_EQ(cheatfile_set_keys(&file, &room, 1, CHEATKEYS(CHEATKEYS_PRESS, 0x044)), CHEATFILE_EDIT_OK);

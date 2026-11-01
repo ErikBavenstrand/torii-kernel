@@ -223,9 +223,8 @@ check_sleep:
 	bne			cheat_game
 	mov			r1,#1
 	str			r1,[r0,#-0x1C]
-	ldrb 		r1,[r0,#-0x20]	@;its low byte: Run once's byte and the keys follow it (cheatrun.s)
-	cmp 		r1,#1
-	beq 		cheat_game
+	@;CheatONOFF's byte (1: off) is the blob's to read: off, it only sets
+	@;Torii code's switches to 0 (cheatrun.s)
 	adrl		r3,RTS_ReplaceIRQ_start
 	add			r3,r3,r2
 	mov			lr,pc

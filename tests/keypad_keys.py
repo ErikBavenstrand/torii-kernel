@@ -4,9 +4,10 @@
 
 usage: tests/keypad_keys.py [--at N] [--every N] TOKENS...
 
-Each token is typed in turn: hex digits, ':' and AnyGBA's '[', ']', '+',
-'^' and '|' as they are (a token of several types each; the symbols through
-the symbol key, which the keypad turns back after '[', '+' and '|'), "\n"
+Each token is typed in turn: hex digits, ':' and Torii code's symbols
+("[]+^|&#@=!<>*~{}") as they are (a token of several types each; the
+symbols through the symbol key, which the keypad turns back after any but
+']' and '^'), "\n"
 or LINE the Line key, DEL the Del key, SYM the symbol key, and A, B, L, R,
 SELECT and START that key alone. The selection starts on 0, as the
 keypad opens. Prints -k options, one press and its release per line, the
@@ -23,8 +24,8 @@ COLS = 8
 FUNC = {":": 0, "LINE": 1, "SYM": 2, "DEL": 3, "CANCEL": 4, "SAVE": 6}
 FUNC_ORDER = [0, 1, 2, 3, 4, 6]
 HEX = "0123456789ABCDEF"
-SYMBOLS = "[]+^|"  # the symbol row, on the digits' first
-BACK = "[+|"  # typing one turns the digits back
+SYMBOLS = "[]+^|&#@=!<>*~{}"  # the symbol rows, over the digits' two
+STAY = "]^"  # typing one keeps the symbols; any other turns the digits back
 
 
 def func_index(col):
@@ -33,7 +34,7 @@ def func_index(col):
 
 def moves(at, to, symbols=False):
     """The d-pad keys from selection at to to (row, col): straight moves,
-    no wrapping; with the symbol row shown, the digits' second row is gone."""
+    no wrapping. The symbols take the digits' two rows, key for key."""
     (r, c), (tr, tc) = at, to
     keys = []
     if r == 2 and tr == 2:
@@ -41,12 +42,7 @@ def moves(at, to, symbols=False):
         return ["RIGHT" if d > 0 else "LEFT"] * abs(d)
     if r == 2:
         keys.append("UP")
-        r = 0 if symbols else 1
-        if symbols:
-            c = min(c, len(SYMBOLS) - 1)  # the symbol row's last key
-    if symbols and tr == 2:
-        d = func_index(tc) - func_index(c)
-        return keys + ["DOWN"] + ["RIGHT" if d > 0 else "LEFT"] * abs(d)
+        r = 1
     if tr < 2:
         keys += ["DOWN" if tr > r else "UP"] * abs(tr - r)
         keys += ["RIGHT" if tc > c else "LEFT"] * abs(tc - c)
@@ -80,7 +76,8 @@ def presses(tokens, at=(0, 0)):
                     i = HEX.index(ch)
                     targets.append(((i // COLS, i % COLS), False))
                 elif ch in SYMBOLS:
-                    targets.append(((0, SYMBOLS.index(ch)), True))
+                    i = SYMBOLS.index(ch)
+                    targets.append(((i // COLS, i % COLS), True))
                 else:
                     sys.exit(f"keypad_keys: {ch!r} isn't on the keypad")
         for t, page in targets:
@@ -91,7 +88,7 @@ def presses(tokens, at=(0, 0)):
             out += moves(at, t, symbols)
             out.append("A")
             at = t
-            if symbols and SYMBOLS[t[1]] in BACK and t[0] == 0 and page:
+            if symbols and page and SYMBOLS[t[0] * COLS + t[1]] not in STAY:
                 symbols = False
     return out, at
 

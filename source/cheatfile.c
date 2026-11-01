@@ -29,8 +29,8 @@ enum {
 	KEY_OTHER,
 };
 
-const char *const cheatfile_format_names[CHEAT_FMT_VBA + 1] = {
-	NULL, "GSAv1", "GSAv1 raw", "PARv3", "PARv3 raw", "CodeBreaker", "VBA",
+const char *const cheatfile_format_names[CHEAT_FMT_TORII + 1] = {
+	NULL, "GSAv1", "GSAv1 raw", "PARv3", "PARv3 raw", "CodeBreaker", "Torii",
 };
 
 // A key "cheatN_desc", "_code", "_enable", "_format", "_user", "_renamed",
@@ -90,10 +90,12 @@ static int is_true(const char *v, u32 len)
 }
 
 // A cheatN_format value's format, in any case; CHEAT_FMT_AUTO for one
-// unknown
+// unknown. "VBA", the name before Torii code, reads as Torii.
 static u32 format_of(const char *v, u32 len)
 {
-	for (u32 f = CHEAT_FMT_GSAV1; f <= CHEAT_FMT_VBA; f++) {
+	if (len == 3 && (v[0] | 0x20) == 'v' && (v[1] | 0x20) == 'b' && (v[2] | 0x20) == 'a')
+		return CHEAT_FMT_TORII;
+	for (u32 f = CHEAT_FMT_GSAV1; f <= CHEAT_FMT_TORII; f++) {
 		const char *name = cheatfile_format_names[f];
 		u32 i = 0;
 		if (strlen(name) != len)
@@ -1397,7 +1399,7 @@ u32 cheatfile_can_add(const struct cheatfile *f, u32 cap, const char *desc)
 u32 cheatfile_add(struct cheatfile *f, const struct cheatfile_room *room, const char *desc, const char *code, u8 format,
 		  u32 *index)
 {
-	if (!code_ok(code) || format > CHEAT_FMT_VBA)
+	if (!code_ok(code) || format > CHEAT_FMT_TORII)
 		return CHEATFILE_EDIT_BAD;
 	if (f->next >= top(f))
 		return CHEATFILE_EDIT_FULL;
@@ -1437,7 +1439,7 @@ static u32 line_end(const char *text, u32 len, u32 at)
 u32 cheatfile_set_code(struct cheatfile *f, const struct cheatfile_room *room, u32 i, const char *desc,
 		       const char *code, u8 format)
 {
-	if (i >= f->count || !code_ok(code) || format > CHEAT_FMT_VBA)
+	if (i >= f->count || !code_ok(code) || format > CHEAT_FMT_TORII)
 		return CHEATFILE_EDIT_BAD;
 	const struct cheatfile_cheat *c = &f->cheats[i];
 	u32 n = c->number;

@@ -19,12 +19,34 @@ static int is_sep(char c)
 }
 
 // AnyGBA's characters in a raw line ('+' within one is a pointer's offset's)
+// Torii code's characters but ':' (source/cheatcode.h's CHEAT_FMT_TORII):
+// AnyGBA's, and Torii's writes, tests and blocks. Its switch, '$', isn't
+// typed: it goes with ROM code made on a PC.
 static int is_raw(char c)
 {
-	return c == '[' || c == ']' || c == '^' || c == '|';
+	switch (c) {
+	case '[':
+	case ']':
+	case '^':
+	case '|':
+	case '&':
+	case '#':
+	case '@':
+	case '=':
+	case '!':
+	case '<':
+	case '>':
+	case '*':
+	case '~':
+	case '{':
+	case '}':
+		return 1;
+	default:
+		return 0;
+	}
 }
 
-// 1 if line i holds more than digits: VBA's ':' or AnyGBA's characters
+// 1 if line i holds more than digits: a Torii line (':' or the rest)
 static int is_raw_line(const struct keypad_edit *e, u32 i)
 {
 	for (u32 c = 0; c < e->len[i]; c++)
@@ -234,7 +256,7 @@ u32 keypad_edit_digits(const struct keypad_edit *e, u32 i, u32 format, u32 *expe
 	if (i >= e->lines)
 		return 0;
 	u32 n = e->len[i];
-	if (is_raw_line(e, i) || format == CHEAT_FMT_VBA)
+	if (is_raw_line(e, i) || format == CHEAT_FMT_TORII)
 		return n;
 	if (format == CHEAT_FMT_CODEBREAKER)
 		*expect = 12;

@@ -417,7 +417,7 @@ struct cheatfile_room {
 };
 
 // The cheatN_format values, by enum cheat_format (CHEAT_FMT_AUTO: none)
-extern const char *const cheatfile_format_names[CHEAT_FMT_VBA + 1];
+extern const char *const cheatfile_format_names[CHEAT_FMT_TORII + 1];
 
 // Appends a cheat of the user's (cheatN_user = true) after the others:
 // desc, code ("+" between lines), cheatN_enable = false (picked once it

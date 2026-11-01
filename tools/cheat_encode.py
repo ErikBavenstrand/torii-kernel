@@ -597,6 +597,59 @@ class VBA:
         return [f"{target}|{value & (1 << 8 * width) - 1:0{width * 2}X}"]
 
 
+class Torii(VBA):
+    """Torii code (source/cheatcode.h's CHEAT_FMT_TORII): VBA's lines and
+    AnyGBA's, and Torii's own, which only Torii reads"""
+
+    name = "Torii"
+
+    @staticmethod
+    def _value(width, value):
+        return f"{value & (1 << 8 * width) - 1:0{width * 2}X}"
+
+    @staticmethod
+    def and_(width, address, value):
+        """the bits value hasn't cleared"""
+        return [f"{address:08X}&{Torii._value(width, value)}"]
+
+    @staticmethod
+    def add(width, address, value):
+        """value added, wrapping at the width"""
+        return [f"{address:08X}#{Torii._value(width, value)}"]
+
+    TESTS = "=!<>*~"  # equal, not equal, below, above, any bit, no bit
+
+    @staticmethod
+    def test(op, width, address, value, block=False):
+        """a test of the width bytes at address: it covers the next line, or
+        with block every line up to end() (else_() between for when it fails)"""
+        assert op in Torii.TESTS
+        return [
+            f"{address:08X}{op}{Torii._value(width, value)}" + ("{" if block else "")
+        ]
+
+    @staticmethod
+    def keys(mask, block=False):
+        """every button of mask (KEYINPUT's bits) held"""
+        assert 0 < mask <= 0x3FF
+        return [f"@{mask:04X}" + ("{" if block else "")]
+
+    @staticmethod
+    def else_():
+        return ["}{"]
+
+    @staticmethod
+    def end():
+        return ["}"]
+
+    @staticmethod
+    def switch(address, value=1):
+        """the cheat's switch: Torii keeps the byte at address at value while
+        the cheat is on and 0 while it's off (one a cheat, outside tests)"""
+        assert 0 < value <= 0xFF
+        return [f"${address:08X}" + (f":{value:02X}" if value != 1 else "")]
+
+
 class Code:
     """One cheat's code lines in one format, encrypted as they're added"""
 
@@ -613,9 +666,9 @@ class Code:
 
     def add(self, line):
         fmt = self.fmt
-        if fmt is VBA and isinstance(line, str):
+        if issubclass(fmt, VBA) and isinstance(line, str):
             self.lines.append(line)
-        elif fmt is VBA:
+        elif issubclass(fmt, VBA):
             address, value, width = line
             self.lines.append(f"{address:08X}:{value:0{width * 2}X}")
         elif fmt is CB:

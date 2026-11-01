@@ -146,6 +146,22 @@ class Layouts(unittest.TestCase):
             "[03005D8C]+0490:000F423F^[03005D90]+00AC+[03005D8C]+137C|80+02001000:0063",
         )
         self.assertIn("cheat0_enable = true\n", ce.cht([("x", "02030022:BEEF")]))
+        # Torii code's own lines (source/cheatcode.h's CHEAT_FMT_TORII)
+        T = ce.Torii
+        torii = ce.Code(T)
+        torii += T.switch(0x0203FA00, 4)
+        torii += T.keys(0x300, block=True)
+        torii += T.test("=", 1, 0x02030000, 1)
+        torii += T.add(2, 0x02030002, 0x10)
+        torii += T.else_()
+        torii += T.and_(1, 0x02030004, 0x0F)
+        torii += T.end()
+        torii += T.write(1, 0x02030006, 0xAA)
+        self.assertEqual(
+            torii.text(),
+            "$0203FA00:04+@0300{+02030000=01+02030002#0010+}{+02030004&0F+}+02030006:AA",
+        )
+        self.assertEqual(T.switch(0x0203FA00), ["$0203FA00"])
 
 
 if __name__ == "__main__":

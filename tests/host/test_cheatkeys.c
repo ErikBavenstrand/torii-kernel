@@ -114,10 +114,10 @@ void test_cheatkeys_derive(void)
 	// No condition on the keys: always on, game-state conditions too
 	CHECK_EQ(derive(CHEAT_FMT_AUTO, "32001000 0063"), CHEATKEYS_ALWAYS_ON);
 	CHECK_EQ(derive(CHEAT_FMT_AUTO, "72001000 0001+32001002 0001"), CHEATKEYS_ALWAYS_ON);
-	CHECK_EQ(derive(CHEAT_FMT_VBA, "02001000:AB"), CHEATKEYS_ALWAYS_ON);
+	CHECK_EQ(derive(CHEAT_FMT_TORII, "02001000:AB"), CHEATKEYS_ALWAYS_ON);
 	// ROM patches only: at launch; with a write that runs in game, always
-	CHECK_EQ(derive(CHEAT_FMT_VBA, "08001000:4770"), CHEATKEYS_AT_LAUNCH);
-	CHECK_EQ(derive(CHEAT_FMT_VBA, "08001000:4770+02001000:AB"), CHEATKEYS_ALWAYS_ON);
+	CHECK_EQ(derive(CHEAT_FMT_TORII, "08001000:4770"), CHEATKEYS_AT_LAUNCH);
+	CHECK_EQ(derive(CHEAT_FMT_TORII, "08001000:4770+02001000:AB"), CHEATKEYS_ALWAYS_ON);
 
 	// Other conditions on KEYINPUT, and ones that need nothing held, aren't read
 	struct cheat_op ops[2];

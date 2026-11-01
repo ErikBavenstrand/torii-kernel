@@ -139,7 +139,15 @@ BIG_BYTES = 0x240000
 INDEX_EXT = ".cdx"  # CHEATINDEX_EXT: a larger file's index, beside it
 # cheatN_format's values by enum cheat_format (source/cheatfile.c's
 # cheatfile_format_names); the first four are mGBA's GBA directives
-FORMAT_NAMES = (None, "GSAv1", "GSAv1 raw", "PARv3", "PARv3 raw", "CodeBreaker", "VBA")
+FORMAT_NAMES = (
+    None,
+    "GSAv1",
+    "GSAv1 raw",
+    "PARv3",
+    "PARv3 raw",
+    "CodeBreaker",
+    "Torii",
+)
 DIRECTIVES = FORMAT_NAMES[1:5]
 FOR_CRC = "# for crc32 "
 

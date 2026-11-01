@@ -460,6 +460,57 @@ void test_cheatrun_off(void)
 	CHECK(took <= model);
 }
 
+// Torii code's switch (CHEAT_OP_SWITCH): its byte holds its value while
+// the cheat is on and 0 while it's off, whatever the cheat's ops; a plain
+// cheat, one with a test and one of the switch alone
+void test_cheatrun_switch(void)
+{
+	const u32 sw = T_DATA + 0x300;
+	struct cheat_op ops[3][3] = {
+		{OP(sw, 4, 1, 0, 0, 0, CHEAT_OP_SWITCH, 1), OP(T_DATA + 0x10, 0x11, 1, 0, 0, 0, CHEAT_OP_WRITE, 1)},
+		{OP(sw + 1, 1, 1, 0, 0, 0, CHEAT_OP_SWITCH, 1)},
+		{OP(sw + 2, 2, 1, 0, 0, 0, CHEAT_OP_SWITCH, 1), OP(T_DATA + 0x20, 1, 1, 0, 0, 0, CHEAT_OP_IF_EQ, 1),
+		 OP(T_DATA + 0x30, 0x33, 1, 0, 0, 0, CHEAT_OP_WRITE, 1)},
+	};
+	const u32 n[3] = {2, 1, 3};
+	u32 pos = 0, n_patches;
+	set_memory();
+	for (u32 c = 0; c < 3; c++) {
+		u32 got, cost;
+		CHECK_EQ(cheat_lower(ops[c], n[c], T_PROG + pos, T_PROG_MAX - 1 - pos, &got, &cost, T_PATCHES, 1,
+				     &n_patches),
+			 CHEAT_LOWER_OK);
+		CHECK(T_PROG[pos] & CHEAT_PROG_SWITCH);
+		pos += got;
+	}
+	T_PROG[pos] = 0;
+	*(vu32 *)sw = 0xFFFFFFFF;
+	*(vu8 *)(T_DATA + 0x10) = *(vu8 *)(T_DATA + 0x30) = 0;
+	*(vu8 *)(T_DATA + 0x20) = 1;
+	Cheat_run(T_PROG, 0, 0, 0);
+	CHECK_EQ(*(vu8 *)sw, 4);
+	CHECK_EQ(*(vu8 *)(sw + 1), 1);
+	CHECK_EQ(*(vu8 *)(sw + 2), 2);
+	CHECK_EQ(*(vu8 *)(sw + 3), 0xFF);  // no more than its byte
+	CHECK_EQ(*(vu8 *)(T_DATA + 0x10), 0x11);
+	CHECK_EQ(*(vu8 *)(T_DATA + 0x30), 0x33);
+	// Cheats 0 and 2 off: their bytes 0, their ops not run
+	*(vu8 *)(T_DATA + 0x10) = *(vu8 *)(T_DATA + 0x30) = 0;
+	Cheat_run(T_PROG, 1u << 0 | 1u << 2, 0, 0);
+	CHECK_EQ(*(vu8 *)sw, 0);
+	CHECK_EQ(*(vu8 *)(sw + 1), 1);
+	CHECK_EQ(*(vu8 *)(sw + 2), 0);
+	CHECK_EQ(*(vu8 *)(T_DATA + 0x10), 0);
+	CHECK_EQ(*(vu8 *)(T_DATA + 0x30), 0);
+	// Every one off, as while cheats are off (cheatrun.s's blob start)
+	Cheat_run(T_PROG, ~0u, ~0u, 0);
+	CHECK_EQ(*(vu8 *)(sw + 1), 0);
+	// On again
+	Cheat_run(T_PROG, 0, 0, 0);
+	CHECK_EQ(*(vu8 *)sw, 4);
+	CHECK_EQ(*(vu8 *)(sw + 2), 2);
+}
+
 // Run once (the in-game menu's SELECT): the cheat runs whatever its off bit,
 // past its gate's ops (the header's CHEAT_PROG_GATE), and no other with it
 void test_cheatrun_once(void)

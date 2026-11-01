@@ -1063,7 +1063,7 @@ static void detail_text(u32 at)
 	cs.key_w = (u8)(w + 8 < CS_KEY_W_MAX ? w + 8 : CS_KEY_W_MAX);
 	detail_pair(&n, STR_CHEATS_LABEL_STATE,
 		    c->picked ? S(STR_CHEATS_DETAIL_PICKED) : S(STR_CHEATS_DETAIL_NOT_PICKED));
-	if (c->detected != CHEAT_FMT_AUTO && c->detected <= CHEAT_FMT_VBA) {
+	if (c->detected != CHEAT_FMT_AUTO && c->detected <= CHEAT_FMT_TORII) {
 		SF(line, sizeof(line), STR_CHEATS_FORMAT, LS(S(STR_KEYPAD_FORMAT_NONE + c->detected)),
 		   LS(c->format != CHEAT_FMT_AUTO ? S(STR_CHEATS_DETAIL_SET) : S(STR_CHEATS_DETAIL_DETECTED)));
 		detail_pair(&n, STR_CHEATS_LABEL_FORMAT, line);

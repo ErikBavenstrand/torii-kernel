@@ -21,11 +21,29 @@ enum cheat_format {
 	CHEAT_FMT_PARV3 = 3,      // Action Replay v3, GameShark SP, encrypted
 	CHEAT_FMT_PARV3_RAW = 4,  // the same, unencrypted
 	CHEAT_FMT_CODEBREAKER = 5,  // plain, or encrypted after a type-9 key line
-	// AAAAAAAA:VV, :VVVV or :VVVVVVVV; and AnyGBA's raw extensions, which no
-	// device has: [PPPPPPPP]+O for a target through a pointer, VALUE^KEY
-	// (KEY an address or a pointer) to XOR the value with what's there, and
-	// TARGET|VALUE to set bits (CHEAT_OP_KEYED)
-	CHEAT_FMT_VBA = 6,
+	// Torii code: VBA's raw lines, AnyGBA's extensions and Torii's own, one
+	// statement a line (docs/torii-code.md has it whole). A VALUE is 2, 4
+	// or 8 digits (a byte, halfword or word); a TARGET is AAAAAAAA, or
+	// [PPPPPPPP]+O, the u32 at P plus O.
+	//   TARGET:VALUE        write (VBA's); VALUE^KEY XORs it with the bytes
+	//                       at KEY, an address or a pointer (AnyGBA's)
+	//   TARGET|VALUE        set bits (AnyGBA's)
+	//   AAAAAAAA&VALUE      clear the bits VALUE hasn't
+	//   AAAAAAAA#VALUE      add (wrapping at the width)
+	//   AAAAAAAA=VALUE      equal       AAAAAAAA!VALUE  not equal
+	//   AAAAAAAA<VALUE      below       AAAAAAAA>VALUE  above (unsigned)
+	//   AAAAAAAA*VALUE      any of its bits set
+	//   AAAAAAAA~VALUE      none of its bits set
+	//   @MASK               every button of MASK (KEYINPUT's bits) held
+	// A test covers the next line; ended with '{', every line up to '}',
+	// and "}{" between starts the lines that run when it fails. Blocks nest
+	// MAX_BLOCKS deep.
+	//   $AAAAAAAA[:VV]      the cheat's switch: Torii keeps the byte at
+	//                       AAAAAAAA at VV (01) while the cheat is on, 00
+	//                       while it's off, toggled in game too
+	//                       (CHEAT_OP_SWITCH)
+	// Read in files as "Torii", or "VBA", its name before.
+	CHEAT_FMT_TORII = 6,
 };
 
 // What one file's cheats share, carried from each cheat to the next as mGBA's
@@ -108,6 +126,13 @@ enum cheat_op_type {
 	// each frame (count is 1; no fill): for save data a game keeps encrypted
 	// with a key of its own and moves about (Pokémon's money and bag counts).
 	CHEAT_OP_KEYED,
+	// Torii code's switch ($AAAAAAAA:VV): no step of the cheat's, but its
+	// state each frame, the byte at address value (width 1) while the
+	// cheat is on and 0 while it's off (cheatrun.s); one a cheat, outside
+	// any conditional. ROM patches it switches run whatever it says (the
+	// code they put in the game reads the byte), so a cheat with one can be
+	// toggled in game.
+	CHEAT_OP_SWITCH,
 };
 
 #define CHEAT_KEYED_TARGET_PTR 1u
@@ -205,7 +230,10 @@ u8 cheat_detect(const char *line, u32 len, s32 *score);
 // cheat a header word, then its ops; a 0 word ends the table. cheatrun.s
 // describes the layout in full; these are its numbers.
 #define CHEAT_PROG_PLAIN 0x8000u   // header: no conditionals, ops run in order
-#define CHEAT_PROG_OPS_MAX 0x1FFFu // header: ops of a cheat
+#define CHEAT_PROG_OPS_MAX 0x0FFFu // header: ops of a cheat
+// header: a switch (CHEAT_OP_SWITCH) follows it, two words before the ops:
+// its address, and its value while the cheat is on
+#define CHEAT_PROG_SWITCH 0x1000u
 // header: the gate's ops at the cheat's start (cheatfile.c: a Hold or Press
 // line's conditions, 1 or 2), which a run once steps past
 #define CHEAT_PROG_GATE_SHIFT 13
@@ -253,7 +281,7 @@ enum cheat_prog_type {
 // at the BIOS's default wait states, the slowest a game has
 // (tests/kernel/test_cheatrun.c checks the model against the clock).
 #define CHEAT_COST_CALL 300      // the hook's call (with the run once byte), and the table's end
-#define CHEAT_COST_CHEAT 130     // a cheat's header, its off bit tested
+#define CHEAT_COST_CHEAT 132     // a cheat's header, its switch and off bit tested
 #define CHEAT_COST_SINGLE 140    // a write of its own
 #define CHEAT_COST_RUN 150       // a run's header, in a plain cheat
 #define CHEAT_COST_RUN_WRITE 36  // a write in a run
@@ -263,7 +291,7 @@ enum cheat_prog_type {
 #define CHEAT_COST_GEN 200       // each further element of a pointer write, add, or, and
 #define CHEAT_COST_KEYED 520     // a keyed write (its two pointers, key and OR)
 #define CHEAT_COST_COND 450      // a conditional, and the walk past what it skips
-#define CHEAT_COST_SKIP 105      // a cheat the off mask skips (cheatrun.s)
+#define CHEAT_COST_SKIP 107      // a cheat the off mask skips (cheatrun.s)
 #define CHEAT_COST_WALK 20       // each op a false conditional walks past
 // The caps, all picked cheats together: about 10% of a frame (280,896
 // cycles) for what runs every frame, and about 23% with every condition
@@ -334,7 +362,7 @@ int cheat_has_effect(const struct cheat_op *ops, u32 n_ops);
 // For tools on the host only (tools/cheat_patches.c builds with it): each
 // line of the decoding cheat_decode kept, as it read it, decrypted. format
 // is the line's as written plain (CHEAT_FMT_GSAV1_RAW or _PARV3_RAW for a
-// GameShark line, CHEAT_FMT_CODEBREAKER, or CHEAT_FMT_VBA for one it can't
+// GameShark line, CHEAT_FMT_CODEBREAKER, or CHEAT_FMT_TORII for one it can't
 // write); drop marks a line that only sets a key or seed. Written plain in
 // order, less the dropped, the lines decode as the cheat did with no key.
 #define CHEAT_RAW_MAX 512

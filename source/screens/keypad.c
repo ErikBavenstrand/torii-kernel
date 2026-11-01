@@ -90,8 +90,8 @@ static const struct keypad_look {
 static const struct ui_card_config keys_card = {4, 3, 4, 1, 0};  // body 4..236 x 91..143
 
 // The keys: two rows of hex digits, then the function row, whose keys span
-// columns. Its symbol key turns the digits into a row of AnyGBA's symbols
-// (kp.symbols) and back.
+// columns. Its symbol key turns the digits into two rows of Torii code's
+// symbols (kp.symbols) and back.
 #define COLS 8
 #define HEX_ROWS 2
 #define ROWS 3
@@ -108,8 +108,8 @@ enum {
 static const u8 func_col[FUNCS] = {0, 1, 2, 3, 4, 6};
 static const u8 func_span[FUNCS] = {1, 1, 1, 1, 2, 2};
 static const char hex[] = "0123456789ABCDEF";
-#define SYMBOLS 5
-static const char symbol_keys[SYMBOLS + 1] = "[]+^|";
+#define SYMBOLS (HEX_ROWS * COLS)
+static const char symbol_keys[SYMBOLS + 1] = "[]+^|&#@=!<>*~{}";
 
 static u32 func_at(u32 col)
 {
@@ -199,8 +199,8 @@ static const char *verb_of(u32 type)
 }
 
 _Static_assert(STR_KEYPAD_VERB_AND - STR_KEYPAD_VERB_WRITE == CHEAT_OP_AND - CHEAT_OP_WRITE, "keypad's verbs in order");
-_Static_assert(STR_KEYPAD_FORMAT_VBA - STR_KEYPAD_FORMAT_NONE == CHEAT_FMT_VBA, "keypad's formats in order");
-_Static_assert(STR_KEYPAD_TAG_VBA - STR_KEYPAD_TAG_NONE == CHEAT_FMT_VBA, "keypad's tags in order");
+_Static_assert(STR_KEYPAD_FORMAT_TORII - STR_KEYPAD_FORMAT_NONE == CHEAT_FMT_TORII, "keypad's formats in order");
+_Static_assert(STR_KEYPAD_TAG_TORII - STR_KEYPAD_TAG_NONE == CHEAT_FMT_TORII, "keypad's tags in order");
 _Static_assert(STR_KEYPAD_STATUS_CANT_RUN - STR_KEYPAD_STATUS_ADDRESS == KEYPAD_CANT_RUN - KEYPAD_ADDRESS,
 	       "keypad's results in order");
 
@@ -278,7 +278,7 @@ static u32 result_text(char *out, u32 size)
 		return UI_ROLE_DIM;
 	case KEYPAD_WRONG:
 		SF(out, size, STR_KEYPAD_WRONG,
-		   LS(S(STR_KEYPAD_FORMAT_NONE + (c->format <= CHEAT_FMT_VBA ? c->format : 0))));
+		   LS(S(STR_KEYPAD_FORMAT_NONE + (c->format <= CHEAT_FMT_TORII ? c->format : 0))));
 		return UI_ROLE_DANGER;
 	case KEYPAD_EMPTY:
 		snprintf(out, size, "%s", S(STR_KEYPAD_STATUS_EMPTY));
@@ -295,7 +295,7 @@ static u32 result_text(char *out, u32 size)
 // The format's line: SELECT's, else as detected
 static void format_text(char *out, u32 size)
 {
-	u32 f = kp.check.format <= CHEAT_FMT_VBA ? kp.check.format : 0;
+	u32 f = kp.check.format <= CHEAT_FMT_TORII ? kp.check.format : 0;
 	if (kp.format != CHEAT_FMT_AUTO)
 		SF(out, size, STR_KEYPAD_SET, LS(S(STR_KEYPAD_FORMAT_NONE + kp.format)));
 	else if (f == CHEAT_FMT_AUTO)
@@ -309,7 +309,7 @@ static void format_text(char *out, u32 size)
 // A format's name in the log: the file's, or "auto"
 static const char *format_name(u32 f)
 {
-	return f >= CHEAT_FMT_GSAV1 && f <= CHEAT_FMT_VBA ? cheatfile_format_names[f] : "auto";
+	return f >= CHEAT_FMT_GSAV1 && f <= CHEAT_FMT_TORII ? cheatfile_format_names[f] : "auto";
 }
 
 static const char *const status_names[KEYPAD_STATUSES] = {
@@ -350,7 +350,7 @@ static void recheck(void)
 static const char *line_tag(u32 i)
 {
 	u8 shape = cheat_detect(kp.e.text[i], kp.e.len[i], NULL);
-	return S(STR_KEYPAD_TAG_NONE + (shape <= CHEAT_FMT_VBA ? shape : 0));
+	return S(STR_KEYPAD_TAG_NONE + (shape <= CHEAT_FMT_TORII ? shape : 0));
 }
 
 // Text from x with its line's top at y, clipped to right; where it ended
@@ -489,7 +489,7 @@ static void paint_keys(void *ctx, u8 nd, const struct text_window *win, u32 set,
 		text_clear(win, look.grid_x - ox, look.grid_y - oy, COLS * look.col_w, ROWS * look.pitch, 0);
 	for (u32 r = 0; r < HEX_ROWS; r++)
 		for (u32 c = 0; c < COLS; c++) {
-			char ch = kp.symbols ? (r == 0 && c < SYMBOLS ? symbol_keys[c] : 0) : hex[r * COLS + c];
+			char ch = (kp.symbols ? symbol_keys : hex)[r * COLS + c];
 			if (!ch)
 				continue;
 			u32 x = look.grid_x + c * look.col_w - ox, y = look.grid_y + r * look.pitch - oy;
@@ -614,31 +614,18 @@ static void keys_changed(void)
 	ui_canvas_redraw(node(N_KEYS));
 }
 
-// The keys' columns on row r: the symbol row's fewer, its second row none
-static u32 row_cols(u32 r)
-{
-	if (r == FUNC_ROW || !kp.symbols)
-		return COLS;
-	return r == 0 ? SYMBOLS : 0;
-}
-
 // The selection moved by a d-pad key: a fresh press wraps at the edges
 static void move(u16 key, int fresh)
 {
 	u32 row = kp.row, col = kp.col;
 	if (key == INPUT_UP || key == INPUT_DOWN) {
-		s32 to = (s32)row;
-		do {
-			to += key == INPUT_UP ? -1 : 1;
-			if (to < 0 || to >= ROWS) {
-				if (!fresh)
-					return;
-				to = to < 0 ? ROWS - 1 : 0;
-			}
-		} while (!row_cols((u32)to));
+		s32 to = (s32)row + (key == INPUT_UP ? -1 : 1);
+		if (to < 0 || to >= ROWS) {
+			if (!fresh)
+				return;
+			to = to < 0 ? ROWS - 1 : 0;
+		}
 		row = (u32)to;
-		if (col >= row_cols(row))
-			col = row_cols(row) - 1;
 	} else if (row == FUNC_ROW) {
 		s32 k = (s32)func_at(col) + (key == INPUT_LEFT ? -1 : 1);
 		if (k < 0 || k >= FUNCS) {
@@ -648,11 +635,11 @@ static void move(u16 key, int fresh)
 		}
 		col = func_col[k];
 	} else {
-		s32 to = (s32)col + (key == INPUT_LEFT ? -1 : 1), cols = (s32)row_cols(row);
-		if (to < 0 || to >= cols) {
+		s32 to = (s32)col + (key == INPUT_LEFT ? -1 : 1);
+		if (to < 0 || to >= COLS) {
 			if (!fresh)
 				return;
-			to = to < 0 ? cols - 1 : 0;
+			to = to < 0 ? COLS - 1 : 0;
 		}
 		col = (u32)to;
 	}
@@ -669,15 +656,11 @@ static void type(char c)
 		message(S(STR_KEYPAD_PLUS));  // only a pointer's offset: Line starts a line
 }
 
-// The digits' rows, or the symbols' row (the selection kept on a key);
+// The digits' rows, or the symbols' (the selection kept on its key);
 // later: painted the frame after, as the field is painted on this one
 static void show_symbols(int on, int later)
 {
 	kp.symbols = (u8)on;
-	if (kp.row < HEX_ROWS && !row_cols(kp.row))
-		kp.row = 0;
-	if (kp.row < HEX_ROWS && kp.col >= row_cols(kp.row))
-		kp.col = (u8)(row_cols(kp.row) - 1);
 	if (later)
 		kp.keys_later = 1;
 	else
@@ -706,7 +689,7 @@ static void clear_all(void)
 // The next format SELECT gives
 static void step_format(void)
 {
-	kp.format = (u8)((kp.format + 1) % (CHEAT_FMT_VBA + 1));
+	kp.format = (u8)((kp.format + 1) % (CHEAT_FMT_TORII + 1));
 	code_changed();
 }
 
@@ -714,10 +697,10 @@ static void step_format(void)
 static void press_key(int fresh)
 {
 	if (kp.row < HEX_ROWS && kp.symbols) {
-		char c = symbol_keys[kp.col];
+		char c = symbol_keys[kp.row * COLS + kp.col];
 		type(c);
-		// Digits come after '[', '+' and '|'; ']' and '^' are followed by more symbols as often
-		if (c == '[' || c == '+' || c == '|')
+		// Digits come after most; ']' and '^' are followed by more symbols as often
+		if (c != ']' && c != '^')
 			show_symbols(0, 1);
 		return;
 	}
@@ -884,7 +867,7 @@ int keypad_run(const struct keypad_ask *ask, char *out, u8 *format)
 		tlog("keypad: the code can't be edited here");
 		return -1;
 	}
-	kp.format = ask->format <= CHEAT_FMT_VBA ? ask->format : CHEAT_FMT_AUTO;
+	kp.format = ask->format <= CHEAT_FMT_TORII ? ask->format : CHEAT_FMT_AUTO;
 	kp.orig = code_hash();
 	ui_leave(UI_TR_DEEPER, 1);
 	while (ui_depth())

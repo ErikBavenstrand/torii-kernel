@@ -779,7 +779,7 @@ static int found_after_game(const char *path)
 			snprintf(code, sizeof(code), "%s:%04lX", addr, (unsigned long)(c->value & 0xFFFF));
 		else
 			snprintf(code, sizeof(code), "%s:%08lX", addr, (unsigned long)c->value);
-		u32 e = cheatstore_add(name, code, CHEAT_FMT_VBA, &idx[i]);
+		u32 e = cheatstore_add(name, code, CHEAT_FMT_TORII, &idx[i]);
 		tlog("cheats: %s: found in game, %s %s: %s", path, code, on[i] ? "on" : "off",
 		     e == CHEATFILE_EDIT_OK ? "added" : "refused");
 		added += e == CHEATFILE_EDIT_OK;
