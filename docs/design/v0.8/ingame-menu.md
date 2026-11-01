@@ -66,6 +66,18 @@ write-only, so a menu on a BG can't give them back (today's BG2 affine bug).
   the engine's body font (`source/engine/font*.c`).
 - **Look:** the theme's colours, clean and modern: a rounded panel, a selection pill and a
   title, within the sprite budget.
+- **Sprite time.** A line draws at most 954 cycles of sprites when the game sets `DISPCNT`'s
+  H-blank free bit (1210 otherwise): a sprite costs its width. Past that the hardware drops
+  the last sprites in OAM, the cover's, and the game shows through bright. So the cover only
+  goes around the panel (bands above and below, 32 px strips beside), never behind it; the
+  panel's body is columns of exact widths (64, 32, 16, 8 px) between 8 px sides; and every
+  column's sprites overlap only in the panel's top 32 px, which hold the title and its gap
+  (`TITLE_GAP`), never a row with the pill. The busiest line is about 700 cycles.
+- **Scrolling.** Drawing every row's line takes longer than a VBlank, so a scroll of less
+  than a page moves the rows' sprites and tiles with their lines and draws only the rows
+  that come in, each hidden until drawn; the footer, lowest on screen, is drawn first. A
+  page with more rows than it shows has a scroll bar as the kernel's lists do: a 1 px track
+  in the pill's colour, a 3 px thumb in the accent.
 
 ## IRQs, DMA, sound and input
 
@@ -115,7 +127,13 @@ write-only, so a menu on a BG can't give them back (today's BG2 affine bug).
 ## P2: cheats in game (built)
 
 - **The list.** The menu's Cheats row opens a list of the game's cheats, each one on with
-  the kernel's check mark, under "All off" and "Back to my picks"; LEFT and RIGHT page through it. Its footer
+  the kernel's check mark, then "All off", "Back to my picks" and "Cheat search" in the
+  accent, as the kernel's list ends in "+ Add code"; the cursor starts on the first cheat.
+  The title shows how many are on ("✓ 3/8"), drawn with the kernel's number glyphs. LEFT
+  and RIGHT page through it. The list's own code (the count, toggling, the marquee) and the
+  lists' scrolling are the extension's (ext_load, as the cheat search's): every byte of the
+  overlay's image costs the menu's opening time, since the stub backs up the window and
+  loads the image at each opening; 400 more bytes cost it a frame. Its footer
   says why the row under the cursor can't change, else that the toggles are kept.
 - **What the kernel writes.** `cheatstore_launch` lists every pick, then other cheats in
   file order, up to 64 (`INGAME_CHEATS`), each with its name drawn as a line, its cycles,

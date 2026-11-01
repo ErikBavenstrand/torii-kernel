@@ -17,10 +17,11 @@ three power-ons:
    longer, then load it at the next fade or transition; save c, Reset game,
    play the game's start again, and load c there; save d into slot 2, then
    Back to Torii, whose boot files slot 2 on the card.
-2. The game launched into slot 2 (the game popup's Load state: the state put
-   back from the card, loaded at the game's start): d's frames again; then
+2. The game launched again: the launch puts slot 2, the newest, back from
+   the card into cart SRAM; play, then Load state: d's frames again; then
    save e into slot 3, and Back to Torii.
-3. The game launched into slot 3: e again; then Load state in game, e again.
+3. The game launched again (slot 3 the newest): play, then Load state: e
+   again.
 
 After every save the script replays keys the record's name seeds for K
 frames, recording each frame's memory digest (EWRAM and IWRAM, the hook's
@@ -47,7 +48,6 @@ import games as G
 
 LUA = "tests/state_trip.lua"
 K = 120
-NAV_TEST_STATE = 10  # source/screens/nav.h
 
 RUN1 = (
     "play:900 save:1:a play:900 load:a load:a "
@@ -55,8 +55,8 @@ RUN1 = (
     "play:200 save:1:c reset play:900 load:c "
     "play:300 save:2:d play:300"
 )
-RUN2 = "autoload:d play:600 save:3:e play:300"
-RUN3 = "autoload:e play:300 load:e"
+RUN2 = "play:300 load:d play:600 save:3:e play:300"
+RUN3 = "play:300 load:e"
 
 
 def run(
@@ -345,12 +345,12 @@ def trips(
             sd_name,
             steps,
             env,
-            launch_hook(sd_name, NAV_TEST_STATE | slot << 8),
+            launch_hook(sd_name, G.HOOK_ADDON),
             load_frames + 3000 + 6000,
         )
         t.take(lines, hashes, log)
         if t.failed:
-            t.failed = f"launch into slot {slot}: {t.failed}"
+            t.failed = f"launch with slot {slot} the newest: {t.failed}"
             return t
         if slot == 2:
             # the records the next run compares e with
@@ -367,11 +367,13 @@ VECTOR = 0x47FFC  # IWRAM's 0x3007FFC
 def refuse(rom: Path, other: Path, cart: Path) -> list[str]:
     """Load's checks of a state from the card: what failed (none: all held).
 
-    Slot 2 saved in game and filed, then launched into: with another ROM
+    Slot 2 saved in game and filed, then the game launched again, which puts
+    the newest slot in cart SRAM unless it is refused: with another ROM
     (other) in the game's place; from another path's folder (another
-    rom_crc); with its format made newer; and made as v0.8.0 left one (no
-    info, the IRQ vector at another launch's hook, no Supervisor registers),
-    which must load as it was saved."""
+    rom_crc); with its format made newer. A refused state stays out of cart
+    SRAM and the game starts. One made as v0.8.0 left it (no info, the IRQ
+    vector at another launch's hook, no Supervisor registers) must load, in
+    game, as it was saved."""
     import statefile
 
     bad = []
@@ -395,24 +397,12 @@ def refuse(rom: Path, other: Path, cart: Path) -> list[str]:
     hook = int.from_bytes(raw[INFO + 20 : INFO + 24], "little")
 
     def refused(path: str, why: str, case: str) -> None:
-        # The question the launch asks, B: not started
-        extra = [
-            "-w",
-            "screen ready: dialog",
-            "-k",
-            "@12:B",
-            "-k",
-            "@16:-",
-            "-u",
-            "not started",
-        ]
-        _, _, log = run(
-            cart, path, "", {}, launch_hook(path, NAV_TEST_STATE | 2 << 8) + extra, 4000
-        )
+        # The launch logs why and goes on with no state in cart SRAM
+        _, _, log = run(cart, path, "", {}, launch_hook(path, G.HOOK_ADDON), 4000)
         if (
-            f"is {why}" not in log
-            or "not started" not in log
-            or "launch: starting the game" in log
+            why not in log
+            or "no state in cart SRAM" not in log
+            or "launch: starting the game" not in log
         ):
             found = [
                 line
@@ -440,7 +430,7 @@ def refuse(rom: Path, other: Path, cart: Path) -> list[str]:
     original = state.read_bytes()
     # Another ROM at the game's path: its rom_crc is the same, its header not
     G.mtools("mcopy", "-o", "-i", img, str(other), f"::/{sd_name}")
-    refused(sd_name, "another game's", "another ROM in its place")
+    refused(sd_name, "states: slot 2 is of ", "another ROM in its place")
     G.mtools("mcopy", "-o", "-i", img, str(rom), f"::/{sd_name}")
     # The same ROM at another path, the state copied to that path's folder
     G.mtools("mcopy", "-o", "-i", img, str(rom), "::/Copy.gba")
@@ -451,12 +441,12 @@ def refuse(rom: Path, other: Path, cart: Path) -> list[str]:
     G.mtools(
         "mcopy", "-o", "-i", img, str(state), "::/torii/states/Copy.gba/Main/2.state"
     )
-    refused("Copy.gba", "another game's", "another path's state")
+    refused("Copy.gba", "another save slot's or game's", "another path's state")
     # A newer format
     newer = bytearray(raw)
     newer[INFO + 4 : INFO + 8] = (99 | 32 << 16).to_bytes(4, "little")
     put(statefile.pack(str(state), bytes(newer)))
-    refused(sd_name, "of a newer format", "a newer format")
+    refused(sd_name, "states: slot 2 is of format 99", "a newer format")
     # As v0.8.0 left it: loads, into the frames that followed the save
     old = bytearray(raw)
     old[INFO : INFO + 4] = bytes(4)
@@ -468,10 +458,10 @@ def refuse(rom: Path, other: Path, cart: Path) -> list[str]:
     lines, _, log = run(
         cart,
         sd_name,
-        "autoload:d",
+        "play:300 load:d",
         {"TRIP_IN": str(records), "TRIP_BUFSLOT": "2"},
-        launch_hook(sd_name, NAV_TEST_STATE | 2 << 8),
-        4000,
+        launch_hook(sd_name, G.HOOK_ADDON),
+        6000,
     )
     if "same d 120" not in lines:
         bad.append(f"a state as v0.8.0 left one didn't load as saved: {lines}")

@@ -6,6 +6,23 @@ git log, not here.
 
 ## Unreleased
 
+- **Changed:** the game popup drops Hide box art, Load state and Original
+  name; deleting a game's whole name in Rename gives it its original name
+  back (080b83ff).
+- **Removed:** starting a game straight into a save state, which only the
+  popup's Load state asked for; a launch still puts the newest state in cart
+  SRAM for the in-game menu's Load state (be6ff144).
+- **Fixed:** scrolling the game popup's list lags no more: a step redrew
+  every row over four frames, and a cursor step showed a frame with no
+  highlight. A scroll now moves the rows in VRAM and draws only what
+  changed, and the engine commits strided copies in one VBlank (1d3cd617).
+- **Fixed:** the in-game menu no longer lets the game show through bright
+  near its bottom: the dark cover and the panel took more sprite time than a
+  line has when the game sets H-blank free; and a list's scroll no longer
+  shows a half-drawn row or footer for a frame (d987826f).
+- **Changed:** the in-game lists that scroll have a scroll bar; the cheat
+  list shows the cheats first, its actions after them in the accent, and how
+  many cheats are on in its title (d987826f).
 - **Changed:** the cheat screen lists any cheat file as one flat list:
   cheats under no heading first, then each `cheatN_folder` heading as a row
   the cursor passes by (its count or picks at the right) over its cheats,

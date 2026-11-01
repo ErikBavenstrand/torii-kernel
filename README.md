@@ -152,14 +152,11 @@ also name them, fetch their box art and write their cheats in one step, run
 **On the cart, no PC needed.** START on a game opens its menu:
 
 - **Rename** gives the game a name of your own in the lists (its file stays
-  as it is); **Original name**, shown once it has one, takes it back.
+  as it is); deleting the whole name gives it its original name back.
 - **Cheats** lists its cheats: A turns one on or off, `+ Add code` types a
   new one, and SELECT on a cheat renames, edits (your own codes) or deletes
   it. Cheats that can't work on Torii are greyed with the reason; Settings'
   **Clean up cheats** removes them from every game.
-- **Hide box art** (in the List + art view) keeps a wrong cover off a game;
-  the row then says **Show box art**. For a game with art of its own it
-  says **Remove own art**.
 - **Delete** removes the game and its cheat file; its saves stay.
 
 The SD card page's Rename renames the file itself, taking its saves, cheats

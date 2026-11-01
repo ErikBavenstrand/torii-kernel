@@ -16,10 +16,6 @@
 --                     colours changed in a frame
 --   reset             the menu's Reset game (the game from its start)
 --   torii             the menu's Back to Torii; the run goes on in the kernel
---   autoload:NAME     the game was launched into a state (a slot from the
---                     game popup's Load state): wait for the stub's load at
---                     the game's start, then NAME's replay, compared with the
---                     digests TRIP_IN holds
 --
 -- A digest covers EWRAM and IWRAM in 1 KB blocks, but for the hook's own
 -- words (hook_watch.lua's skips: the spend area, the IRQ stack under the
@@ -42,7 +38,7 @@
 --
 -- TRIP_SEED seeds the keys (default 1), TRIP_K is the replay's frames
 -- (default 120), TRIP_OUT a file the records are written to at the end,
--- TRIP_IN one read at the start (records of an earlier run, for autoload),
+-- TRIP_IN one read at the start (records of an earlier run, for a load),
 -- TRIP_BUFSLOT the state slot already in cart SRAM's buffer (0), which
 -- the Save state page opens on.
 
@@ -513,33 +509,6 @@ local function step_load(name, fade)
 	return true
 end
 
-local function step_autoload(name)
-	-- the stub's code at two frame ends in a row: the load under way (not
-	-- the overlay's magic, which the kernel's launch may leave in EWRAM
-	-- until the game clears it)
-	local inside = 0
-	for _ = 1, 3000 do
-		local pc = E:readRegister("pc")
-		inside = patchStart and pc >= patchStart and pc < patchStart + PATCH_SIZE and inside + 1 or 0
-		if inside >= 2 then
-			break
-		end
-		tick()
-	end
-	if inside < 2 then
-		log("fail no load at the game's start for " .. name)
-		return false
-	end
-	local f = resumed(1200)
-	if not f then
-		log("fail the stub never gave the game back after the load at the start")
-		return false
-	end
-	log(string.format("loaded %s %d %s at the game's start", name, f, info()))
-	compare(name, replay(name))
-	return true
-end
-
 local function write_records()
 	if not OUT then
 		return
@@ -611,8 +580,6 @@ local function run()
 			ok = step_save(tonumber(parts[2]), parts[3])
 		elseif kind == "load" then
 			ok = step_load(parts[2], parts[3] == "fade")
-		elseif kind == "autoload" then
-			ok = step_autoload(parts[2])
 		elseif kind == "reset" then
 			-- Resume, then UP round the end: Back to Torii, Sleep, Reset game
 			ok = menu({ "UP", "UP", "UP", "A" })

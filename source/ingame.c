@@ -111,11 +111,11 @@ static u32 line_draw(struct ingame_line *l, const char *s, u32 len, u32 max_w)
 	return cut;
 }
 
-// The cheat search's number glyphs (struct ingame_glyph): 0-9, A-F and the
-// thousands separator, in the body font
+// The overlay's number glyphs (struct ingame_glyph): 0-9, A-F, the
+// thousands separator and the rest INGAME_GLYPHS lists, in the body font
 static void glyphs_draw(struct ingame_glyph *g)
 {
-	static const char chars[] = "0123456789ABCDEF -+[]";  // the space: the thousands separator's place
+	static const char chars[] = "0123456789ABCDEF -+[]/";  // the space: the thousands separator's place
 	memset(g, 0, INGAME_GLYPHS * sizeof(*g));
 	for (u32 i = 0; i < INGAME_GLYPHS; i++) {
 		const char *s = i == INGAME_GLYPH_THOUSANDS ? S(STR_FORMAT_THOUSANDS) : &chars[i];
@@ -276,49 +276,42 @@ void ingame_states_none(void)
 	statestore_buffer_clear();
 }
 
-int ingame_states_launch(const char *rom_path, const char *save_slot, const char *rom_name, u32 slot, u32 rom_bytes)
+void ingame_states_launch(const char *rom_path, const char *save_slot, const char *rom_name, u32 rom_bytes)
 {
 	states.ready = 0;
 	statestore_game(GAMECODE, GAMEHEAD[0], GAMEHEAD[1], GAMEHEAD[2], rom_bytes);
 	if (strlen(save_slot) >= sizeof(states.save_slot) || strlen(rom_path) >= INGAME_PATH_BYTES) {
 		statestore_buffer_clear();  // no state of another game's, as ingame_states_none
-		return !slot;  // no states: a launch that asked for none goes on
+		return;
 	}
 	memset(states.save_slot, 0, sizeof(states.save_slot));
 	memcpy(states.save_slot, save_slot, strlen(save_slot) + 1);  // its length checked above
 	states.rom_crc = states_crc(rom_path, save_slot);
 	int imported = statestore_import_rts(rom_path, save_slot, rom_name, states.rom_crc);
 	statestore_scan(rom_path, save_slot, &states.list);
-	u32 want = slot ? slot : statestore_newest(&states.list);
+	u32 want = statestore_newest(&states.list);
 	u32 start = torii_frames;
 	// An /RTS file just imported is in cart SRAM already, as that slot
 	struct ingame_state_tag tag;
-	int loaded = imported && !slot && want == 1 && statestore_buffer(&tag) && tag.slot == 1 &&
-		     tag.rom_crc == states.rom_crc;
+	int loaded = imported && want == 1 && statestore_buffer(&tag) && tag.slot == 1 && tag.rom_crc == states.rom_crc;
 	if (loaded)
 		tlog("states: slot 1 in cart SRAM from the /RTS import");
-	int r = loaded || !want ? loaded : statestore_load(rom_path, save_slot, want, states.rom_crc, slot != 0);
-	loaded = r == 1;
+	else if (want)
+		loaded = statestore_load(rom_path, save_slot, want, states.rom_crc) == 1;
 	// The newest didn't read whole (a card's error) or isn't the game's: the
 	// next newest, and on
-	while (!loaded && !slot && want) {
+	while (!loaded && want) {
 		states.list.slot[want].have = 0;  // the session's rows say empty: it can't load
 		want = statestore_newest(&states.list);
-		loaded = want && statestore_load(rom_path, save_slot, want, states.rom_crc, 0) == 1;
+		loaded = want && statestore_load(rom_path, save_slot, want, states.rom_crc) == 1;
 	}
-	if (!loaded)
+	if (!loaded) {
 		statestore_buffer_clear();  // whatever another launch left: the patch's entry code would act on it
-	if (!loaded && slot)
-		tlog_error("states: slot %lu of %s (%s) %s", (unsigned long)slot, rom_path, save_slot,
-			   r == STATESTORE_OTHER_GAME ? "is another game's"
-			   : r == STATESTORE_NEWER    ? "is of a newer format"
-						      : "didn't read");
-	else if (!loaded)
-		tlog("states: %s (%s): no state in cart SRAM%s", rom_path, save_slot, want ? ", it didn't read" : "");
-	else
+		tlog("states: %s (%s): no state in cart SRAM", rom_path, save_slot);
+	} else {
 		tlog("states: put back in %lu frames", (unsigned long)(torii_frames - start));
+	}
 	states.ready = 1;
-	return !slot || loaded ? 1 : r;
 }
 
 _Static_assert(INGAME_NAME_BYTES == SHOTNAME_STEM_BYTES, "a session's name is its screenshots' stem");

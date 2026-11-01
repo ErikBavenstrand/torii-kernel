@@ -488,14 +488,16 @@ enum ingame_text {
 };
 
 // The glyphs the overlay draws numbers with (the kernel's body font): 0-9,
-// A-F, then the thousands separator (none: width 0), minus, plus and the
-// brackets of a pointer, at INGAME_SRAM_GLYPHS
-#define INGAME_GLYPHS 21
+// A-F, then the thousands separator (none: width 0), minus, plus, the
+// brackets of a pointer and the slash of the cheats' count ("3/8" on), at
+// INGAME_SRAM_GLYPHS
+#define INGAME_GLYPHS 22
 #define INGAME_GLYPH_THOUSANDS 16
 #define INGAME_GLYPH_MINUS 17
 #define INGAME_GLYPH_PLUS 18
 #define INGAME_GLYPH_OPEN 19
 #define INGAME_GLYPH_CLOSE 20
+#define INGAME_GLYPH_SLASH 21
 struct ingame_glyph {
 	uint8_t width;  // its advance, at most 8
 	uint8_t reserved[3];

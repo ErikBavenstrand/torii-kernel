@@ -31,7 +31,8 @@ struct rename_ask {
 	const char *ext;   // a locked extension shown after it (".gba"), or NULL
 	u8 max;            // characters it may have (RENAME_*_MAX)
 	u8 file;           // a file name: OK drops \ / : * ? " < > | too
-	// OK's name (trimmed, never empty, never the one it started from):
+	// OK's name (trimmed, never the one it started from, never empty but
+	// with lines or empty):
 	// NULL once it is kept (the keyboard closes), or why not, a line the
 	// hint area shows (the keyboard stays). Runs after a frame, where it may
 	// read and write the card.
@@ -44,6 +45,9 @@ struct rename_ask {
 	// types a line break, the counter in the title bar; OK keeps line breaks
 	// (not at the ends) and an empty text too (submit gets "")
 	u8 lines;
+	// An empty name is a name too: OK passes "" to submit (a game's own
+	// name back), where it would ask for one
+	u8 empty;
 };
 
 // Shows the keyboard until OK keeps a name (1) or it is cancelled, or the

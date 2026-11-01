@@ -78,7 +78,7 @@ keys() {
 wait_for() { args+=(-w "$1"); }
 
 # The menu to the search page: with a cheat list its row is on the list's
-# page (UP from the first cheat), else on the menu (past Save state, Load
+# page (its last row: UP from the first cheat), else on the menu (past Save state, Load
 # state greyed)
 to_search() {
   wait_for "screen ready: ingame"
