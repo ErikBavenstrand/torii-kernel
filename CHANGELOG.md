@@ -4,6 +4,23 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Changed:** the cheat screen reads more clearly (8f6c5abf). Its title
+  says how many cheats are on, a heading how many of its rows are on, and a
+  row waiting on buttons shows them all after a keys icon ("L+R+B", not
+  "L+2"). The Guide page has sections (Code, Details with labelled rows),
+  and the Buttons page shows its A and B keys.
+- **Added:** on the cart, START's menu edits any cheat's code (a database
+  cheat edited becomes your own), puts a cheat under a heading (an existing
+  or a new one) and adds a code under the heading you're in; A on the Guide
+  page edits the guide (8f6c5abf).
+- **Fixed:** a guide too long for the keyboard is refused instead of cut
+  on save; a failed write to PSRAM no longer leaves the list out of step
+  with the file; the cheat list's cache can't point a name outside its
+  room; deleting a cheat file's index and list are power-cut tested
+  (8f6c5abf).
+
 ## v0.9.14
 
 - **Changed:** the game popup drops Hide box art, Load state and Original
