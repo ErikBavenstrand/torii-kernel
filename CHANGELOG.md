@@ -30,6 +30,14 @@ git log, not here.
   Gifts, Legends, Tickets, Unlock), as the game's scrolling list with page
   jumps. The Shop opens the game's own marts; Moves is gone. B, not A,
   opens it, as A first talks to what is in front (0a00ed28, 12f49636).
+- **Changed:** a launch keeps the picked cheats' ROM patches as runs in
+  its 48 KB of cart SRAM, not 12 bytes apiece: blocks of ROM data (menus
+  written into free ROM) now fit about 23,000 patches where 4,096 did, and a
+  cheat may have 4,096. The cheat screen shows the room in percent, and
+  the cheat list's cache is built again once (ad7b48e9).
+- **Changed:** Emerald's menu Warp keeps its 106 places as list values,
+  with one shared script: the menu's ROM patches fall from 4,256 to 3,582
+  (da35a18e).
 - **Changed:** Emerald's menu Tickets sets each Mystery Gift's received
   flag too, and its guide says the ferry sails only after the credits
   (872684c0).
