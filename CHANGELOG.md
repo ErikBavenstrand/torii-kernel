@@ -4,6 +4,22 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Fixed:** the menu reads the cart at WS0 3/1, not 2/1 (cd48ee2e). At 2/1 a
+  real cart read PSRAM with bit 6 set at random, about once in 60 KB: a
+  cheat file written from it came out with digits flipped, and a launch
+  decoding cheats from it could patch the game wrongly (Emerald froze on a
+  wild encounter). The menu is a little slower.
+- **Changed:** a cheat's Guide page reads top down: its name, its heading,
+  its buttons, its guide, Details, then its code; a cheat that only patches
+  the ROM shows the buttons its file names (the field menu's L+R+A), and
+  the hint bar no longer gives a ROM patch's NOR note (00cc5c26).
+- **Fixed:** the Guide page's scroll stopped a row short of its end after
+  DOWN was held, and the next key moved nothing; a launch whose cheats take
+  long to make ready shows Preparing cheats instead of a still screen
+  (00cc5c26, 01941b71).
+
 ## v0.9.15
 
 - **Changed:** the cheat screen reads more clearly (8f6c5abf). Its title
