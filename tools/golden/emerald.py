@@ -330,6 +330,9 @@ MART = {
         "BURN_HEAL",
         "ICE_HEAL",
         "FULL_HEAL",
+        "BLUE_FLUTE",
+        "YELLOW_FLUTE",
+        "RED_FLUTE",
         "ETHER",
         "MAX_ETHER",
         "ELIXIR",
@@ -355,6 +358,8 @@ MART = {
         "REPEL",
         "SUPER_REPEL",
         "MAX_REPEL",
+        "BLACK_FLUTE",
+        "WHITE_FLUTE",
         "ESCAPE_ROPE",
         "POKE_DOLL",
         "FLUFFY_TAIL",
@@ -401,6 +406,20 @@ MART = {
         k
         for k, v in sorted(DATA["items"].items(), key=lambda x: x[1][0])
         if 179 <= v[0] <= 225 or 254 <= v[0] <= 258
+    ],
+    "MAIL": [
+        "ORANGE_MAIL",
+        "HARBOR_MAIL",
+        "GLITTER_MAIL",
+        "MECH_MAIL",
+        "WOOD_MAIL",
+        "WAVE_MAIL",
+        "BEAD_MAIL",
+        "SHADOW_MAIL",
+        "TROPIC_MAIL",
+        "DREAM_MAIL",
+        "FAB_MAIL",
+        "RETRO_MAIL",
     ],
     "BERRIES": [
         k
@@ -708,8 +727,8 @@ def pc_section(m, back):
 
 @section(
     "Shop",
-    "A Poké Mart for each kind of item (Medicine, Balls, Training, TMs & HMs, Held items, Berries, "
-    "Valuables) and one for every decoration. Game prices; sell there too.",
+    "A Poké Mart for each kind of item (Medicine, Balls, Training, TMs & HMs, Held items, Mail, "
+    "Berries, Valuables) and one for every decoration. Game prices; sell there too.",
 )
 def shop_section(m, back):
     s = m.s
