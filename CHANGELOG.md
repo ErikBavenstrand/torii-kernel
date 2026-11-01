@@ -4,6 +4,16 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Changed:** the game popup drops Hide box art, Load state and Original
+  name; deleting a game's whole name in Rename gives it its original name
+  back (080b83ff).
+- **Fixed:** scrolling the game popup's list lags no more: a step redrew
+  every row over four frames, and a cursor step showed a frame with no
+  highlight. A scroll now moves the rows in VRAM and draws only what
+  changed, and the engine commits strided copies in one VBlank (1d3cd617).
+
 ## v0.9.13
 
 No kernel changes; this release updates the Emerald golden cheat file
