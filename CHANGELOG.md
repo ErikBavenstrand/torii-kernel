@@ -4,11 +4,12 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
-## Unreleased
+## v0.9.14
 
 - **Changed:** the game popup drops Hide box art, Load state and Original
   name; deleting a game's whole name in Rename gives it its original name
-  back (080b83ff).
+  back (080b83ff). A game whose art was hidden stays so: delete its empty
+  `/torii/art/custom/<file name>.bin` on the card to show the art again.
 - **Removed:** starting a game straight into a save state, which only the
   popup's Load state asked for; a launch still puts the newest state in cart
   SRAM for the in-game menu's Load state (be6ff144).
@@ -30,7 +31,8 @@ git log, not here.
   larger file (Pokémon Emerald's, 198 KB) no longer shows a window at a
   time with its headings split. The list is built once from the decoded
   file and kept beside it (`<stem>.cdc`), so opening again takes a few
-  frames and nothing reflows as decoding goes (3fba1c76).
+  frames and nothing reflows as decoding goes (3fba1c76). On + Add code,
+  the title names the game, not the last heading (87171029).
 
 ## v0.9.13
 
