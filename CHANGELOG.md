@@ -30,6 +30,10 @@ git log, not here.
   Gifts, Legends, Tickets, Unlock), as the game's scrolling list with page
   jumps. The Shop opens the game's own marts; Moves is gone. B, not A,
   opens it, as A first talks to what is in front (0a00ed28, 12f49636).
+- **Changed:** Emerald's menu Warp lists every route, the gyms and the
+  League, 15 landmarks and ten more dungeons beside the towns and islands;
+  a route is reached at its edge toward a town, or surfing at sea
+  (25f56c25).
 - **Changed:** Emerald's menu Gifts has every Pokémon the game gives: the
   Mystery Gift's Surfing Pichu egg joins, Castform holds its Mystic Water,
   a gift sent to the PC says so, and Altering Cave's Pokémon are picked
