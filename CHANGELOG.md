@@ -35,6 +35,9 @@ git log, not here.
   written into free ROM) now fit about 23,000 patches where 4,096 did, and a
   cheat may have 4,096. The cheat screen shows the room in percent, and
   the cheat list's cache is built again once (ad7b48e9).
+- **Fixed:** Emerald's Free Day Care no longer zeroes a script variable
+  every frame that other scripts and the menu use (the Day Care now
+  charges 0), and Any Pokémon in the Frontier lets Mew in too (e674d662).
 - **Changed:** Emerald's Wild cheats are all Torii code, and their guides
   say what each leaves alone: roaming Pokémon, outbreak levels, and
   fishing, Rock Smash and Sweet Scent (070c6b18).
