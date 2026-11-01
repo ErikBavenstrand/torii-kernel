@@ -28,7 +28,8 @@ git log, not here.
 - **Changed:** Emerald's golden cheats have one L+R+B menu: Menu: Open with
   L+R+B, plus a cheat for each section it lists (Heal, PC, Shop, Warp,
   Gifts, Legends, Tickets, Unlock), as the game's scrolling list with page
-  jumps. The Shop opens the game's own marts; Moves is gone (0a00ed28).
+  jumps. The Shop opens the game's own marts; Moves is gone. B, not A,
+  opens it, as A first talks to what is in front (0a00ed28, 12f49636).
 - **Fixed:** Emerald's Pokérus when caught no longer wipes where every new
   Pokémon was met: only a caught one gets Pokérus, the game's own way
   (3daf5c67).
