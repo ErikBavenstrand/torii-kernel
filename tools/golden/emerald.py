@@ -1531,11 +1531,12 @@ def cheats():
     add(
         "Battle",
         "One-hit KO",
-        cb(
+        # gBattleMons[1] and [3].hp, the foes: above 1, set to 1
+        vba(
             *(
-                op
+                f"{a:08X}{op}"
                 for a in (0x02024104, 0x020241B4)
-                for op in (CB.op("GT", a, 1), CB.write16(a, 1))
+                for op in (">0001", ":0001")
             )
         ),
         "Foes have 1 HP: any hit that lands knocks them out.",
@@ -1588,14 +1589,16 @@ def cheats():
                     (0x0804A68C, 0x6018),
                 ]
             ),
-            f"Battles give x{mult} EXP. Replaces the Lucky Egg's bonus.",
+            f"Battles give x{mult} EXP, at most 14,335 a Pokémon before the trainer and trade bonuses. Replaces "
+            "the Lucky Egg's bonus.",
             "launch",
         )
     add(
         "Battle",
         "EXP shared with the party",
-        cb(CB.write8(0x020243FE, 0xFF)),
-        "Every Pokémon in your party gets a share of each battle's EXP, as if all had fought.",
+        # gSentPokesToOpponent, a byte a foe: every party slot fought each one
+        vba("020243FE:FFFF"),
+        "Every Pokémon in your party gets a share of each battle's EXP and the foe's EVs, as if all had fought.",
     )
     add(
         "Battle",

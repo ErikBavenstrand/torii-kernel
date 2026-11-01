@@ -401,8 +401,8 @@ cheat49_guide = "The Day Care rolls for an egg on every step instead of every 25
 cheat49_enable = false
 
 cheat50_desc = "Battle: One-hit KO"
-cheat50_code = "B2024104 0001+82024104 0001+B20241B4 0001+820241B4 0001"
-cheat50_format = "CodeBreaker"
+cheat50_code = "02024104>0001+02024104:0001+020241B4>0001+020241B4:0001"
+cheat50_format = "Torii"
 cheat50_folder = "Battle"
 cheat50_keys = "always"
 cheat50_guide = "Foes have 1 HP: any hit that lands knocks them out."
@@ -437,7 +437,7 @@ cheat54_code = "0804A67A:464B+0804A67C:21026818+0804A680:21384348+0804A684:42880
 cheat54_format = "Torii"
 cheat54_folder = "Battle"
 cheat54_keys = "launch"
-cheat54_guide = "Battles give x2 EXP. Replaces the Lucky Egg's bonus."
+cheat54_guide = "Battles give x2 EXP, at most 14,335 a Pokémon before the trainer and trade bonuses. Replaces the Lucky Egg's bonus."
 cheat54_enable = false
 
 cheat55_desc = "Battle: EXP x3"
@@ -445,7 +445,7 @@ cheat55_code = "0804A67A:464B+0804A67C:21036818+0804A680:21384348+0804A684:42880
 cheat55_format = "Torii"
 cheat55_folder = "Battle"
 cheat55_keys = "launch"
-cheat55_guide = "Battles give x3 EXP. Replaces the Lucky Egg's bonus."
+cheat55_guide = "Battles give x3 EXP, at most 14,335 a Pokémon before the trainer and trade bonuses. Replaces the Lucky Egg's bonus."
 cheat55_enable = false
 
 cheat56_desc = "Battle: EXP x5"
@@ -453,7 +453,7 @@ cheat56_code = "0804A67A:464B+0804A67C:21056818+0804A680:21384348+0804A684:42880
 cheat56_format = "Torii"
 cheat56_folder = "Battle"
 cheat56_keys = "launch"
-cheat56_guide = "Battles give x5 EXP. Replaces the Lucky Egg's bonus."
+cheat56_guide = "Battles give x5 EXP, at most 14,335 a Pokémon before the trainer and trade bonuses. Replaces the Lucky Egg's bonus."
 cheat56_enable = false
 
 cheat57_desc = "Battle: EXP x10"
@@ -461,7 +461,7 @@ cheat57_code = "0804A67A:464B+0804A67C:210A6818+0804A680:21384348+0804A684:42880
 cheat57_format = "Torii"
 cheat57_folder = "Battle"
 cheat57_keys = "launch"
-cheat57_guide = "Battles give x10 EXP. Replaces the Lucky Egg's bonus."
+cheat57_guide = "Battles give x10 EXP, at most 14,335 a Pokémon before the trainer and trade bonuses. Replaces the Lucky Egg's bonus."
 cheat57_enable = false
 
 cheat58_desc = "Battle: EXP x255"
@@ -469,15 +469,15 @@ cheat58_code = "0804A67A:464B+0804A67C:21FF6818+0804A680:21384348+0804A684:42880
 cheat58_format = "Torii"
 cheat58_folder = "Battle"
 cheat58_keys = "launch"
-cheat58_guide = "Battles give x255 EXP. Replaces the Lucky Egg's bonus."
+cheat58_guide = "Battles give x255 EXP, at most 14,335 a Pokémon before the trainer and trade bonuses. Replaces the Lucky Egg's bonus."
 cheat58_enable = false
 
 cheat59_desc = "Battle: EXP shared with the party"
-cheat59_code = "320243FE 00FF"
-cheat59_format = "CodeBreaker"
+cheat59_code = "020243FE:FFFF"
+cheat59_format = "Torii"
 cheat59_folder = "Battle"
 cheat59_keys = "always"
-cheat59_guide = "Every Pokémon in your party gets a share of each battle's EXP, as if all had fought."
+cheat59_guide = "Every Pokémon in your party gets a share of each battle's EXP and the foe's EVs, as if all had fought."
 cheat59_enable = false
 
 cheat60_desc = "Battle: Every ball catches"
