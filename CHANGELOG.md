@@ -4,6 +4,17 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Changed:** the cheat screen lists any cheat file as one flat list:
+  cheats under no heading first, then each `cheatN_folder` heading as a row
+  the cursor passes by (its count or picks at the right) over its cheats,
+  runs of variants one choice row each; L and R jump between headings. A
+  larger file (Pokémon Emerald's, 198 KB) no longer shows a window at a
+  time with its headings split. The list is built once from the decoded
+  file and kept beside it (`<stem>.cdc`), so opening again takes a few
+  frames and nothing reflows as decoding goes (3fba1c76).
+
 ## v0.9.13
 
 No kernel changes; this release updates the Emerald golden cheat file
