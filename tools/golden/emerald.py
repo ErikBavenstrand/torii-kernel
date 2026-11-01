@@ -136,6 +136,7 @@ SPECIAL = {  # indexes into gSpecials (0x081DBA64), counted from 0
     "CreateAbnormalWeatherEvent": 0x1EB,
     "GetAbnormalWeatherMapNameAndType": 0x1EC,
     "InitRoamer": 0x12B,
+    "ChoosePartyMon": 0xA2,
     "EnableNationalPokedex": 0x1F3,
 }
 HOW_MAY_I_SERVE_YOU = 0x08272A2A  # gText_HowMayIServeYou past its "Welcome!" page
@@ -656,13 +657,20 @@ GIFTS = [  # name, species, level (0: an egg), held item: as the game's own gift
     ("LILEEP", "LILEEP", 20, None),
     ("ANORITH", "ANORITH", 20, None),
     ("WYNAUT EGG", "WYNAUT", 0, None),
-    (
-        "PICHU EGG",
-        "PICHU",
-        0,
-        None,
-    ),  # the Pokémon Center's Mystery Gift: Surf, a fateful encounter
+    # The Pokémon Center's Mystery Gift: Surf, a fateful encounter
+    ("PICHU EGG", "PICHU", 0, None),
+    # Events of other games, as they came to the GBA games, each a fateful
+    # encounter: the US Colosseum bonus disc's WISHMKR Jirachi (level 5:
+    # Wish, Confusion, Rest) and the Japanese one's Ageto Celebi (level 10:
+    # Confusion, Recover, Heal Bell, Safeguard), the moves givemon gives
+    ("JIRACHI", "JIRACHI", 5, None),
+    ("CELEBI", "CELEBI", 10, None),
 ]
+EVENT_GIFTS = {
+    "PICHU",
+    "JIRACHI",
+    "CELEBI",
+}  # into the party only, then marked as an event's
 MOVE_SURF = 57
 # The Mystery Gift's other news: which of the cave's 9 wild sets lives in it
 VAR_ALTERING_CAVE_WILD_SET = 0x403E
@@ -1007,7 +1015,7 @@ def warp_section(m, back):
 
 @section(
     "Gifts",
-    "The game's gift Pokémon and eggs, again: the starters, fossils, Castform, Beldum, the Wynaut egg and the Mystery Gift's Surfing Pichu egg. ALTERING CAVE picks which Pokémon live in the cave on Route 103.",
+    "The game's gift Pokémon and eggs, again: the starters, fossils, Castform, Beldum, the Wynaut egg, and the events' Surfing Pichu egg, Jirachi and Celebi. ALTERING CAVE picks which Pokémon live in the cave on Route 103.",
 )
 def gifts_section(m, back):
     s = m.s
@@ -1035,18 +1043,18 @@ def gifts_section(m, back):
         s.goto("gifts")
     for i, (_, sp, level, item) in enumerate(GIFTS):
         s.label(f"gf{i}")
-        if sp == "PICHU":
-            # MysteryGiftScript_SurfPichu's egg: into the party only (its
-            # slot then takes Surf), as the gift asks for a free place
+        if sp in EVENT_GIFTS:
+            # As MysteryGiftScript_SurfPichu gives its egg: into the party
+            # only (the new slot, VAR_0x8000, is then marked a fateful
+            # encounter met at one), as the gift asks for a free place
             s.cmd(
                 "specialvar",
                 ("h", VAR_8000),
                 ("h", SPECIAL["CalculatePlayerPartyCount"]),
             )
             s.when(VAR_8000, 6, "party_full")
+        if sp == "PICHU":
             s.cmd("giveegg", ("h", species(sp)))
-            s.cmd("setmodernfatefulencounter", ("h", VAR_8000))
-            s.cmd("setmonmetlocation", ("h", VAR_8000), ("b", METLOC_FATEFUL_ENCOUNTER))
             s.cmd(
                 "setmonmove", ("b", 7), ("b", 2), ("h", MOVE_SURF)
             )  # past 6: the party's last
@@ -1062,6 +1070,9 @@ def gifts_section(m, back):
             )
         else:
             s.cmd("giveegg", ("h", species(sp)))
+        if sp in EVENT_GIFTS:
+            s.cmd("setmodernfatefulencounter", ("h", VAR_8000))
+            s.cmd("setmonmetlocation", ("h", VAR_8000), ("b", METLOC_FATEFUL_ENCOUNTER))
         s.when(VAR_RESULT, 2, "full")
         s.cmd("bufferspeciesname", ("b", 0), ("h", species(sp)))
         s.when(VAR_RESULT, 1, "pc_egg" if not level else "pc_mon")
@@ -1083,9 +1094,39 @@ def gifts_section(m, back):
     s.say(m.t("There is no room for it."))
     s.goto("gifts")
     s.label("party_full")
-    s.say(m.t("This EGG needs a place\nin your party."))
+    s.say(m.t("It needs a place\nin your party."))
     s.goto("gifts")
     return "GIFTS", "gifts"
+
+
+@section(
+    "Trade evolution",
+    "Evolves a party POKéMON as a trade would: KADABRA, MACHOKE, GRAVELER, HAUNTER, and those "
+    "holding their item (KING'S ROCK, METAL COAT, DRAGON SCALE, UP-GRADE, DEEPSEATOOTH or "
+    "DEEPSEASCALE), which it uses up.",
+)
+def evolve_section(m, back):
+    """The game's party screen (ChoosePartyMon) picks the POKéMON, then
+    tools/golden/evolve.c evolves it as a trade would and runs the
+    evolution scene, which comes back to the field with the script going
+    on (VAR_RESULT 1); with no trade evolution it says so (VAR_RESULT 0)."""
+    s = m.s
+    s.label("evolve")
+    s.cmd("special", ("h", SPECIAL["ChoosePartyMon"]))
+    s.cmd("waitstate")
+    s.cmd("callnative", ("p", "evolve_mon+1"))  # nothing chosen: VAR_RESULT 0 too
+    s.when(VAR_RESULT, 0, "evolve_no")
+    s.cmd("waitstate")
+    s.goto(back)
+    s.label("evolve_no")
+    s.cmd("compare", ("h", VAR_8004), ("h", 6))
+    s.cmd("goto_if", ("b", 4), ("p", back))  # >= 6: nothing chosen
+    s.say(m.t("It doesn't evolve by trading."))
+    s.goto(back)
+    s.align()
+    s.label("evolve_mon")
+    s.raw(Path(__file__).with_name("evolve.bin").read_bytes())
+    return "TRADE EVOLVE", "evolve"
 
 
 @section(
