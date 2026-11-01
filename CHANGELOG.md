@@ -30,6 +30,9 @@ git log, not here.
   Gifts, Legends, Tickets, Unlock), as the game's scrolling list with page
   jumps. The Shop opens the game's own marts; Moves is gone. B, not A,
   opens it, as A first talks to what is in front (0a00ed28, 12f49636).
+- **Fixed:** Emerald's menu PC no longer leaves an impassable PC drawn
+  beside or under the player on logging off: it runs its own copy of the
+  game's PC script, without the PC screen's effects (a2e9e164).
 - **Fixed:** Emerald's Pokérus when caught no longer wipes where every new
   Pokémon was met: only a caught one gets Pokérus, the game's own way
   (3daf5c67).
