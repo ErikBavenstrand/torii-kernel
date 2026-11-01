@@ -13,7 +13,7 @@ raw for ROM patches and save-block pointer writes, and Torii's raw lines
 (AnyGBA's syntax) only where a value must be XORed with the save's key or
 bits ORed in: money, coins, badges, symbols, the National Pokédex flag.
 
-The menu starts nothing from RAM: L+R+A opens it from the game's own field
+The menu starts nothing from RAM: L+R+B opens it from the game's own field
 input (tools/golden/field.c), as a sign's or a person's script opens. Its
 lists are the game's scrolling list, shown by tools/golden/menu.c; its
 scripts, strings and lists are in the ROM's free space, a base cheat's and
@@ -548,7 +548,7 @@ def item_name(item):
 
 
 def field_hook():
-    """L+R+A opens the menu where the game opens its own scripts
+    """L+R+B opens the menu where the game opens its own scripts
     (tools/golden/field.c): the routine, and DoCB1_Overworld's call to
     ProcessPlayerFieldInput sent through it"""
     code = Path(__file__).with_name("field.bin").read_bytes()
@@ -563,7 +563,7 @@ def field_hook():
 
 
 def menu_base():
-    """The menu's base: L+R+A, the routine that shows its lists and the main
+    """The menu's base: L+R+B, the routine that shows its lists and the main
     list, laid out last: its rows are slots past the base's end that each
     section's cheat fills (the ROM's free space, 0xFF, is unset and left
     out). Returns the patches, the main list's script (a section's way back)
@@ -927,11 +927,11 @@ def cheats():
     out.append(
         Cheat(
             "Menu",
-            "Menu: Open with L+R+A",
+            "Menu: Open with L+R+B",
             vba(*Mixed(base, None).lines),
-            "Hold L and R, press A where nothing is in front of you. Lists the Menu sections you picked: "
+            "Hold L and R, then press B. Lists the Menu sections you picked: "
             "pick this and any of them. UP/DOWN move, LEFT/RIGHT a page, A chooses, B goes back.",
-            "hold L+R+A",  # field.c's (ROM patches only): shown, never a gate
+            "hold L+R+B",  # field.c's (ROM patches only): shown, never a gate
         )
     )
     for name, guide, patches in menu_sections(back, slots):
@@ -940,8 +940,8 @@ def cheats():
                 "Menu",
                 f"Menu: {name}",
                 vba(*Mixed(patches, None).lines),
-                guide + " Needs Menu: Open with L+R+A.",
-                "hold L+R+A",
+                guide + " Needs Menu: Open with L+R+B.",
+                "hold L+R+B",
             )
         )
 
@@ -1384,7 +1384,7 @@ def main():
         f"cheats = {len(cs)}",
         "",
     ]
-    fmt = {CB: "CodeBreaker", AR: "PARv3 raw", VBA: "VBA"}
+    fmt = {CB: "CodeBreaker", AR: "PARv3 raw", VBA: "Torii"}
     for i, c in enumerate(cs):
         lines.append(f'cheat{i}_desc = "{c.name}"')
         lines.append(f'cheat{i}_code = "{c.code.text()}"')

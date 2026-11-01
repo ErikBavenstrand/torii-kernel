@@ -19,14 +19,14 @@ git log, not here.
   wild encounter). The menu is a little slower.
 - **Changed:** a cheat's Guide page reads top down: its name, its heading,
   its buttons, its guide, Details, then its code; a cheat that only patches
-  the ROM shows the buttons its file names (the field menu's L+R+A), and
+  the ROM shows the buttons its file names (the field menu's L+R+B), and
   the hint bar no longer gives a ROM patch's NOR note (00cc5c26).
 - **Fixed:** the Guide page's scroll stopped a row short of its end after
   DOWN was held, and the next key moved nothing; a launch whose cheats take
   long to make ready shows Preparing cheats instead of a still screen
   (00cc5c26, 01941b71).
-- **Changed:** Emerald's golden cheats have one L+R+A menu: Menu: Open with
-  L+R+A, plus a cheat for each section it lists (Heal, PC, Shop, Warp,
+- **Changed:** Emerald's golden cheats have one L+R+B menu: Menu: Open with
+  L+R+B, plus a cheat for each section it lists (Heal, PC, Shop, Warp,
   Gifts, Legends, Tickets, Unlock), as the game's scrolling list with page
   jumps. The Shop opens the game's own marts; Moves is gone (0a00ed28).
 - **Fixed:** Emerald's Pokérus when caught no longer wipes where every new

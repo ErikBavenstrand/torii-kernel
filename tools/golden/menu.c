@@ -1,4 +1,4 @@
-// Pokémon Emerald's L+R+A menu: one routine shows every list in it, as the
+// Pokémon Emerald's L+R+B menu: one routine shows every list in it, as the
 // game's own scrolling list (the Battle Frontier's): up to 7 rows with
 // arrows when more follow, LEFT and RIGHT a page at a time, A to choose,
 // B to go back. Each list remembers where its cursor was.

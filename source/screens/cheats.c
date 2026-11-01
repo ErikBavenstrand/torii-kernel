@@ -263,7 +263,7 @@ static void as_cheat(const struct cheatlist_entry *e, struct cheatfile_cheat *c)
 
 // The buttons cheat c is used with, as the screen shows them: how it is
 // activated, but for one that only patches the ROM (set at launch) whose
-// file names buttons, its own routine's (the field menu's L+R+A): those,
+// file names buttons, its own routine's (the field menu's L+R+B): those,
 // which never gate it
 static u16 shown_keys(const struct cheatfile_cheat *c)
 {
