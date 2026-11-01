@@ -1262,7 +1262,8 @@ int cheatstore_decode_wanted(int (*want)(u32 i, void *ctx), void *ctx)
 	while (cs->work.next < last) {
 		if (cs->sparse)
 			sparse_skip(want, ctx);
-		if ((i = cheatfile_next(&cs->file, &cs->work)) < 0)
+		i = cheatfile_next(&cs->file, &cs->work);
+		if (i < 0)
 			break;
 		if (cs->sparse && want((u32)i, ctx) && !sparse_check((u32)i)) {
 			tlog_error("cheats: %s: cheat %lu isn't as its cache says: decoded in full", cs->path,
@@ -2042,7 +2043,8 @@ static int launch_pass(const char *rom_path, int quick)
 		for (;;) {
 			if (cs->sparse)
 				sparse_skip(launch_wants, NULL);
-			if ((i = cheatfile_next(f, &cs->work)) < 0)
+			i = cheatfile_next(f, &cs->work);
+			if (i < 0)
 				break;
 			decoded++;
 			const struct cheatfile_cheat *c = &cs->cheats[i];

@@ -1134,7 +1134,7 @@ static int cs_guide(u32 at)
 	cs.keys[1] = (struct ui_hint){"B", S(STR_HINT_BACK)};
 	ui_hints_set((u8)(v->first + CS_HINTS), cs.keys, 2);
 	tlog_debug("cheats: guide of cheat %lu, %lu rows",
-		   (unsigned long)(cheatstore_window_start(cheatstore_window()) + at), (unsigned long)cs.reading.count);
+		   (unsigned long)cheatstore_window_start(cheatstore_window()) + at, (unsigned long)cs.reading.count);
 	cs.close = 0;
 	while (ui_depth() && !cs.close)
 		ui_frame();

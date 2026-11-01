@@ -79,6 +79,16 @@ void cheatlist_put(u32 g, const struct cheatlist_entry *e)
 
 // --- Checkpoints -------------------------------------------------------------------------
 
+// a and b hold the same decoder (member by member: the struct has padding)
+static int dec_same(const struct cheat_decoder *a, const struct cheat_decoder *b)
+{
+	return a->forced == b->forced && a->gs_version == b->gs_version && a->last == b->last &&
+	       a->last_alone == b->last_alone && !memcmp(a->cb_table, b->cb_table, sizeof(a->cb_table)) &&
+	       a->cb_key2 == b->cb_key2 && !memcmp(a->gs_seeds, b->gs_seeds, sizeof(a->gs_seeds)) &&
+	       a->cb_master == b->cb_master && !memcmp(a->cb_seeds, b->cb_seeds, sizeof(a->cb_seeds)) &&
+	       a->cb_rng == b->cb_rng;
+}
+
 void cheatlist_ckpt_note(u32 g, const struct cheat_decoder *d)
 {
 	struct cheatlist *l = list();
@@ -86,10 +96,11 @@ void cheatlist_ckpt_note(u32 g, const struct cheat_decoder *d)
 	    !(l->building == 1 || (l->valid && l->on)))
 		return;
 	struct cheatlist_ckpt c, was;
+	memset(&c, 0, sizeof(c));  // its padding written as zeros, as the cache's CRC sees it
 	c.at = g + 1;
-	c.dec = *d;
+	memcpy(&c.dec, d, sizeof(c.dec));
 	page_get(&CKPTS[g / CHEATLIST_CKPT_EVERY], &was, sizeof(was));
-	if (memcmp(&was, &c, sizeof(c)) != 0) {
+	if (was.at != c.at || !dec_same(&was.dec, &c.dec)) {
 		page_put(&CKPTS[g / CHEATLIST_CKPT_EVERY], &c, sizeof(c));
 		l->dirty |= l->valid;
 	}
@@ -707,7 +718,6 @@ static int cache_read(void)
 			      (h.names_bytes + 3) & ~3u};
 	const u32 units[4] = {sizeof(struct cheatlist_ckpt), CHEATLIST_HEADING_BYTES, sizeof(struct cheatlist_entry),
 			      4};
-	u8 *const to[4] = {(u8 *)CKPTS, NULL, (u8 *)ENTRIES, NAMES};
 	for (u32 p = 0; ok && p < 4; p++) {
 		const u32 chunk = sizeof(cs->part) / units[p] * units[p];
 		for (u32 at = 0; ok && at < parts[p]; at += got) {
@@ -724,7 +734,7 @@ static int cache_read(void)
 					memcpy(hd->name, buf + k + 1, CHEATFILE_FOLDER_MAX);
 				}
 			} else {
-				page_put(to[p] + at, buf, got);
+				page_put((p == 0 ? (u8 *)CKPTS : p == 2 ? (u8 *)ENTRIES : NAMES) + at, buf, got);
 			}
 		}
 	}
