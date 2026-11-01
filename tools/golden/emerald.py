@@ -1626,7 +1626,7 @@ def cheats():
             "Wild",
             f"Species: {title(name)}",
             rom_code(words([(0x080B4E6C, v)])),
-            f"Every wild Pokémon is {title(name)}, at the area's usual levels.",
+            f"Every wild Pokémon is {title(name)}, at the area's usual levels. Roaming Pokémon stay as they are.",
             "launch",
         )
     for level in range(5, 101, 5):
@@ -1634,14 +1634,16 @@ def cheats():
             "Wild",
             f"Level {level}",
             rom_code(words([(0x080B4C74, 0x47702000 | level)])),
-            f"Every wild Pokémon is level {level}.",
+            f"Every wild Pokémon is level {level}. Roaming and outbreak Pokémon keep theirs.",
             "launch",
         )
     add(
         "Wild",
         "No wild encounters",
-        cb(CB.write8(0x020375D4, 0)),
-        "No wild Pokémon in grass, caves or water. Fishing still works.",
+        # sWildEncounterImmunitySteps: the 4 steps after a battle with no
+        # encounter, never counted past the first
+        vba("020375D4:00"),
+        "No wild Pokémon in grass, caves or water. Fishing, Rock Smash and Sweet Scent still find them.",
     )
     add(
         "Wild",

@@ -501,7 +501,7 @@ cheat62_code = "080B4E6C:36002601"
 cheat62_format = "Torii"
 cheat62_folder = "Wild"
 cheat62_keys = "launch"
-cheat62_guide = "Every wild Pokémon is Bulbasaur, at the area's usual levels."
+cheat62_guide = "Every wild Pokémon is Bulbasaur, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat62_enable = false
 
 cheat63_desc = "Wild: Species: Ivysaur"
@@ -509,7 +509,7 @@ cheat63_code = "080B4E6C:36002602"
 cheat63_format = "Torii"
 cheat63_folder = "Wild"
 cheat63_keys = "launch"
-cheat63_guide = "Every wild Pokémon is Ivysaur, at the area's usual levels."
+cheat63_guide = "Every wild Pokémon is Ivysaur, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat63_enable = false
 
 cheat64_desc = "Wild: Species: Venusaur"
@@ -517,7 +517,7 @@ cheat64_code = "080B4E6C:36002603"
 cheat64_format = "Torii"
 cheat64_folder = "Wild"
 cheat64_keys = "launch"
-cheat64_guide = "Every wild Pokémon is Venusaur, at the area's usual levels."
+cheat64_guide = "Every wild Pokémon is Venusaur, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat64_enable = false
 
 cheat65_desc = "Wild: Species: Charmander"
@@ -525,7 +525,7 @@ cheat65_code = "080B4E6C:36002604"
 cheat65_format = "Torii"
 cheat65_folder = "Wild"
 cheat65_keys = "launch"
-cheat65_guide = "Every wild Pokémon is Charmander, at the area's usual levels."
+cheat65_guide = "Every wild Pokémon is Charmander, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat65_enable = false
 
 cheat66_desc = "Wild: Species: Charmeleon"
@@ -533,7 +533,7 @@ cheat66_code = "080B4E6C:36002605"
 cheat66_format = "Torii"
 cheat66_folder = "Wild"
 cheat66_keys = "launch"
-cheat66_guide = "Every wild Pokémon is Charmeleon, at the area's usual levels."
+cheat66_guide = "Every wild Pokémon is Charmeleon, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat66_enable = false
 
 cheat67_desc = "Wild: Species: Charizard"
@@ -541,7 +541,7 @@ cheat67_code = "080B4E6C:36002606"
 cheat67_format = "Torii"
 cheat67_folder = "Wild"
 cheat67_keys = "launch"
-cheat67_guide = "Every wild Pokémon is Charizard, at the area's usual levels."
+cheat67_guide = "Every wild Pokémon is Charizard, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat67_enable = false
 
 cheat68_desc = "Wild: Species: Squirtle"
@@ -549,7 +549,7 @@ cheat68_code = "080B4E6C:36002607"
 cheat68_format = "Torii"
 cheat68_folder = "Wild"
 cheat68_keys = "launch"
-cheat68_guide = "Every wild Pokémon is Squirtle, at the area's usual levels."
+cheat68_guide = "Every wild Pokémon is Squirtle, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat68_enable = false
 
 cheat69_desc = "Wild: Species: Wartortle"
@@ -557,7 +557,7 @@ cheat69_code = "080B4E6C:36002608"
 cheat69_format = "Torii"
 cheat69_folder = "Wild"
 cheat69_keys = "launch"
-cheat69_guide = "Every wild Pokémon is Wartortle, at the area's usual levels."
+cheat69_guide = "Every wild Pokémon is Wartortle, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat69_enable = false
 
 cheat70_desc = "Wild: Species: Blastoise"
@@ -565,7 +565,7 @@ cheat70_code = "080B4E6C:36002609"
 cheat70_format = "Torii"
 cheat70_folder = "Wild"
 cheat70_keys = "launch"
-cheat70_guide = "Every wild Pokémon is Blastoise, at the area's usual levels."
+cheat70_guide = "Every wild Pokémon is Blastoise, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat70_enable = false
 
 cheat71_desc = "Wild: Species: Caterpie"
@@ -573,7 +573,7 @@ cheat71_code = "080B4E6C:3600260A"
 cheat71_format = "Torii"
 cheat71_folder = "Wild"
 cheat71_keys = "launch"
-cheat71_guide = "Every wild Pokémon is Caterpie, at the area's usual levels."
+cheat71_guide = "Every wild Pokémon is Caterpie, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat71_enable = false
 
 cheat72_desc = "Wild: Species: Metapod"
@@ -581,7 +581,7 @@ cheat72_code = "080B4E6C:3600260B"
 cheat72_format = "Torii"
 cheat72_folder = "Wild"
 cheat72_keys = "launch"
-cheat72_guide = "Every wild Pokémon is Metapod, at the area's usual levels."
+cheat72_guide = "Every wild Pokémon is Metapod, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat72_enable = false
 
 cheat73_desc = "Wild: Species: Butterfree"
@@ -589,7 +589,7 @@ cheat73_code = "080B4E6C:3600260C"
 cheat73_format = "Torii"
 cheat73_folder = "Wild"
 cheat73_keys = "launch"
-cheat73_guide = "Every wild Pokémon is Butterfree, at the area's usual levels."
+cheat73_guide = "Every wild Pokémon is Butterfree, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat73_enable = false
 
 cheat74_desc = "Wild: Species: Weedle"
@@ -597,7 +597,7 @@ cheat74_code = "080B4E6C:3600260D"
 cheat74_format = "Torii"
 cheat74_folder = "Wild"
 cheat74_keys = "launch"
-cheat74_guide = "Every wild Pokémon is Weedle, at the area's usual levels."
+cheat74_guide = "Every wild Pokémon is Weedle, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat74_enable = false
 
 cheat75_desc = "Wild: Species: Kakuna"
@@ -605,7 +605,7 @@ cheat75_code = "080B4E6C:3600260E"
 cheat75_format = "Torii"
 cheat75_folder = "Wild"
 cheat75_keys = "launch"
-cheat75_guide = "Every wild Pokémon is Kakuna, at the area's usual levels."
+cheat75_guide = "Every wild Pokémon is Kakuna, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat75_enable = false
 
 cheat76_desc = "Wild: Species: Beedrill"
@@ -613,7 +613,7 @@ cheat76_code = "080B4E6C:3600260F"
 cheat76_format = "Torii"
 cheat76_folder = "Wild"
 cheat76_keys = "launch"
-cheat76_guide = "Every wild Pokémon is Beedrill, at the area's usual levels."
+cheat76_guide = "Every wild Pokémon is Beedrill, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat76_enable = false
 
 cheat77_desc = "Wild: Species: Pidgey"
@@ -621,7 +621,7 @@ cheat77_code = "080B4E6C:36002610"
 cheat77_format = "Torii"
 cheat77_folder = "Wild"
 cheat77_keys = "launch"
-cheat77_guide = "Every wild Pokémon is Pidgey, at the area's usual levels."
+cheat77_guide = "Every wild Pokémon is Pidgey, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat77_enable = false
 
 cheat78_desc = "Wild: Species: Pidgeotto"
@@ -629,7 +629,7 @@ cheat78_code = "080B4E6C:36002611"
 cheat78_format = "Torii"
 cheat78_folder = "Wild"
 cheat78_keys = "launch"
-cheat78_guide = "Every wild Pokémon is Pidgeotto, at the area's usual levels."
+cheat78_guide = "Every wild Pokémon is Pidgeotto, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat78_enable = false
 
 cheat79_desc = "Wild: Species: Pidgeot"
@@ -637,7 +637,7 @@ cheat79_code = "080B4E6C:36002612"
 cheat79_format = "Torii"
 cheat79_folder = "Wild"
 cheat79_keys = "launch"
-cheat79_guide = "Every wild Pokémon is Pidgeot, at the area's usual levels."
+cheat79_guide = "Every wild Pokémon is Pidgeot, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat79_enable = false
 
 cheat80_desc = "Wild: Species: Rattata"
@@ -645,7 +645,7 @@ cheat80_code = "080B4E6C:36002613"
 cheat80_format = "Torii"
 cheat80_folder = "Wild"
 cheat80_keys = "launch"
-cheat80_guide = "Every wild Pokémon is Rattata, at the area's usual levels."
+cheat80_guide = "Every wild Pokémon is Rattata, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat80_enable = false
 
 cheat81_desc = "Wild: Species: Raticate"
@@ -653,7 +653,7 @@ cheat81_code = "080B4E6C:36002614"
 cheat81_format = "Torii"
 cheat81_folder = "Wild"
 cheat81_keys = "launch"
-cheat81_guide = "Every wild Pokémon is Raticate, at the area's usual levels."
+cheat81_guide = "Every wild Pokémon is Raticate, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat81_enable = false
 
 cheat82_desc = "Wild: Species: Spearow"
@@ -661,7 +661,7 @@ cheat82_code = "080B4E6C:36002615"
 cheat82_format = "Torii"
 cheat82_folder = "Wild"
 cheat82_keys = "launch"
-cheat82_guide = "Every wild Pokémon is Spearow, at the area's usual levels."
+cheat82_guide = "Every wild Pokémon is Spearow, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat82_enable = false
 
 cheat83_desc = "Wild: Species: Fearow"
@@ -669,7 +669,7 @@ cheat83_code = "080B4E6C:36002616"
 cheat83_format = "Torii"
 cheat83_folder = "Wild"
 cheat83_keys = "launch"
-cheat83_guide = "Every wild Pokémon is Fearow, at the area's usual levels."
+cheat83_guide = "Every wild Pokémon is Fearow, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat83_enable = false
 
 cheat84_desc = "Wild: Species: Ekans"
@@ -677,7 +677,7 @@ cheat84_code = "080B4E6C:36002617"
 cheat84_format = "Torii"
 cheat84_folder = "Wild"
 cheat84_keys = "launch"
-cheat84_guide = "Every wild Pokémon is Ekans, at the area's usual levels."
+cheat84_guide = "Every wild Pokémon is Ekans, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat84_enable = false
 
 cheat85_desc = "Wild: Species: Arbok"
@@ -685,7 +685,7 @@ cheat85_code = "080B4E6C:36002618"
 cheat85_format = "Torii"
 cheat85_folder = "Wild"
 cheat85_keys = "launch"
-cheat85_guide = "Every wild Pokémon is Arbok, at the area's usual levels."
+cheat85_guide = "Every wild Pokémon is Arbok, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat85_enable = false
 
 cheat86_desc = "Wild: Species: Pikachu"
@@ -693,7 +693,7 @@ cheat86_code = "080B4E6C:36002619"
 cheat86_format = "Torii"
 cheat86_folder = "Wild"
 cheat86_keys = "launch"
-cheat86_guide = "Every wild Pokémon is Pikachu, at the area's usual levels."
+cheat86_guide = "Every wild Pokémon is Pikachu, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat86_enable = false
 
 cheat87_desc = "Wild: Species: Raichu"
@@ -701,7 +701,7 @@ cheat87_code = "080B4E6C:3600261A"
 cheat87_format = "Torii"
 cheat87_folder = "Wild"
 cheat87_keys = "launch"
-cheat87_guide = "Every wild Pokémon is Raichu, at the area's usual levels."
+cheat87_guide = "Every wild Pokémon is Raichu, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat87_enable = false
 
 cheat88_desc = "Wild: Species: Sandshrew"
@@ -709,7 +709,7 @@ cheat88_code = "080B4E6C:3600261B"
 cheat88_format = "Torii"
 cheat88_folder = "Wild"
 cheat88_keys = "launch"
-cheat88_guide = "Every wild Pokémon is Sandshrew, at the area's usual levels."
+cheat88_guide = "Every wild Pokémon is Sandshrew, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat88_enable = false
 
 cheat89_desc = "Wild: Species: Sandslash"
@@ -717,7 +717,7 @@ cheat89_code = "080B4E6C:3600261C"
 cheat89_format = "Torii"
 cheat89_folder = "Wild"
 cheat89_keys = "launch"
-cheat89_guide = "Every wild Pokémon is Sandslash, at the area's usual levels."
+cheat89_guide = "Every wild Pokémon is Sandslash, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat89_enable = false
 
 cheat90_desc = "Wild: Species: Nidoran F"
@@ -725,7 +725,7 @@ cheat90_code = "080B4E6C:3600261D"
 cheat90_format = "Torii"
 cheat90_folder = "Wild"
 cheat90_keys = "launch"
-cheat90_guide = "Every wild Pokémon is Nidoran F, at the area's usual levels."
+cheat90_guide = "Every wild Pokémon is Nidoran F, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat90_enable = false
 
 cheat91_desc = "Wild: Species: Nidorina"
@@ -733,7 +733,7 @@ cheat91_code = "080B4E6C:3600261E"
 cheat91_format = "Torii"
 cheat91_folder = "Wild"
 cheat91_keys = "launch"
-cheat91_guide = "Every wild Pokémon is Nidorina, at the area's usual levels."
+cheat91_guide = "Every wild Pokémon is Nidorina, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat91_enable = false
 
 cheat92_desc = "Wild: Species: Nidoqueen"
@@ -741,7 +741,7 @@ cheat92_code = "080B4E6C:3600261F"
 cheat92_format = "Torii"
 cheat92_folder = "Wild"
 cheat92_keys = "launch"
-cheat92_guide = "Every wild Pokémon is Nidoqueen, at the area's usual levels."
+cheat92_guide = "Every wild Pokémon is Nidoqueen, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat92_enable = false
 
 cheat93_desc = "Wild: Species: Nidoran M"
@@ -749,7 +749,7 @@ cheat93_code = "080B4E6C:36002620"
 cheat93_format = "Torii"
 cheat93_folder = "Wild"
 cheat93_keys = "launch"
-cheat93_guide = "Every wild Pokémon is Nidoran M, at the area's usual levels."
+cheat93_guide = "Every wild Pokémon is Nidoran M, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat93_enable = false
 
 cheat94_desc = "Wild: Species: Nidorino"
@@ -757,7 +757,7 @@ cheat94_code = "080B4E6C:36002621"
 cheat94_format = "Torii"
 cheat94_folder = "Wild"
 cheat94_keys = "launch"
-cheat94_guide = "Every wild Pokémon is Nidorino, at the area's usual levels."
+cheat94_guide = "Every wild Pokémon is Nidorino, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat94_enable = false
 
 cheat95_desc = "Wild: Species: Nidoking"
@@ -765,7 +765,7 @@ cheat95_code = "080B4E6C:36002622"
 cheat95_format = "Torii"
 cheat95_folder = "Wild"
 cheat95_keys = "launch"
-cheat95_guide = "Every wild Pokémon is Nidoking, at the area's usual levels."
+cheat95_guide = "Every wild Pokémon is Nidoking, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat95_enable = false
 
 cheat96_desc = "Wild: Species: Clefairy"
@@ -773,7 +773,7 @@ cheat96_code = "080B4E6C:36002623"
 cheat96_format = "Torii"
 cheat96_folder = "Wild"
 cheat96_keys = "launch"
-cheat96_guide = "Every wild Pokémon is Clefairy, at the area's usual levels."
+cheat96_guide = "Every wild Pokémon is Clefairy, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat96_enable = false
 
 cheat97_desc = "Wild: Species: Clefable"
@@ -781,7 +781,7 @@ cheat97_code = "080B4E6C:36002624"
 cheat97_format = "Torii"
 cheat97_folder = "Wild"
 cheat97_keys = "launch"
-cheat97_guide = "Every wild Pokémon is Clefable, at the area's usual levels."
+cheat97_guide = "Every wild Pokémon is Clefable, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat97_enable = false
 
 cheat98_desc = "Wild: Species: Vulpix"
@@ -789,7 +789,7 @@ cheat98_code = "080B4E6C:36002625"
 cheat98_format = "Torii"
 cheat98_folder = "Wild"
 cheat98_keys = "launch"
-cheat98_guide = "Every wild Pokémon is Vulpix, at the area's usual levels."
+cheat98_guide = "Every wild Pokémon is Vulpix, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat98_enable = false
 
 cheat99_desc = "Wild: Species: Ninetales"
@@ -797,7 +797,7 @@ cheat99_code = "080B4E6C:36002626"
 cheat99_format = "Torii"
 cheat99_folder = "Wild"
 cheat99_keys = "launch"
-cheat99_guide = "Every wild Pokémon is Ninetales, at the area's usual levels."
+cheat99_guide = "Every wild Pokémon is Ninetales, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat99_enable = false
 
 cheat100_desc = "Wild: Species: Jigglypuff"
@@ -805,7 +805,7 @@ cheat100_code = "080B4E6C:36002627"
 cheat100_format = "Torii"
 cheat100_folder = "Wild"
 cheat100_keys = "launch"
-cheat100_guide = "Every wild Pokémon is Jigglypuff, at the area's usual levels."
+cheat100_guide = "Every wild Pokémon is Jigglypuff, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat100_enable = false
 
 cheat101_desc = "Wild: Species: Wigglytuff"
@@ -813,7 +813,7 @@ cheat101_code = "080B4E6C:36002628"
 cheat101_format = "Torii"
 cheat101_folder = "Wild"
 cheat101_keys = "launch"
-cheat101_guide = "Every wild Pokémon is Wigglytuff, at the area's usual levels."
+cheat101_guide = "Every wild Pokémon is Wigglytuff, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat101_enable = false
 
 cheat102_desc = "Wild: Species: Zubat"
@@ -821,7 +821,7 @@ cheat102_code = "080B4E6C:36002629"
 cheat102_format = "Torii"
 cheat102_folder = "Wild"
 cheat102_keys = "launch"
-cheat102_guide = "Every wild Pokémon is Zubat, at the area's usual levels."
+cheat102_guide = "Every wild Pokémon is Zubat, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat102_enable = false
 
 cheat103_desc = "Wild: Species: Golbat"
@@ -829,7 +829,7 @@ cheat103_code = "080B4E6C:3600262A"
 cheat103_format = "Torii"
 cheat103_folder = "Wild"
 cheat103_keys = "launch"
-cheat103_guide = "Every wild Pokémon is Golbat, at the area's usual levels."
+cheat103_guide = "Every wild Pokémon is Golbat, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat103_enable = false
 
 cheat104_desc = "Wild: Species: Oddish"
@@ -837,7 +837,7 @@ cheat104_code = "080B4E6C:3600262B"
 cheat104_format = "Torii"
 cheat104_folder = "Wild"
 cheat104_keys = "launch"
-cheat104_guide = "Every wild Pokémon is Oddish, at the area's usual levels."
+cheat104_guide = "Every wild Pokémon is Oddish, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat104_enable = false
 
 cheat105_desc = "Wild: Species: Gloom"
@@ -845,7 +845,7 @@ cheat105_code = "080B4E6C:3600262C"
 cheat105_format = "Torii"
 cheat105_folder = "Wild"
 cheat105_keys = "launch"
-cheat105_guide = "Every wild Pokémon is Gloom, at the area's usual levels."
+cheat105_guide = "Every wild Pokémon is Gloom, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat105_enable = false
 
 cheat106_desc = "Wild: Species: Vileplume"
@@ -853,7 +853,7 @@ cheat106_code = "080B4E6C:3600262D"
 cheat106_format = "Torii"
 cheat106_folder = "Wild"
 cheat106_keys = "launch"
-cheat106_guide = "Every wild Pokémon is Vileplume, at the area's usual levels."
+cheat106_guide = "Every wild Pokémon is Vileplume, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat106_enable = false
 
 cheat107_desc = "Wild: Species: Paras"
@@ -861,7 +861,7 @@ cheat107_code = "080B4E6C:3600262E"
 cheat107_format = "Torii"
 cheat107_folder = "Wild"
 cheat107_keys = "launch"
-cheat107_guide = "Every wild Pokémon is Paras, at the area's usual levels."
+cheat107_guide = "Every wild Pokémon is Paras, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat107_enable = false
 
 cheat108_desc = "Wild: Species: Parasect"
@@ -869,7 +869,7 @@ cheat108_code = "080B4E6C:3600262F"
 cheat108_format = "Torii"
 cheat108_folder = "Wild"
 cheat108_keys = "launch"
-cheat108_guide = "Every wild Pokémon is Parasect, at the area's usual levels."
+cheat108_guide = "Every wild Pokémon is Parasect, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat108_enable = false
 
 cheat109_desc = "Wild: Species: Venonat"
@@ -877,7 +877,7 @@ cheat109_code = "080B4E6C:36002630"
 cheat109_format = "Torii"
 cheat109_folder = "Wild"
 cheat109_keys = "launch"
-cheat109_guide = "Every wild Pokémon is Venonat, at the area's usual levels."
+cheat109_guide = "Every wild Pokémon is Venonat, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat109_enable = false
 
 cheat110_desc = "Wild: Species: Venomoth"
@@ -885,7 +885,7 @@ cheat110_code = "080B4E6C:36002631"
 cheat110_format = "Torii"
 cheat110_folder = "Wild"
 cheat110_keys = "launch"
-cheat110_guide = "Every wild Pokémon is Venomoth, at the area's usual levels."
+cheat110_guide = "Every wild Pokémon is Venomoth, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat110_enable = false
 
 cheat111_desc = "Wild: Species: Diglett"
@@ -893,7 +893,7 @@ cheat111_code = "080B4E6C:36002632"
 cheat111_format = "Torii"
 cheat111_folder = "Wild"
 cheat111_keys = "launch"
-cheat111_guide = "Every wild Pokémon is Diglett, at the area's usual levels."
+cheat111_guide = "Every wild Pokémon is Diglett, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat111_enable = false
 
 cheat112_desc = "Wild: Species: Dugtrio"
@@ -901,7 +901,7 @@ cheat112_code = "080B4E6C:36002633"
 cheat112_format = "Torii"
 cheat112_folder = "Wild"
 cheat112_keys = "launch"
-cheat112_guide = "Every wild Pokémon is Dugtrio, at the area's usual levels."
+cheat112_guide = "Every wild Pokémon is Dugtrio, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat112_enable = false
 
 cheat113_desc = "Wild: Species: Meowth"
@@ -909,7 +909,7 @@ cheat113_code = "080B4E6C:36002634"
 cheat113_format = "Torii"
 cheat113_folder = "Wild"
 cheat113_keys = "launch"
-cheat113_guide = "Every wild Pokémon is Meowth, at the area's usual levels."
+cheat113_guide = "Every wild Pokémon is Meowth, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat113_enable = false
 
 cheat114_desc = "Wild: Species: Persian"
@@ -917,7 +917,7 @@ cheat114_code = "080B4E6C:36002635"
 cheat114_format = "Torii"
 cheat114_folder = "Wild"
 cheat114_keys = "launch"
-cheat114_guide = "Every wild Pokémon is Persian, at the area's usual levels."
+cheat114_guide = "Every wild Pokémon is Persian, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat114_enable = false
 
 cheat115_desc = "Wild: Species: Psyduck"
@@ -925,7 +925,7 @@ cheat115_code = "080B4E6C:36002636"
 cheat115_format = "Torii"
 cheat115_folder = "Wild"
 cheat115_keys = "launch"
-cheat115_guide = "Every wild Pokémon is Psyduck, at the area's usual levels."
+cheat115_guide = "Every wild Pokémon is Psyduck, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat115_enable = false
 
 cheat116_desc = "Wild: Species: Golduck"
@@ -933,7 +933,7 @@ cheat116_code = "080B4E6C:36002637"
 cheat116_format = "Torii"
 cheat116_folder = "Wild"
 cheat116_keys = "launch"
-cheat116_guide = "Every wild Pokémon is Golduck, at the area's usual levels."
+cheat116_guide = "Every wild Pokémon is Golduck, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat116_enable = false
 
 cheat117_desc = "Wild: Species: Mankey"
@@ -941,7 +941,7 @@ cheat117_code = "080B4E6C:36002638"
 cheat117_format = "Torii"
 cheat117_folder = "Wild"
 cheat117_keys = "launch"
-cheat117_guide = "Every wild Pokémon is Mankey, at the area's usual levels."
+cheat117_guide = "Every wild Pokémon is Mankey, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat117_enable = false
 
 cheat118_desc = "Wild: Species: Primeape"
@@ -949,7 +949,7 @@ cheat118_code = "080B4E6C:36002639"
 cheat118_format = "Torii"
 cheat118_folder = "Wild"
 cheat118_keys = "launch"
-cheat118_guide = "Every wild Pokémon is Primeape, at the area's usual levels."
+cheat118_guide = "Every wild Pokémon is Primeape, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat118_enable = false
 
 cheat119_desc = "Wild: Species: Growlithe"
@@ -957,7 +957,7 @@ cheat119_code = "080B4E6C:3600263A"
 cheat119_format = "Torii"
 cheat119_folder = "Wild"
 cheat119_keys = "launch"
-cheat119_guide = "Every wild Pokémon is Growlithe, at the area's usual levels."
+cheat119_guide = "Every wild Pokémon is Growlithe, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat119_enable = false
 
 cheat120_desc = "Wild: Species: Arcanine"
@@ -965,7 +965,7 @@ cheat120_code = "080B4E6C:3600263B"
 cheat120_format = "Torii"
 cheat120_folder = "Wild"
 cheat120_keys = "launch"
-cheat120_guide = "Every wild Pokémon is Arcanine, at the area's usual levels."
+cheat120_guide = "Every wild Pokémon is Arcanine, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat120_enable = false
 
 cheat121_desc = "Wild: Species: Poliwag"
@@ -973,7 +973,7 @@ cheat121_code = "080B4E6C:3600263C"
 cheat121_format = "Torii"
 cheat121_folder = "Wild"
 cheat121_keys = "launch"
-cheat121_guide = "Every wild Pokémon is Poliwag, at the area's usual levels."
+cheat121_guide = "Every wild Pokémon is Poliwag, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat121_enable = false
 
 cheat122_desc = "Wild: Species: Poliwhirl"
@@ -981,7 +981,7 @@ cheat122_code = "080B4E6C:3600263D"
 cheat122_format = "Torii"
 cheat122_folder = "Wild"
 cheat122_keys = "launch"
-cheat122_guide = "Every wild Pokémon is Poliwhirl, at the area's usual levels."
+cheat122_guide = "Every wild Pokémon is Poliwhirl, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat122_enable = false
 
 cheat123_desc = "Wild: Species: Poliwrath"
@@ -989,7 +989,7 @@ cheat123_code = "080B4E6C:3600263E"
 cheat123_format = "Torii"
 cheat123_folder = "Wild"
 cheat123_keys = "launch"
-cheat123_guide = "Every wild Pokémon is Poliwrath, at the area's usual levels."
+cheat123_guide = "Every wild Pokémon is Poliwrath, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat123_enable = false
 
 cheat124_desc = "Wild: Species: Abra"
@@ -997,7 +997,7 @@ cheat124_code = "080B4E6C:3600263F"
 cheat124_format = "Torii"
 cheat124_folder = "Wild"
 cheat124_keys = "launch"
-cheat124_guide = "Every wild Pokémon is Abra, at the area's usual levels."
+cheat124_guide = "Every wild Pokémon is Abra, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat124_enable = false
 
 cheat125_desc = "Wild: Species: Kadabra"
@@ -1005,7 +1005,7 @@ cheat125_code = "080B4E6C:36002640"
 cheat125_format = "Torii"
 cheat125_folder = "Wild"
 cheat125_keys = "launch"
-cheat125_guide = "Every wild Pokémon is Kadabra, at the area's usual levels."
+cheat125_guide = "Every wild Pokémon is Kadabra, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat125_enable = false
 
 cheat126_desc = "Wild: Species: Alakazam"
@@ -1013,7 +1013,7 @@ cheat126_code = "080B4E6C:36002641"
 cheat126_format = "Torii"
 cheat126_folder = "Wild"
 cheat126_keys = "launch"
-cheat126_guide = "Every wild Pokémon is Alakazam, at the area's usual levels."
+cheat126_guide = "Every wild Pokémon is Alakazam, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat126_enable = false
 
 cheat127_desc = "Wild: Species: Machop"
@@ -1021,7 +1021,7 @@ cheat127_code = "080B4E6C:36002642"
 cheat127_format = "Torii"
 cheat127_folder = "Wild"
 cheat127_keys = "launch"
-cheat127_guide = "Every wild Pokémon is Machop, at the area's usual levels."
+cheat127_guide = "Every wild Pokémon is Machop, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat127_enable = false
 
 cheat128_desc = "Wild: Species: Machoke"
@@ -1029,7 +1029,7 @@ cheat128_code = "080B4E6C:36002643"
 cheat128_format = "Torii"
 cheat128_folder = "Wild"
 cheat128_keys = "launch"
-cheat128_guide = "Every wild Pokémon is Machoke, at the area's usual levels."
+cheat128_guide = "Every wild Pokémon is Machoke, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat128_enable = false
 
 cheat129_desc = "Wild: Species: Machamp"
@@ -1037,7 +1037,7 @@ cheat129_code = "080B4E6C:36002644"
 cheat129_format = "Torii"
 cheat129_folder = "Wild"
 cheat129_keys = "launch"
-cheat129_guide = "Every wild Pokémon is Machamp, at the area's usual levels."
+cheat129_guide = "Every wild Pokémon is Machamp, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat129_enable = false
 
 cheat130_desc = "Wild: Species: Bellsprout"
@@ -1045,7 +1045,7 @@ cheat130_code = "080B4E6C:36002645"
 cheat130_format = "Torii"
 cheat130_folder = "Wild"
 cheat130_keys = "launch"
-cheat130_guide = "Every wild Pokémon is Bellsprout, at the area's usual levels."
+cheat130_guide = "Every wild Pokémon is Bellsprout, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat130_enable = false
 
 cheat131_desc = "Wild: Species: Weepinbell"
@@ -1053,7 +1053,7 @@ cheat131_code = "080B4E6C:36002646"
 cheat131_format = "Torii"
 cheat131_folder = "Wild"
 cheat131_keys = "launch"
-cheat131_guide = "Every wild Pokémon is Weepinbell, at the area's usual levels."
+cheat131_guide = "Every wild Pokémon is Weepinbell, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat131_enable = false
 
 cheat132_desc = "Wild: Species: Victreebel"
@@ -1061,7 +1061,7 @@ cheat132_code = "080B4E6C:36002647"
 cheat132_format = "Torii"
 cheat132_folder = "Wild"
 cheat132_keys = "launch"
-cheat132_guide = "Every wild Pokémon is Victreebel, at the area's usual levels."
+cheat132_guide = "Every wild Pokémon is Victreebel, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat132_enable = false
 
 cheat133_desc = "Wild: Species: Tentacool"
@@ -1069,7 +1069,7 @@ cheat133_code = "080B4E6C:36002648"
 cheat133_format = "Torii"
 cheat133_folder = "Wild"
 cheat133_keys = "launch"
-cheat133_guide = "Every wild Pokémon is Tentacool, at the area's usual levels."
+cheat133_guide = "Every wild Pokémon is Tentacool, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat133_enable = false
 
 cheat134_desc = "Wild: Species: Tentacruel"
@@ -1077,7 +1077,7 @@ cheat134_code = "080B4E6C:36002649"
 cheat134_format = "Torii"
 cheat134_folder = "Wild"
 cheat134_keys = "launch"
-cheat134_guide = "Every wild Pokémon is Tentacruel, at the area's usual levels."
+cheat134_guide = "Every wild Pokémon is Tentacruel, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat134_enable = false
 
 cheat135_desc = "Wild: Species: Geodude"
@@ -1085,7 +1085,7 @@ cheat135_code = "080B4E6C:3600264A"
 cheat135_format = "Torii"
 cheat135_folder = "Wild"
 cheat135_keys = "launch"
-cheat135_guide = "Every wild Pokémon is Geodude, at the area's usual levels."
+cheat135_guide = "Every wild Pokémon is Geodude, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat135_enable = false
 
 cheat136_desc = "Wild: Species: Graveler"
@@ -1093,7 +1093,7 @@ cheat136_code = "080B4E6C:3600264B"
 cheat136_format = "Torii"
 cheat136_folder = "Wild"
 cheat136_keys = "launch"
-cheat136_guide = "Every wild Pokémon is Graveler, at the area's usual levels."
+cheat136_guide = "Every wild Pokémon is Graveler, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat136_enable = false
 
 cheat137_desc = "Wild: Species: Golem"
@@ -1101,7 +1101,7 @@ cheat137_code = "080B4E6C:3600264C"
 cheat137_format = "Torii"
 cheat137_folder = "Wild"
 cheat137_keys = "launch"
-cheat137_guide = "Every wild Pokémon is Golem, at the area's usual levels."
+cheat137_guide = "Every wild Pokémon is Golem, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat137_enable = false
 
 cheat138_desc = "Wild: Species: Ponyta"
@@ -1109,7 +1109,7 @@ cheat138_code = "080B4E6C:3600264D"
 cheat138_format = "Torii"
 cheat138_folder = "Wild"
 cheat138_keys = "launch"
-cheat138_guide = "Every wild Pokémon is Ponyta, at the area's usual levels."
+cheat138_guide = "Every wild Pokémon is Ponyta, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat138_enable = false
 
 cheat139_desc = "Wild: Species: Rapidash"
@@ -1117,7 +1117,7 @@ cheat139_code = "080B4E6C:3600264E"
 cheat139_format = "Torii"
 cheat139_folder = "Wild"
 cheat139_keys = "launch"
-cheat139_guide = "Every wild Pokémon is Rapidash, at the area's usual levels."
+cheat139_guide = "Every wild Pokémon is Rapidash, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat139_enable = false
 
 cheat140_desc = "Wild: Species: Slowpoke"
@@ -1125,7 +1125,7 @@ cheat140_code = "080B4E6C:3600264F"
 cheat140_format = "Torii"
 cheat140_folder = "Wild"
 cheat140_keys = "launch"
-cheat140_guide = "Every wild Pokémon is Slowpoke, at the area's usual levels."
+cheat140_guide = "Every wild Pokémon is Slowpoke, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat140_enable = false
 
 cheat141_desc = "Wild: Species: Slowbro"
@@ -1133,7 +1133,7 @@ cheat141_code = "080B4E6C:36002650"
 cheat141_format = "Torii"
 cheat141_folder = "Wild"
 cheat141_keys = "launch"
-cheat141_guide = "Every wild Pokémon is Slowbro, at the area's usual levels."
+cheat141_guide = "Every wild Pokémon is Slowbro, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat141_enable = false
 
 cheat142_desc = "Wild: Species: Magnemite"
@@ -1141,7 +1141,7 @@ cheat142_code = "080B4E6C:36002651"
 cheat142_format = "Torii"
 cheat142_folder = "Wild"
 cheat142_keys = "launch"
-cheat142_guide = "Every wild Pokémon is Magnemite, at the area's usual levels."
+cheat142_guide = "Every wild Pokémon is Magnemite, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat142_enable = false
 
 cheat143_desc = "Wild: Species: Magneton"
@@ -1149,7 +1149,7 @@ cheat143_code = "080B4E6C:36002652"
 cheat143_format = "Torii"
 cheat143_folder = "Wild"
 cheat143_keys = "launch"
-cheat143_guide = "Every wild Pokémon is Magneton, at the area's usual levels."
+cheat143_guide = "Every wild Pokémon is Magneton, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat143_enable = false
 
 cheat144_desc = "Wild: Species: Farfetch'd"
@@ -1157,7 +1157,7 @@ cheat144_code = "080B4E6C:36002653"
 cheat144_format = "Torii"
 cheat144_folder = "Wild"
 cheat144_keys = "launch"
-cheat144_guide = "Every wild Pokémon is Farfetch'd, at the area's usual levels."
+cheat144_guide = "Every wild Pokémon is Farfetch'd, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat144_enable = false
 
 cheat145_desc = "Wild: Species: Doduo"
@@ -1165,7 +1165,7 @@ cheat145_code = "080B4E6C:36002654"
 cheat145_format = "Torii"
 cheat145_folder = "Wild"
 cheat145_keys = "launch"
-cheat145_guide = "Every wild Pokémon is Doduo, at the area's usual levels."
+cheat145_guide = "Every wild Pokémon is Doduo, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat145_enable = false
 
 cheat146_desc = "Wild: Species: Dodrio"
@@ -1173,7 +1173,7 @@ cheat146_code = "080B4E6C:36002655"
 cheat146_format = "Torii"
 cheat146_folder = "Wild"
 cheat146_keys = "launch"
-cheat146_guide = "Every wild Pokémon is Dodrio, at the area's usual levels."
+cheat146_guide = "Every wild Pokémon is Dodrio, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat146_enable = false
 
 cheat147_desc = "Wild: Species: Seel"
@@ -1181,7 +1181,7 @@ cheat147_code = "080B4E6C:36002656"
 cheat147_format = "Torii"
 cheat147_folder = "Wild"
 cheat147_keys = "launch"
-cheat147_guide = "Every wild Pokémon is Seel, at the area's usual levels."
+cheat147_guide = "Every wild Pokémon is Seel, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat147_enable = false
 
 cheat148_desc = "Wild: Species: Dewgong"
@@ -1189,7 +1189,7 @@ cheat148_code = "080B4E6C:36002657"
 cheat148_format = "Torii"
 cheat148_folder = "Wild"
 cheat148_keys = "launch"
-cheat148_guide = "Every wild Pokémon is Dewgong, at the area's usual levels."
+cheat148_guide = "Every wild Pokémon is Dewgong, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat148_enable = false
 
 cheat149_desc = "Wild: Species: Grimer"
@@ -1197,7 +1197,7 @@ cheat149_code = "080B4E6C:36002658"
 cheat149_format = "Torii"
 cheat149_folder = "Wild"
 cheat149_keys = "launch"
-cheat149_guide = "Every wild Pokémon is Grimer, at the area's usual levels."
+cheat149_guide = "Every wild Pokémon is Grimer, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat149_enable = false
 
 cheat150_desc = "Wild: Species: Muk"
@@ -1205,7 +1205,7 @@ cheat150_code = "080B4E6C:36002659"
 cheat150_format = "Torii"
 cheat150_folder = "Wild"
 cheat150_keys = "launch"
-cheat150_guide = "Every wild Pokémon is Muk, at the area's usual levels."
+cheat150_guide = "Every wild Pokémon is Muk, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat150_enable = false
 
 cheat151_desc = "Wild: Species: Shellder"
@@ -1213,7 +1213,7 @@ cheat151_code = "080B4E6C:3600265A"
 cheat151_format = "Torii"
 cheat151_folder = "Wild"
 cheat151_keys = "launch"
-cheat151_guide = "Every wild Pokémon is Shellder, at the area's usual levels."
+cheat151_guide = "Every wild Pokémon is Shellder, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat151_enable = false
 
 cheat152_desc = "Wild: Species: Cloyster"
@@ -1221,7 +1221,7 @@ cheat152_code = "080B4E6C:3600265B"
 cheat152_format = "Torii"
 cheat152_folder = "Wild"
 cheat152_keys = "launch"
-cheat152_guide = "Every wild Pokémon is Cloyster, at the area's usual levels."
+cheat152_guide = "Every wild Pokémon is Cloyster, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat152_enable = false
 
 cheat153_desc = "Wild: Species: Gastly"
@@ -1229,7 +1229,7 @@ cheat153_code = "080B4E6C:3600265C"
 cheat153_format = "Torii"
 cheat153_folder = "Wild"
 cheat153_keys = "launch"
-cheat153_guide = "Every wild Pokémon is Gastly, at the area's usual levels."
+cheat153_guide = "Every wild Pokémon is Gastly, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat153_enable = false
 
 cheat154_desc = "Wild: Species: Haunter"
@@ -1237,7 +1237,7 @@ cheat154_code = "080B4E6C:3600265D"
 cheat154_format = "Torii"
 cheat154_folder = "Wild"
 cheat154_keys = "launch"
-cheat154_guide = "Every wild Pokémon is Haunter, at the area's usual levels."
+cheat154_guide = "Every wild Pokémon is Haunter, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat154_enable = false
 
 cheat155_desc = "Wild: Species: Gengar"
@@ -1245,7 +1245,7 @@ cheat155_code = "080B4E6C:3600265E"
 cheat155_format = "Torii"
 cheat155_folder = "Wild"
 cheat155_keys = "launch"
-cheat155_guide = "Every wild Pokémon is Gengar, at the area's usual levels."
+cheat155_guide = "Every wild Pokémon is Gengar, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat155_enable = false
 
 cheat156_desc = "Wild: Species: Onix"
@@ -1253,7 +1253,7 @@ cheat156_code = "080B4E6C:3600265F"
 cheat156_format = "Torii"
 cheat156_folder = "Wild"
 cheat156_keys = "launch"
-cheat156_guide = "Every wild Pokémon is Onix, at the area's usual levels."
+cheat156_guide = "Every wild Pokémon is Onix, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat156_enable = false
 
 cheat157_desc = "Wild: Species: Drowzee"
@@ -1261,7 +1261,7 @@ cheat157_code = "080B4E6C:36002660"
 cheat157_format = "Torii"
 cheat157_folder = "Wild"
 cheat157_keys = "launch"
-cheat157_guide = "Every wild Pokémon is Drowzee, at the area's usual levels."
+cheat157_guide = "Every wild Pokémon is Drowzee, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat157_enable = false
 
 cheat158_desc = "Wild: Species: Hypno"
@@ -1269,7 +1269,7 @@ cheat158_code = "080B4E6C:36002661"
 cheat158_format = "Torii"
 cheat158_folder = "Wild"
 cheat158_keys = "launch"
-cheat158_guide = "Every wild Pokémon is Hypno, at the area's usual levels."
+cheat158_guide = "Every wild Pokémon is Hypno, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat158_enable = false
 
 cheat159_desc = "Wild: Species: Krabby"
@@ -1277,7 +1277,7 @@ cheat159_code = "080B4E6C:36002662"
 cheat159_format = "Torii"
 cheat159_folder = "Wild"
 cheat159_keys = "launch"
-cheat159_guide = "Every wild Pokémon is Krabby, at the area's usual levels."
+cheat159_guide = "Every wild Pokémon is Krabby, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat159_enable = false
 
 cheat160_desc = "Wild: Species: Kingler"
@@ -1285,7 +1285,7 @@ cheat160_code = "080B4E6C:36002663"
 cheat160_format = "Torii"
 cheat160_folder = "Wild"
 cheat160_keys = "launch"
-cheat160_guide = "Every wild Pokémon is Kingler, at the area's usual levels."
+cheat160_guide = "Every wild Pokémon is Kingler, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat160_enable = false
 
 cheat161_desc = "Wild: Species: Voltorb"
@@ -1293,7 +1293,7 @@ cheat161_code = "080B4E6C:36002664"
 cheat161_format = "Torii"
 cheat161_folder = "Wild"
 cheat161_keys = "launch"
-cheat161_guide = "Every wild Pokémon is Voltorb, at the area's usual levels."
+cheat161_guide = "Every wild Pokémon is Voltorb, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat161_enable = false
 
 cheat162_desc = "Wild: Species: Electrode"
@@ -1301,7 +1301,7 @@ cheat162_code = "080B4E6C:36002665"
 cheat162_format = "Torii"
 cheat162_folder = "Wild"
 cheat162_keys = "launch"
-cheat162_guide = "Every wild Pokémon is Electrode, at the area's usual levels."
+cheat162_guide = "Every wild Pokémon is Electrode, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat162_enable = false
 
 cheat163_desc = "Wild: Species: Exeggcute"
@@ -1309,7 +1309,7 @@ cheat163_code = "080B4E6C:36002666"
 cheat163_format = "Torii"
 cheat163_folder = "Wild"
 cheat163_keys = "launch"
-cheat163_guide = "Every wild Pokémon is Exeggcute, at the area's usual levels."
+cheat163_guide = "Every wild Pokémon is Exeggcute, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat163_enable = false
 
 cheat164_desc = "Wild: Species: Exeggutor"
@@ -1317,7 +1317,7 @@ cheat164_code = "080B4E6C:36002667"
 cheat164_format = "Torii"
 cheat164_folder = "Wild"
 cheat164_keys = "launch"
-cheat164_guide = "Every wild Pokémon is Exeggutor, at the area's usual levels."
+cheat164_guide = "Every wild Pokémon is Exeggutor, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat164_enable = false
 
 cheat165_desc = "Wild: Species: Cubone"
@@ -1325,7 +1325,7 @@ cheat165_code = "080B4E6C:36002668"
 cheat165_format = "Torii"
 cheat165_folder = "Wild"
 cheat165_keys = "launch"
-cheat165_guide = "Every wild Pokémon is Cubone, at the area's usual levels."
+cheat165_guide = "Every wild Pokémon is Cubone, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat165_enable = false
 
 cheat166_desc = "Wild: Species: Marowak"
@@ -1333,7 +1333,7 @@ cheat166_code = "080B4E6C:36002669"
 cheat166_format = "Torii"
 cheat166_folder = "Wild"
 cheat166_keys = "launch"
-cheat166_guide = "Every wild Pokémon is Marowak, at the area's usual levels."
+cheat166_guide = "Every wild Pokémon is Marowak, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat166_enable = false
 
 cheat167_desc = "Wild: Species: Hitmonlee"
@@ -1341,7 +1341,7 @@ cheat167_code = "080B4E6C:3600266A"
 cheat167_format = "Torii"
 cheat167_folder = "Wild"
 cheat167_keys = "launch"
-cheat167_guide = "Every wild Pokémon is Hitmonlee, at the area's usual levels."
+cheat167_guide = "Every wild Pokémon is Hitmonlee, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat167_enable = false
 
 cheat168_desc = "Wild: Species: Hitmonchan"
@@ -1349,7 +1349,7 @@ cheat168_code = "080B4E6C:3600266B"
 cheat168_format = "Torii"
 cheat168_folder = "Wild"
 cheat168_keys = "launch"
-cheat168_guide = "Every wild Pokémon is Hitmonchan, at the area's usual levels."
+cheat168_guide = "Every wild Pokémon is Hitmonchan, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat168_enable = false
 
 cheat169_desc = "Wild: Species: Lickitung"
@@ -1357,7 +1357,7 @@ cheat169_code = "080B4E6C:3600266C"
 cheat169_format = "Torii"
 cheat169_folder = "Wild"
 cheat169_keys = "launch"
-cheat169_guide = "Every wild Pokémon is Lickitung, at the area's usual levels."
+cheat169_guide = "Every wild Pokémon is Lickitung, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat169_enable = false
 
 cheat170_desc = "Wild: Species: Koffing"
@@ -1365,7 +1365,7 @@ cheat170_code = "080B4E6C:3600266D"
 cheat170_format = "Torii"
 cheat170_folder = "Wild"
 cheat170_keys = "launch"
-cheat170_guide = "Every wild Pokémon is Koffing, at the area's usual levels."
+cheat170_guide = "Every wild Pokémon is Koffing, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat170_enable = false
 
 cheat171_desc = "Wild: Species: Weezing"
@@ -1373,7 +1373,7 @@ cheat171_code = "080B4E6C:3600266E"
 cheat171_format = "Torii"
 cheat171_folder = "Wild"
 cheat171_keys = "launch"
-cheat171_guide = "Every wild Pokémon is Weezing, at the area's usual levels."
+cheat171_guide = "Every wild Pokémon is Weezing, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat171_enable = false
 
 cheat172_desc = "Wild: Species: Rhyhorn"
@@ -1381,7 +1381,7 @@ cheat172_code = "080B4E6C:3600266F"
 cheat172_format = "Torii"
 cheat172_folder = "Wild"
 cheat172_keys = "launch"
-cheat172_guide = "Every wild Pokémon is Rhyhorn, at the area's usual levels."
+cheat172_guide = "Every wild Pokémon is Rhyhorn, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat172_enable = false
 
 cheat173_desc = "Wild: Species: Rhydon"
@@ -1389,7 +1389,7 @@ cheat173_code = "080B4E6C:36002670"
 cheat173_format = "Torii"
 cheat173_folder = "Wild"
 cheat173_keys = "launch"
-cheat173_guide = "Every wild Pokémon is Rhydon, at the area's usual levels."
+cheat173_guide = "Every wild Pokémon is Rhydon, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat173_enable = false
 
 cheat174_desc = "Wild: Species: Chansey"
@@ -1397,7 +1397,7 @@ cheat174_code = "080B4E6C:36002671"
 cheat174_format = "Torii"
 cheat174_folder = "Wild"
 cheat174_keys = "launch"
-cheat174_guide = "Every wild Pokémon is Chansey, at the area's usual levels."
+cheat174_guide = "Every wild Pokémon is Chansey, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat174_enable = false
 
 cheat175_desc = "Wild: Species: Tangela"
@@ -1405,7 +1405,7 @@ cheat175_code = "080B4E6C:36002672"
 cheat175_format = "Torii"
 cheat175_folder = "Wild"
 cheat175_keys = "launch"
-cheat175_guide = "Every wild Pokémon is Tangela, at the area's usual levels."
+cheat175_guide = "Every wild Pokémon is Tangela, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat175_enable = false
 
 cheat176_desc = "Wild: Species: Kangaskhan"
@@ -1413,7 +1413,7 @@ cheat176_code = "080B4E6C:36002673"
 cheat176_format = "Torii"
 cheat176_folder = "Wild"
 cheat176_keys = "launch"
-cheat176_guide = "Every wild Pokémon is Kangaskhan, at the area's usual levels."
+cheat176_guide = "Every wild Pokémon is Kangaskhan, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat176_enable = false
 
 cheat177_desc = "Wild: Species: Horsea"
@@ -1421,7 +1421,7 @@ cheat177_code = "080B4E6C:36002674"
 cheat177_format = "Torii"
 cheat177_folder = "Wild"
 cheat177_keys = "launch"
-cheat177_guide = "Every wild Pokémon is Horsea, at the area's usual levels."
+cheat177_guide = "Every wild Pokémon is Horsea, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat177_enable = false
 
 cheat178_desc = "Wild: Species: Seadra"
@@ -1429,7 +1429,7 @@ cheat178_code = "080B4E6C:36002675"
 cheat178_format = "Torii"
 cheat178_folder = "Wild"
 cheat178_keys = "launch"
-cheat178_guide = "Every wild Pokémon is Seadra, at the area's usual levels."
+cheat178_guide = "Every wild Pokémon is Seadra, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat178_enable = false
 
 cheat179_desc = "Wild: Species: Goldeen"
@@ -1437,7 +1437,7 @@ cheat179_code = "080B4E6C:36002676"
 cheat179_format = "Torii"
 cheat179_folder = "Wild"
 cheat179_keys = "launch"
-cheat179_guide = "Every wild Pokémon is Goldeen, at the area's usual levels."
+cheat179_guide = "Every wild Pokémon is Goldeen, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat179_enable = false
 
 cheat180_desc = "Wild: Species: Seaking"
@@ -1445,7 +1445,7 @@ cheat180_code = "080B4E6C:36002677"
 cheat180_format = "Torii"
 cheat180_folder = "Wild"
 cheat180_keys = "launch"
-cheat180_guide = "Every wild Pokémon is Seaking, at the area's usual levels."
+cheat180_guide = "Every wild Pokémon is Seaking, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat180_enable = false
 
 cheat181_desc = "Wild: Species: Staryu"
@@ -1453,7 +1453,7 @@ cheat181_code = "080B4E6C:36002678"
 cheat181_format = "Torii"
 cheat181_folder = "Wild"
 cheat181_keys = "launch"
-cheat181_guide = "Every wild Pokémon is Staryu, at the area's usual levels."
+cheat181_guide = "Every wild Pokémon is Staryu, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat181_enable = false
 
 cheat182_desc = "Wild: Species: Starmie"
@@ -1461,7 +1461,7 @@ cheat182_code = "080B4E6C:36002679"
 cheat182_format = "Torii"
 cheat182_folder = "Wild"
 cheat182_keys = "launch"
-cheat182_guide = "Every wild Pokémon is Starmie, at the area's usual levels."
+cheat182_guide = "Every wild Pokémon is Starmie, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat182_enable = false
 
 cheat183_desc = "Wild: Species: Mr. Mime"
@@ -1469,7 +1469,7 @@ cheat183_code = "080B4E6C:3600267A"
 cheat183_format = "Torii"
 cheat183_folder = "Wild"
 cheat183_keys = "launch"
-cheat183_guide = "Every wild Pokémon is Mr. Mime, at the area's usual levels."
+cheat183_guide = "Every wild Pokémon is Mr. Mime, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat183_enable = false
 
 cheat184_desc = "Wild: Species: Scyther"
@@ -1477,7 +1477,7 @@ cheat184_code = "080B4E6C:3600267B"
 cheat184_format = "Torii"
 cheat184_folder = "Wild"
 cheat184_keys = "launch"
-cheat184_guide = "Every wild Pokémon is Scyther, at the area's usual levels."
+cheat184_guide = "Every wild Pokémon is Scyther, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat184_enable = false
 
 cheat185_desc = "Wild: Species: Jynx"
@@ -1485,7 +1485,7 @@ cheat185_code = "080B4E6C:3600267C"
 cheat185_format = "Torii"
 cheat185_folder = "Wild"
 cheat185_keys = "launch"
-cheat185_guide = "Every wild Pokémon is Jynx, at the area's usual levels."
+cheat185_guide = "Every wild Pokémon is Jynx, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat185_enable = false
 
 cheat186_desc = "Wild: Species: Electabuzz"
@@ -1493,7 +1493,7 @@ cheat186_code = "080B4E6C:3600267D"
 cheat186_format = "Torii"
 cheat186_folder = "Wild"
 cheat186_keys = "launch"
-cheat186_guide = "Every wild Pokémon is Electabuzz, at the area's usual levels."
+cheat186_guide = "Every wild Pokémon is Electabuzz, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat186_enable = false
 
 cheat187_desc = "Wild: Species: Magmar"
@@ -1501,7 +1501,7 @@ cheat187_code = "080B4E6C:3600267E"
 cheat187_format = "Torii"
 cheat187_folder = "Wild"
 cheat187_keys = "launch"
-cheat187_guide = "Every wild Pokémon is Magmar, at the area's usual levels."
+cheat187_guide = "Every wild Pokémon is Magmar, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat187_enable = false
 
 cheat188_desc = "Wild: Species: Pinsir"
@@ -1509,7 +1509,7 @@ cheat188_code = "080B4E6C:3600267F"
 cheat188_format = "Torii"
 cheat188_folder = "Wild"
 cheat188_keys = "launch"
-cheat188_guide = "Every wild Pokémon is Pinsir, at the area's usual levels."
+cheat188_guide = "Every wild Pokémon is Pinsir, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat188_enable = false
 
 cheat189_desc = "Wild: Species: Tauros"
@@ -1517,7 +1517,7 @@ cheat189_code = "080B4E6C:36002680"
 cheat189_format = "Torii"
 cheat189_folder = "Wild"
 cheat189_keys = "launch"
-cheat189_guide = "Every wild Pokémon is Tauros, at the area's usual levels."
+cheat189_guide = "Every wild Pokémon is Tauros, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat189_enable = false
 
 cheat190_desc = "Wild: Species: Magikarp"
@@ -1525,7 +1525,7 @@ cheat190_code = "080B4E6C:36002681"
 cheat190_format = "Torii"
 cheat190_folder = "Wild"
 cheat190_keys = "launch"
-cheat190_guide = "Every wild Pokémon is Magikarp, at the area's usual levels."
+cheat190_guide = "Every wild Pokémon is Magikarp, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat190_enable = false
 
 cheat191_desc = "Wild: Species: Gyarados"
@@ -1533,7 +1533,7 @@ cheat191_code = "080B4E6C:36002682"
 cheat191_format = "Torii"
 cheat191_folder = "Wild"
 cheat191_keys = "launch"
-cheat191_guide = "Every wild Pokémon is Gyarados, at the area's usual levels."
+cheat191_guide = "Every wild Pokémon is Gyarados, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat191_enable = false
 
 cheat192_desc = "Wild: Species: Lapras"
@@ -1541,7 +1541,7 @@ cheat192_code = "080B4E6C:36002683"
 cheat192_format = "Torii"
 cheat192_folder = "Wild"
 cheat192_keys = "launch"
-cheat192_guide = "Every wild Pokémon is Lapras, at the area's usual levels."
+cheat192_guide = "Every wild Pokémon is Lapras, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat192_enable = false
 
 cheat193_desc = "Wild: Species: Ditto"
@@ -1549,7 +1549,7 @@ cheat193_code = "080B4E6C:36002684"
 cheat193_format = "Torii"
 cheat193_folder = "Wild"
 cheat193_keys = "launch"
-cheat193_guide = "Every wild Pokémon is Ditto, at the area's usual levels."
+cheat193_guide = "Every wild Pokémon is Ditto, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat193_enable = false
 
 cheat194_desc = "Wild: Species: Eevee"
@@ -1557,7 +1557,7 @@ cheat194_code = "080B4E6C:36002685"
 cheat194_format = "Torii"
 cheat194_folder = "Wild"
 cheat194_keys = "launch"
-cheat194_guide = "Every wild Pokémon is Eevee, at the area's usual levels."
+cheat194_guide = "Every wild Pokémon is Eevee, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat194_enable = false
 
 cheat195_desc = "Wild: Species: Vaporeon"
@@ -1565,7 +1565,7 @@ cheat195_code = "080B4E6C:36002686"
 cheat195_format = "Torii"
 cheat195_folder = "Wild"
 cheat195_keys = "launch"
-cheat195_guide = "Every wild Pokémon is Vaporeon, at the area's usual levels."
+cheat195_guide = "Every wild Pokémon is Vaporeon, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat195_enable = false
 
 cheat196_desc = "Wild: Species: Jolteon"
@@ -1573,7 +1573,7 @@ cheat196_code = "080B4E6C:36002687"
 cheat196_format = "Torii"
 cheat196_folder = "Wild"
 cheat196_keys = "launch"
-cheat196_guide = "Every wild Pokémon is Jolteon, at the area's usual levels."
+cheat196_guide = "Every wild Pokémon is Jolteon, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat196_enable = false
 
 cheat197_desc = "Wild: Species: Flareon"
@@ -1581,7 +1581,7 @@ cheat197_code = "080B4E6C:36002688"
 cheat197_format = "Torii"
 cheat197_folder = "Wild"
 cheat197_keys = "launch"
-cheat197_guide = "Every wild Pokémon is Flareon, at the area's usual levels."
+cheat197_guide = "Every wild Pokémon is Flareon, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat197_enable = false
 
 cheat198_desc = "Wild: Species: Porygon"
@@ -1589,7 +1589,7 @@ cheat198_code = "080B4E6C:36002689"
 cheat198_format = "Torii"
 cheat198_folder = "Wild"
 cheat198_keys = "launch"
-cheat198_guide = "Every wild Pokémon is Porygon, at the area's usual levels."
+cheat198_guide = "Every wild Pokémon is Porygon, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat198_enable = false
 
 cheat199_desc = "Wild: Species: Omanyte"
@@ -1597,7 +1597,7 @@ cheat199_code = "080B4E6C:3600268A"
 cheat199_format = "Torii"
 cheat199_folder = "Wild"
 cheat199_keys = "launch"
-cheat199_guide = "Every wild Pokémon is Omanyte, at the area's usual levels."
+cheat199_guide = "Every wild Pokémon is Omanyte, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat199_enable = false
 
 cheat200_desc = "Wild: Species: Omastar"
@@ -1605,7 +1605,7 @@ cheat200_code = "080B4E6C:3600268B"
 cheat200_format = "Torii"
 cheat200_folder = "Wild"
 cheat200_keys = "launch"
-cheat200_guide = "Every wild Pokémon is Omastar, at the area's usual levels."
+cheat200_guide = "Every wild Pokémon is Omastar, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat200_enable = false
 
 cheat201_desc = "Wild: Species: Kabuto"
@@ -1613,7 +1613,7 @@ cheat201_code = "080B4E6C:3600268C"
 cheat201_format = "Torii"
 cheat201_folder = "Wild"
 cheat201_keys = "launch"
-cheat201_guide = "Every wild Pokémon is Kabuto, at the area's usual levels."
+cheat201_guide = "Every wild Pokémon is Kabuto, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat201_enable = false
 
 cheat202_desc = "Wild: Species: Kabutops"
@@ -1621,7 +1621,7 @@ cheat202_code = "080B4E6C:3600268D"
 cheat202_format = "Torii"
 cheat202_folder = "Wild"
 cheat202_keys = "launch"
-cheat202_guide = "Every wild Pokémon is Kabutops, at the area's usual levels."
+cheat202_guide = "Every wild Pokémon is Kabutops, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat202_enable = false
 
 cheat203_desc = "Wild: Species: Aerodactyl"
@@ -1629,7 +1629,7 @@ cheat203_code = "080B4E6C:3600268E"
 cheat203_format = "Torii"
 cheat203_folder = "Wild"
 cheat203_keys = "launch"
-cheat203_guide = "Every wild Pokémon is Aerodactyl, at the area's usual levels."
+cheat203_guide = "Every wild Pokémon is Aerodactyl, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat203_enable = false
 
 cheat204_desc = "Wild: Species: Snorlax"
@@ -1637,7 +1637,7 @@ cheat204_code = "080B4E6C:3600268F"
 cheat204_format = "Torii"
 cheat204_folder = "Wild"
 cheat204_keys = "launch"
-cheat204_guide = "Every wild Pokémon is Snorlax, at the area's usual levels."
+cheat204_guide = "Every wild Pokémon is Snorlax, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat204_enable = false
 
 cheat205_desc = "Wild: Species: Articuno"
@@ -1645,7 +1645,7 @@ cheat205_code = "080B4E6C:36002690"
 cheat205_format = "Torii"
 cheat205_folder = "Wild"
 cheat205_keys = "launch"
-cheat205_guide = "Every wild Pokémon is Articuno, at the area's usual levels."
+cheat205_guide = "Every wild Pokémon is Articuno, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat205_enable = false
 
 cheat206_desc = "Wild: Species: Zapdos"
@@ -1653,7 +1653,7 @@ cheat206_code = "080B4E6C:36002691"
 cheat206_format = "Torii"
 cheat206_folder = "Wild"
 cheat206_keys = "launch"
-cheat206_guide = "Every wild Pokémon is Zapdos, at the area's usual levels."
+cheat206_guide = "Every wild Pokémon is Zapdos, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat206_enable = false
 
 cheat207_desc = "Wild: Species: Moltres"
@@ -1661,7 +1661,7 @@ cheat207_code = "080B4E6C:36002692"
 cheat207_format = "Torii"
 cheat207_folder = "Wild"
 cheat207_keys = "launch"
-cheat207_guide = "Every wild Pokémon is Moltres, at the area's usual levels."
+cheat207_guide = "Every wild Pokémon is Moltres, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat207_enable = false
 
 cheat208_desc = "Wild: Species: Dratini"
@@ -1669,7 +1669,7 @@ cheat208_code = "080B4E6C:36002693"
 cheat208_format = "Torii"
 cheat208_folder = "Wild"
 cheat208_keys = "launch"
-cheat208_guide = "Every wild Pokémon is Dratini, at the area's usual levels."
+cheat208_guide = "Every wild Pokémon is Dratini, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat208_enable = false
 
 cheat209_desc = "Wild: Species: Dragonair"
@@ -1677,7 +1677,7 @@ cheat209_code = "080B4E6C:36002694"
 cheat209_format = "Torii"
 cheat209_folder = "Wild"
 cheat209_keys = "launch"
-cheat209_guide = "Every wild Pokémon is Dragonair, at the area's usual levels."
+cheat209_guide = "Every wild Pokémon is Dragonair, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat209_enable = false
 
 cheat210_desc = "Wild: Species: Dragonite"
@@ -1685,7 +1685,7 @@ cheat210_code = "080B4E6C:36002695"
 cheat210_format = "Torii"
 cheat210_folder = "Wild"
 cheat210_keys = "launch"
-cheat210_guide = "Every wild Pokémon is Dragonite, at the area's usual levels."
+cheat210_guide = "Every wild Pokémon is Dragonite, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat210_enable = false
 
 cheat211_desc = "Wild: Species: Mewtwo"
@@ -1693,7 +1693,7 @@ cheat211_code = "080B4E6C:36002696"
 cheat211_format = "Torii"
 cheat211_folder = "Wild"
 cheat211_keys = "launch"
-cheat211_guide = "Every wild Pokémon is Mewtwo, at the area's usual levels."
+cheat211_guide = "Every wild Pokémon is Mewtwo, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat211_enable = false
 
 cheat212_desc = "Wild: Species: Mew"
@@ -1701,7 +1701,7 @@ cheat212_code = "080B4E6C:36002697"
 cheat212_format = "Torii"
 cheat212_folder = "Wild"
 cheat212_keys = "launch"
-cheat212_guide = "Every wild Pokémon is Mew, at the area's usual levels."
+cheat212_guide = "Every wild Pokémon is Mew, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat212_enable = false
 
 cheat213_desc = "Wild: Species: Chikorita"
@@ -1709,7 +1709,7 @@ cheat213_code = "080B4E6C:36002698"
 cheat213_format = "Torii"
 cheat213_folder = "Wild"
 cheat213_keys = "launch"
-cheat213_guide = "Every wild Pokémon is Chikorita, at the area's usual levels."
+cheat213_guide = "Every wild Pokémon is Chikorita, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat213_enable = false
 
 cheat214_desc = "Wild: Species: Bayleef"
@@ -1717,7 +1717,7 @@ cheat214_code = "080B4E6C:36002699"
 cheat214_format = "Torii"
 cheat214_folder = "Wild"
 cheat214_keys = "launch"
-cheat214_guide = "Every wild Pokémon is Bayleef, at the area's usual levels."
+cheat214_guide = "Every wild Pokémon is Bayleef, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat214_enable = false
 
 cheat215_desc = "Wild: Species: Meganium"
@@ -1725,7 +1725,7 @@ cheat215_code = "080B4E6C:3600269A"
 cheat215_format = "Torii"
 cheat215_folder = "Wild"
 cheat215_keys = "launch"
-cheat215_guide = "Every wild Pokémon is Meganium, at the area's usual levels."
+cheat215_guide = "Every wild Pokémon is Meganium, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat215_enable = false
 
 cheat216_desc = "Wild: Species: Cyndaquil"
@@ -1733,7 +1733,7 @@ cheat216_code = "080B4E6C:3600269B"
 cheat216_format = "Torii"
 cheat216_folder = "Wild"
 cheat216_keys = "launch"
-cheat216_guide = "Every wild Pokémon is Cyndaquil, at the area's usual levels."
+cheat216_guide = "Every wild Pokémon is Cyndaquil, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat216_enable = false
 
 cheat217_desc = "Wild: Species: Quilava"
@@ -1741,7 +1741,7 @@ cheat217_code = "080B4E6C:3600269C"
 cheat217_format = "Torii"
 cheat217_folder = "Wild"
 cheat217_keys = "launch"
-cheat217_guide = "Every wild Pokémon is Quilava, at the area's usual levels."
+cheat217_guide = "Every wild Pokémon is Quilava, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat217_enable = false
 
 cheat218_desc = "Wild: Species: Typhlosion"
@@ -1749,7 +1749,7 @@ cheat218_code = "080B4E6C:3600269D"
 cheat218_format = "Torii"
 cheat218_folder = "Wild"
 cheat218_keys = "launch"
-cheat218_guide = "Every wild Pokémon is Typhlosion, at the area's usual levels."
+cheat218_guide = "Every wild Pokémon is Typhlosion, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat218_enable = false
 
 cheat219_desc = "Wild: Species: Totodile"
@@ -1757,7 +1757,7 @@ cheat219_code = "080B4E6C:3600269E"
 cheat219_format = "Torii"
 cheat219_folder = "Wild"
 cheat219_keys = "launch"
-cheat219_guide = "Every wild Pokémon is Totodile, at the area's usual levels."
+cheat219_guide = "Every wild Pokémon is Totodile, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat219_enable = false
 
 cheat220_desc = "Wild: Species: Croconaw"
@@ -1765,7 +1765,7 @@ cheat220_code = "080B4E6C:3600269F"
 cheat220_format = "Torii"
 cheat220_folder = "Wild"
 cheat220_keys = "launch"
-cheat220_guide = "Every wild Pokémon is Croconaw, at the area's usual levels."
+cheat220_guide = "Every wild Pokémon is Croconaw, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat220_enable = false
 
 cheat221_desc = "Wild: Species: Feraligatr"
@@ -1773,7 +1773,7 @@ cheat221_code = "080B4E6C:360026A0"
 cheat221_format = "Torii"
 cheat221_folder = "Wild"
 cheat221_keys = "launch"
-cheat221_guide = "Every wild Pokémon is Feraligatr, at the area's usual levels."
+cheat221_guide = "Every wild Pokémon is Feraligatr, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat221_enable = false
 
 cheat222_desc = "Wild: Species: Sentret"
@@ -1781,7 +1781,7 @@ cheat222_code = "080B4E6C:360026A1"
 cheat222_format = "Torii"
 cheat222_folder = "Wild"
 cheat222_keys = "launch"
-cheat222_guide = "Every wild Pokémon is Sentret, at the area's usual levels."
+cheat222_guide = "Every wild Pokémon is Sentret, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat222_enable = false
 
 cheat223_desc = "Wild: Species: Furret"
@@ -1789,7 +1789,7 @@ cheat223_code = "080B4E6C:360026A2"
 cheat223_format = "Torii"
 cheat223_folder = "Wild"
 cheat223_keys = "launch"
-cheat223_guide = "Every wild Pokémon is Furret, at the area's usual levels."
+cheat223_guide = "Every wild Pokémon is Furret, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat223_enable = false
 
 cheat224_desc = "Wild: Species: Hoothoot"
@@ -1797,7 +1797,7 @@ cheat224_code = "080B4E6C:360026A3"
 cheat224_format = "Torii"
 cheat224_folder = "Wild"
 cheat224_keys = "launch"
-cheat224_guide = "Every wild Pokémon is Hoothoot, at the area's usual levels."
+cheat224_guide = "Every wild Pokémon is Hoothoot, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat224_enable = false
 
 cheat225_desc = "Wild: Species: Noctowl"
@@ -1805,7 +1805,7 @@ cheat225_code = "080B4E6C:360026A4"
 cheat225_format = "Torii"
 cheat225_folder = "Wild"
 cheat225_keys = "launch"
-cheat225_guide = "Every wild Pokémon is Noctowl, at the area's usual levels."
+cheat225_guide = "Every wild Pokémon is Noctowl, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat225_enable = false
 
 cheat226_desc = "Wild: Species: Ledyba"
@@ -1813,7 +1813,7 @@ cheat226_code = "080B4E6C:360026A5"
 cheat226_format = "Torii"
 cheat226_folder = "Wild"
 cheat226_keys = "launch"
-cheat226_guide = "Every wild Pokémon is Ledyba, at the area's usual levels."
+cheat226_guide = "Every wild Pokémon is Ledyba, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat226_enable = false
 
 cheat227_desc = "Wild: Species: Ledian"
@@ -1821,7 +1821,7 @@ cheat227_code = "080B4E6C:360026A6"
 cheat227_format = "Torii"
 cheat227_folder = "Wild"
 cheat227_keys = "launch"
-cheat227_guide = "Every wild Pokémon is Ledian, at the area's usual levels."
+cheat227_guide = "Every wild Pokémon is Ledian, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat227_enable = false
 
 cheat228_desc = "Wild: Species: Spinarak"
@@ -1829,7 +1829,7 @@ cheat228_code = "080B4E6C:360026A7"
 cheat228_format = "Torii"
 cheat228_folder = "Wild"
 cheat228_keys = "launch"
-cheat228_guide = "Every wild Pokémon is Spinarak, at the area's usual levels."
+cheat228_guide = "Every wild Pokémon is Spinarak, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat228_enable = false
 
 cheat229_desc = "Wild: Species: Ariados"
@@ -1837,7 +1837,7 @@ cheat229_code = "080B4E6C:360026A8"
 cheat229_format = "Torii"
 cheat229_folder = "Wild"
 cheat229_keys = "launch"
-cheat229_guide = "Every wild Pokémon is Ariados, at the area's usual levels."
+cheat229_guide = "Every wild Pokémon is Ariados, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat229_enable = false
 
 cheat230_desc = "Wild: Species: Crobat"
@@ -1845,7 +1845,7 @@ cheat230_code = "080B4E6C:360026A9"
 cheat230_format = "Torii"
 cheat230_folder = "Wild"
 cheat230_keys = "launch"
-cheat230_guide = "Every wild Pokémon is Crobat, at the area's usual levels."
+cheat230_guide = "Every wild Pokémon is Crobat, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat230_enable = false
 
 cheat231_desc = "Wild: Species: Chinchou"
@@ -1853,7 +1853,7 @@ cheat231_code = "080B4E6C:360026AA"
 cheat231_format = "Torii"
 cheat231_folder = "Wild"
 cheat231_keys = "launch"
-cheat231_guide = "Every wild Pokémon is Chinchou, at the area's usual levels."
+cheat231_guide = "Every wild Pokémon is Chinchou, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat231_enable = false
 
 cheat232_desc = "Wild: Species: Lanturn"
@@ -1861,7 +1861,7 @@ cheat232_code = "080B4E6C:360026AB"
 cheat232_format = "Torii"
 cheat232_folder = "Wild"
 cheat232_keys = "launch"
-cheat232_guide = "Every wild Pokémon is Lanturn, at the area's usual levels."
+cheat232_guide = "Every wild Pokémon is Lanturn, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat232_enable = false
 
 cheat233_desc = "Wild: Species: Pichu"
@@ -1869,7 +1869,7 @@ cheat233_code = "080B4E6C:360026AC"
 cheat233_format = "Torii"
 cheat233_folder = "Wild"
 cheat233_keys = "launch"
-cheat233_guide = "Every wild Pokémon is Pichu, at the area's usual levels."
+cheat233_guide = "Every wild Pokémon is Pichu, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat233_enable = false
 
 cheat234_desc = "Wild: Species: Cleffa"
@@ -1877,7 +1877,7 @@ cheat234_code = "080B4E6C:360026AD"
 cheat234_format = "Torii"
 cheat234_folder = "Wild"
 cheat234_keys = "launch"
-cheat234_guide = "Every wild Pokémon is Cleffa, at the area's usual levels."
+cheat234_guide = "Every wild Pokémon is Cleffa, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat234_enable = false
 
 cheat235_desc = "Wild: Species: Igglybuff"
@@ -1885,7 +1885,7 @@ cheat235_code = "080B4E6C:360026AE"
 cheat235_format = "Torii"
 cheat235_folder = "Wild"
 cheat235_keys = "launch"
-cheat235_guide = "Every wild Pokémon is Igglybuff, at the area's usual levels."
+cheat235_guide = "Every wild Pokémon is Igglybuff, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat235_enable = false
 
 cheat236_desc = "Wild: Species: Togepi"
@@ -1893,7 +1893,7 @@ cheat236_code = "080B4E6C:360026AF"
 cheat236_format = "Torii"
 cheat236_folder = "Wild"
 cheat236_keys = "launch"
-cheat236_guide = "Every wild Pokémon is Togepi, at the area's usual levels."
+cheat236_guide = "Every wild Pokémon is Togepi, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat236_enable = false
 
 cheat237_desc = "Wild: Species: Togetic"
@@ -1901,7 +1901,7 @@ cheat237_code = "080B4E6C:360026B0"
 cheat237_format = "Torii"
 cheat237_folder = "Wild"
 cheat237_keys = "launch"
-cheat237_guide = "Every wild Pokémon is Togetic, at the area's usual levels."
+cheat237_guide = "Every wild Pokémon is Togetic, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat237_enable = false
 
 cheat238_desc = "Wild: Species: Natu"
@@ -1909,7 +1909,7 @@ cheat238_code = "080B4E6C:360026B1"
 cheat238_format = "Torii"
 cheat238_folder = "Wild"
 cheat238_keys = "launch"
-cheat238_guide = "Every wild Pokémon is Natu, at the area's usual levels."
+cheat238_guide = "Every wild Pokémon is Natu, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat238_enable = false
 
 cheat239_desc = "Wild: Species: Xatu"
@@ -1917,7 +1917,7 @@ cheat239_code = "080B4E6C:360026B2"
 cheat239_format = "Torii"
 cheat239_folder = "Wild"
 cheat239_keys = "launch"
-cheat239_guide = "Every wild Pokémon is Xatu, at the area's usual levels."
+cheat239_guide = "Every wild Pokémon is Xatu, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat239_enable = false
 
 cheat240_desc = "Wild: Species: Mareep"
@@ -1925,7 +1925,7 @@ cheat240_code = "080B4E6C:360026B3"
 cheat240_format = "Torii"
 cheat240_folder = "Wild"
 cheat240_keys = "launch"
-cheat240_guide = "Every wild Pokémon is Mareep, at the area's usual levels."
+cheat240_guide = "Every wild Pokémon is Mareep, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat240_enable = false
 
 cheat241_desc = "Wild: Species: Flaaffy"
@@ -1933,7 +1933,7 @@ cheat241_code = "080B4E6C:360026B4"
 cheat241_format = "Torii"
 cheat241_folder = "Wild"
 cheat241_keys = "launch"
-cheat241_guide = "Every wild Pokémon is Flaaffy, at the area's usual levels."
+cheat241_guide = "Every wild Pokémon is Flaaffy, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat241_enable = false
 
 cheat242_desc = "Wild: Species: Ampharos"
@@ -1941,7 +1941,7 @@ cheat242_code = "080B4E6C:360026B5"
 cheat242_format = "Torii"
 cheat242_folder = "Wild"
 cheat242_keys = "launch"
-cheat242_guide = "Every wild Pokémon is Ampharos, at the area's usual levels."
+cheat242_guide = "Every wild Pokémon is Ampharos, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat242_enable = false
 
 cheat243_desc = "Wild: Species: Bellossom"
@@ -1949,7 +1949,7 @@ cheat243_code = "080B4E6C:360026B6"
 cheat243_format = "Torii"
 cheat243_folder = "Wild"
 cheat243_keys = "launch"
-cheat243_guide = "Every wild Pokémon is Bellossom, at the area's usual levels."
+cheat243_guide = "Every wild Pokémon is Bellossom, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat243_enable = false
 
 cheat244_desc = "Wild: Species: Marill"
@@ -1957,7 +1957,7 @@ cheat244_code = "080B4E6C:360026B7"
 cheat244_format = "Torii"
 cheat244_folder = "Wild"
 cheat244_keys = "launch"
-cheat244_guide = "Every wild Pokémon is Marill, at the area's usual levels."
+cheat244_guide = "Every wild Pokémon is Marill, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat244_enable = false
 
 cheat245_desc = "Wild: Species: Azumarill"
@@ -1965,7 +1965,7 @@ cheat245_code = "080B4E6C:360026B8"
 cheat245_format = "Torii"
 cheat245_folder = "Wild"
 cheat245_keys = "launch"
-cheat245_guide = "Every wild Pokémon is Azumarill, at the area's usual levels."
+cheat245_guide = "Every wild Pokémon is Azumarill, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat245_enable = false
 
 cheat246_desc = "Wild: Species: Sudowoodo"
@@ -1973,7 +1973,7 @@ cheat246_code = "080B4E6C:360026B9"
 cheat246_format = "Torii"
 cheat246_folder = "Wild"
 cheat246_keys = "launch"
-cheat246_guide = "Every wild Pokémon is Sudowoodo, at the area's usual levels."
+cheat246_guide = "Every wild Pokémon is Sudowoodo, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat246_enable = false
 
 cheat247_desc = "Wild: Species: Politoed"
@@ -1981,7 +1981,7 @@ cheat247_code = "080B4E6C:360026BA"
 cheat247_format = "Torii"
 cheat247_folder = "Wild"
 cheat247_keys = "launch"
-cheat247_guide = "Every wild Pokémon is Politoed, at the area's usual levels."
+cheat247_guide = "Every wild Pokémon is Politoed, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat247_enable = false
 
 cheat248_desc = "Wild: Species: Hoppip"
@@ -1989,7 +1989,7 @@ cheat248_code = "080B4E6C:360026BB"
 cheat248_format = "Torii"
 cheat248_folder = "Wild"
 cheat248_keys = "launch"
-cheat248_guide = "Every wild Pokémon is Hoppip, at the area's usual levels."
+cheat248_guide = "Every wild Pokémon is Hoppip, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat248_enable = false
 
 cheat249_desc = "Wild: Species: Skiploom"
@@ -1997,7 +1997,7 @@ cheat249_code = "080B4E6C:360026BC"
 cheat249_format = "Torii"
 cheat249_folder = "Wild"
 cheat249_keys = "launch"
-cheat249_guide = "Every wild Pokémon is Skiploom, at the area's usual levels."
+cheat249_guide = "Every wild Pokémon is Skiploom, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat249_enable = false
 
 cheat250_desc = "Wild: Species: Jumpluff"
@@ -2005,7 +2005,7 @@ cheat250_code = "080B4E6C:360026BD"
 cheat250_format = "Torii"
 cheat250_folder = "Wild"
 cheat250_keys = "launch"
-cheat250_guide = "Every wild Pokémon is Jumpluff, at the area's usual levels."
+cheat250_guide = "Every wild Pokémon is Jumpluff, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat250_enable = false
 
 cheat251_desc = "Wild: Species: Aipom"
@@ -2013,7 +2013,7 @@ cheat251_code = "080B4E6C:360026BE"
 cheat251_format = "Torii"
 cheat251_folder = "Wild"
 cheat251_keys = "launch"
-cheat251_guide = "Every wild Pokémon is Aipom, at the area's usual levels."
+cheat251_guide = "Every wild Pokémon is Aipom, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat251_enable = false
 
 cheat252_desc = "Wild: Species: Sunkern"
@@ -2021,7 +2021,7 @@ cheat252_code = "080B4E6C:360026BF"
 cheat252_format = "Torii"
 cheat252_folder = "Wild"
 cheat252_keys = "launch"
-cheat252_guide = "Every wild Pokémon is Sunkern, at the area's usual levels."
+cheat252_guide = "Every wild Pokémon is Sunkern, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat252_enable = false
 
 cheat253_desc = "Wild: Species: Sunflora"
@@ -2029,7 +2029,7 @@ cheat253_code = "080B4E6C:360026C0"
 cheat253_format = "Torii"
 cheat253_folder = "Wild"
 cheat253_keys = "launch"
-cheat253_guide = "Every wild Pokémon is Sunflora, at the area's usual levels."
+cheat253_guide = "Every wild Pokémon is Sunflora, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat253_enable = false
 
 cheat254_desc = "Wild: Species: Yanma"
@@ -2037,7 +2037,7 @@ cheat254_code = "080B4E6C:360026C1"
 cheat254_format = "Torii"
 cheat254_folder = "Wild"
 cheat254_keys = "launch"
-cheat254_guide = "Every wild Pokémon is Yanma, at the area's usual levels."
+cheat254_guide = "Every wild Pokémon is Yanma, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat254_enable = false
 
 cheat255_desc = "Wild: Species: Wooper"
@@ -2045,7 +2045,7 @@ cheat255_code = "080B4E6C:360026C2"
 cheat255_format = "Torii"
 cheat255_folder = "Wild"
 cheat255_keys = "launch"
-cheat255_guide = "Every wild Pokémon is Wooper, at the area's usual levels."
+cheat255_guide = "Every wild Pokémon is Wooper, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat255_enable = false
 
 cheat256_desc = "Wild: Species: Quagsire"
@@ -2053,7 +2053,7 @@ cheat256_code = "080B4E6C:360026C3"
 cheat256_format = "Torii"
 cheat256_folder = "Wild"
 cheat256_keys = "launch"
-cheat256_guide = "Every wild Pokémon is Quagsire, at the area's usual levels."
+cheat256_guide = "Every wild Pokémon is Quagsire, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat256_enable = false
 
 cheat257_desc = "Wild: Species: Espeon"
@@ -2061,7 +2061,7 @@ cheat257_code = "080B4E6C:360026C4"
 cheat257_format = "Torii"
 cheat257_folder = "Wild"
 cheat257_keys = "launch"
-cheat257_guide = "Every wild Pokémon is Espeon, at the area's usual levels."
+cheat257_guide = "Every wild Pokémon is Espeon, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat257_enable = false
 
 cheat258_desc = "Wild: Species: Umbreon"
@@ -2069,7 +2069,7 @@ cheat258_code = "080B4E6C:360026C5"
 cheat258_format = "Torii"
 cheat258_folder = "Wild"
 cheat258_keys = "launch"
-cheat258_guide = "Every wild Pokémon is Umbreon, at the area's usual levels."
+cheat258_guide = "Every wild Pokémon is Umbreon, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat258_enable = false
 
 cheat259_desc = "Wild: Species: Murkrow"
@@ -2077,7 +2077,7 @@ cheat259_code = "080B4E6C:360026C6"
 cheat259_format = "Torii"
 cheat259_folder = "Wild"
 cheat259_keys = "launch"
-cheat259_guide = "Every wild Pokémon is Murkrow, at the area's usual levels."
+cheat259_guide = "Every wild Pokémon is Murkrow, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat259_enable = false
 
 cheat260_desc = "Wild: Species: Slowking"
@@ -2085,7 +2085,7 @@ cheat260_code = "080B4E6C:360026C7"
 cheat260_format = "Torii"
 cheat260_folder = "Wild"
 cheat260_keys = "launch"
-cheat260_guide = "Every wild Pokémon is Slowking, at the area's usual levels."
+cheat260_guide = "Every wild Pokémon is Slowking, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat260_enable = false
 
 cheat261_desc = "Wild: Species: Misdreavus"
@@ -2093,7 +2093,7 @@ cheat261_code = "080B4E6C:360026C8"
 cheat261_format = "Torii"
 cheat261_folder = "Wild"
 cheat261_keys = "launch"
-cheat261_guide = "Every wild Pokémon is Misdreavus, at the area's usual levels."
+cheat261_guide = "Every wild Pokémon is Misdreavus, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat261_enable = false
 
 cheat262_desc = "Wild: Species: Unown"
@@ -2101,7 +2101,7 @@ cheat262_code = "080B4E6C:360026C9"
 cheat262_format = "Torii"
 cheat262_folder = "Wild"
 cheat262_keys = "launch"
-cheat262_guide = "Every wild Pokémon is Unown, at the area's usual levels."
+cheat262_guide = "Every wild Pokémon is Unown, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat262_enable = false
 
 cheat263_desc = "Wild: Species: Wobbuffet"
@@ -2109,7 +2109,7 @@ cheat263_code = "080B4E6C:360026CA"
 cheat263_format = "Torii"
 cheat263_folder = "Wild"
 cheat263_keys = "launch"
-cheat263_guide = "Every wild Pokémon is Wobbuffet, at the area's usual levels."
+cheat263_guide = "Every wild Pokémon is Wobbuffet, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat263_enable = false
 
 cheat264_desc = "Wild: Species: Girafarig"
@@ -2117,7 +2117,7 @@ cheat264_code = "080B4E6C:360026CB"
 cheat264_format = "Torii"
 cheat264_folder = "Wild"
 cheat264_keys = "launch"
-cheat264_guide = "Every wild Pokémon is Girafarig, at the area's usual levels."
+cheat264_guide = "Every wild Pokémon is Girafarig, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat264_enable = false
 
 cheat265_desc = "Wild: Species: Pineco"
@@ -2125,7 +2125,7 @@ cheat265_code = "080B4E6C:360026CC"
 cheat265_format = "Torii"
 cheat265_folder = "Wild"
 cheat265_keys = "launch"
-cheat265_guide = "Every wild Pokémon is Pineco, at the area's usual levels."
+cheat265_guide = "Every wild Pokémon is Pineco, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat265_enable = false
 
 cheat266_desc = "Wild: Species: Forretress"
@@ -2133,7 +2133,7 @@ cheat266_code = "080B4E6C:360026CD"
 cheat266_format = "Torii"
 cheat266_folder = "Wild"
 cheat266_keys = "launch"
-cheat266_guide = "Every wild Pokémon is Forretress, at the area's usual levels."
+cheat266_guide = "Every wild Pokémon is Forretress, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat266_enable = false
 
 cheat267_desc = "Wild: Species: Dunsparce"
@@ -2141,7 +2141,7 @@ cheat267_code = "080B4E6C:360026CE"
 cheat267_format = "Torii"
 cheat267_folder = "Wild"
 cheat267_keys = "launch"
-cheat267_guide = "Every wild Pokémon is Dunsparce, at the area's usual levels."
+cheat267_guide = "Every wild Pokémon is Dunsparce, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat267_enable = false
 
 cheat268_desc = "Wild: Species: Gligar"
@@ -2149,7 +2149,7 @@ cheat268_code = "080B4E6C:360026CF"
 cheat268_format = "Torii"
 cheat268_folder = "Wild"
 cheat268_keys = "launch"
-cheat268_guide = "Every wild Pokémon is Gligar, at the area's usual levels."
+cheat268_guide = "Every wild Pokémon is Gligar, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat268_enable = false
 
 cheat269_desc = "Wild: Species: Steelix"
@@ -2157,7 +2157,7 @@ cheat269_code = "080B4E6C:360026D0"
 cheat269_format = "Torii"
 cheat269_folder = "Wild"
 cheat269_keys = "launch"
-cheat269_guide = "Every wild Pokémon is Steelix, at the area's usual levels."
+cheat269_guide = "Every wild Pokémon is Steelix, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat269_enable = false
 
 cheat270_desc = "Wild: Species: Snubbull"
@@ -2165,7 +2165,7 @@ cheat270_code = "080B4E6C:360026D1"
 cheat270_format = "Torii"
 cheat270_folder = "Wild"
 cheat270_keys = "launch"
-cheat270_guide = "Every wild Pokémon is Snubbull, at the area's usual levels."
+cheat270_guide = "Every wild Pokémon is Snubbull, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat270_enable = false
 
 cheat271_desc = "Wild: Species: Granbull"
@@ -2173,7 +2173,7 @@ cheat271_code = "080B4E6C:360026D2"
 cheat271_format = "Torii"
 cheat271_folder = "Wild"
 cheat271_keys = "launch"
-cheat271_guide = "Every wild Pokémon is Granbull, at the area's usual levels."
+cheat271_guide = "Every wild Pokémon is Granbull, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat271_enable = false
 
 cheat272_desc = "Wild: Species: Qwilfish"
@@ -2181,7 +2181,7 @@ cheat272_code = "080B4E6C:360026D3"
 cheat272_format = "Torii"
 cheat272_folder = "Wild"
 cheat272_keys = "launch"
-cheat272_guide = "Every wild Pokémon is Qwilfish, at the area's usual levels."
+cheat272_guide = "Every wild Pokémon is Qwilfish, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat272_enable = false
 
 cheat273_desc = "Wild: Species: Scizor"
@@ -2189,7 +2189,7 @@ cheat273_code = "080B4E6C:360026D4"
 cheat273_format = "Torii"
 cheat273_folder = "Wild"
 cheat273_keys = "launch"
-cheat273_guide = "Every wild Pokémon is Scizor, at the area's usual levels."
+cheat273_guide = "Every wild Pokémon is Scizor, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat273_enable = false
 
 cheat274_desc = "Wild: Species: Shuckle"
@@ -2197,7 +2197,7 @@ cheat274_code = "080B4E6C:360026D5"
 cheat274_format = "Torii"
 cheat274_folder = "Wild"
 cheat274_keys = "launch"
-cheat274_guide = "Every wild Pokémon is Shuckle, at the area's usual levels."
+cheat274_guide = "Every wild Pokémon is Shuckle, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat274_enable = false
 
 cheat275_desc = "Wild: Species: Heracross"
@@ -2205,7 +2205,7 @@ cheat275_code = "080B4E6C:360026D6"
 cheat275_format = "Torii"
 cheat275_folder = "Wild"
 cheat275_keys = "launch"
-cheat275_guide = "Every wild Pokémon is Heracross, at the area's usual levels."
+cheat275_guide = "Every wild Pokémon is Heracross, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat275_enable = false
 
 cheat276_desc = "Wild: Species: Sneasel"
@@ -2213,7 +2213,7 @@ cheat276_code = "080B4E6C:360026D7"
 cheat276_format = "Torii"
 cheat276_folder = "Wild"
 cheat276_keys = "launch"
-cheat276_guide = "Every wild Pokémon is Sneasel, at the area's usual levels."
+cheat276_guide = "Every wild Pokémon is Sneasel, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat276_enable = false
 
 cheat277_desc = "Wild: Species: Teddiursa"
@@ -2221,7 +2221,7 @@ cheat277_code = "080B4E6C:360026D8"
 cheat277_format = "Torii"
 cheat277_folder = "Wild"
 cheat277_keys = "launch"
-cheat277_guide = "Every wild Pokémon is Teddiursa, at the area's usual levels."
+cheat277_guide = "Every wild Pokémon is Teddiursa, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat277_enable = false
 
 cheat278_desc = "Wild: Species: Ursaring"
@@ -2229,7 +2229,7 @@ cheat278_code = "080B4E6C:360026D9"
 cheat278_format = "Torii"
 cheat278_folder = "Wild"
 cheat278_keys = "launch"
-cheat278_guide = "Every wild Pokémon is Ursaring, at the area's usual levels."
+cheat278_guide = "Every wild Pokémon is Ursaring, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat278_enable = false
 
 cheat279_desc = "Wild: Species: Slugma"
@@ -2237,7 +2237,7 @@ cheat279_code = "080B4E6C:360026DA"
 cheat279_format = "Torii"
 cheat279_folder = "Wild"
 cheat279_keys = "launch"
-cheat279_guide = "Every wild Pokémon is Slugma, at the area's usual levels."
+cheat279_guide = "Every wild Pokémon is Slugma, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat279_enable = false
 
 cheat280_desc = "Wild: Species: Magcargo"
@@ -2245,7 +2245,7 @@ cheat280_code = "080B4E6C:360026DB"
 cheat280_format = "Torii"
 cheat280_folder = "Wild"
 cheat280_keys = "launch"
-cheat280_guide = "Every wild Pokémon is Magcargo, at the area's usual levels."
+cheat280_guide = "Every wild Pokémon is Magcargo, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat280_enable = false
 
 cheat281_desc = "Wild: Species: Swinub"
@@ -2253,7 +2253,7 @@ cheat281_code = "080B4E6C:360026DC"
 cheat281_format = "Torii"
 cheat281_folder = "Wild"
 cheat281_keys = "launch"
-cheat281_guide = "Every wild Pokémon is Swinub, at the area's usual levels."
+cheat281_guide = "Every wild Pokémon is Swinub, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat281_enable = false
 
 cheat282_desc = "Wild: Species: Piloswine"
@@ -2261,7 +2261,7 @@ cheat282_code = "080B4E6C:360026DD"
 cheat282_format = "Torii"
 cheat282_folder = "Wild"
 cheat282_keys = "launch"
-cheat282_guide = "Every wild Pokémon is Piloswine, at the area's usual levels."
+cheat282_guide = "Every wild Pokémon is Piloswine, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat282_enable = false
 
 cheat283_desc = "Wild: Species: Corsola"
@@ -2269,7 +2269,7 @@ cheat283_code = "080B4E6C:360026DE"
 cheat283_format = "Torii"
 cheat283_folder = "Wild"
 cheat283_keys = "launch"
-cheat283_guide = "Every wild Pokémon is Corsola, at the area's usual levels."
+cheat283_guide = "Every wild Pokémon is Corsola, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat283_enable = false
 
 cheat284_desc = "Wild: Species: Remoraid"
@@ -2277,7 +2277,7 @@ cheat284_code = "080B4E6C:360026DF"
 cheat284_format = "Torii"
 cheat284_folder = "Wild"
 cheat284_keys = "launch"
-cheat284_guide = "Every wild Pokémon is Remoraid, at the area's usual levels."
+cheat284_guide = "Every wild Pokémon is Remoraid, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat284_enable = false
 
 cheat285_desc = "Wild: Species: Octillery"
@@ -2285,7 +2285,7 @@ cheat285_code = "080B4E6C:360026E0"
 cheat285_format = "Torii"
 cheat285_folder = "Wild"
 cheat285_keys = "launch"
-cheat285_guide = "Every wild Pokémon is Octillery, at the area's usual levels."
+cheat285_guide = "Every wild Pokémon is Octillery, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat285_enable = false
 
 cheat286_desc = "Wild: Species: Delibird"
@@ -2293,7 +2293,7 @@ cheat286_code = "080B4E6C:360026E1"
 cheat286_format = "Torii"
 cheat286_folder = "Wild"
 cheat286_keys = "launch"
-cheat286_guide = "Every wild Pokémon is Delibird, at the area's usual levels."
+cheat286_guide = "Every wild Pokémon is Delibird, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat286_enable = false
 
 cheat287_desc = "Wild: Species: Mantine"
@@ -2301,7 +2301,7 @@ cheat287_code = "080B4E6C:360026E2"
 cheat287_format = "Torii"
 cheat287_folder = "Wild"
 cheat287_keys = "launch"
-cheat287_guide = "Every wild Pokémon is Mantine, at the area's usual levels."
+cheat287_guide = "Every wild Pokémon is Mantine, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat287_enable = false
 
 cheat288_desc = "Wild: Species: Skarmory"
@@ -2309,7 +2309,7 @@ cheat288_code = "080B4E6C:360026E3"
 cheat288_format = "Torii"
 cheat288_folder = "Wild"
 cheat288_keys = "launch"
-cheat288_guide = "Every wild Pokémon is Skarmory, at the area's usual levels."
+cheat288_guide = "Every wild Pokémon is Skarmory, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat288_enable = false
 
 cheat289_desc = "Wild: Species: Houndour"
@@ -2317,7 +2317,7 @@ cheat289_code = "080B4E6C:360026E4"
 cheat289_format = "Torii"
 cheat289_folder = "Wild"
 cheat289_keys = "launch"
-cheat289_guide = "Every wild Pokémon is Houndour, at the area's usual levels."
+cheat289_guide = "Every wild Pokémon is Houndour, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat289_enable = false
 
 cheat290_desc = "Wild: Species: Houndoom"
@@ -2325,7 +2325,7 @@ cheat290_code = "080B4E6C:360026E5"
 cheat290_format = "Torii"
 cheat290_folder = "Wild"
 cheat290_keys = "launch"
-cheat290_guide = "Every wild Pokémon is Houndoom, at the area's usual levels."
+cheat290_guide = "Every wild Pokémon is Houndoom, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat290_enable = false
 
 cheat291_desc = "Wild: Species: Kingdra"
@@ -2333,7 +2333,7 @@ cheat291_code = "080B4E6C:360026E6"
 cheat291_format = "Torii"
 cheat291_folder = "Wild"
 cheat291_keys = "launch"
-cheat291_guide = "Every wild Pokémon is Kingdra, at the area's usual levels."
+cheat291_guide = "Every wild Pokémon is Kingdra, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat291_enable = false
 
 cheat292_desc = "Wild: Species: Phanpy"
@@ -2341,7 +2341,7 @@ cheat292_code = "080B4E6C:360026E7"
 cheat292_format = "Torii"
 cheat292_folder = "Wild"
 cheat292_keys = "launch"
-cheat292_guide = "Every wild Pokémon is Phanpy, at the area's usual levels."
+cheat292_guide = "Every wild Pokémon is Phanpy, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat292_enable = false
 
 cheat293_desc = "Wild: Species: Donphan"
@@ -2349,7 +2349,7 @@ cheat293_code = "080B4E6C:360026E8"
 cheat293_format = "Torii"
 cheat293_folder = "Wild"
 cheat293_keys = "launch"
-cheat293_guide = "Every wild Pokémon is Donphan, at the area's usual levels."
+cheat293_guide = "Every wild Pokémon is Donphan, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat293_enable = false
 
 cheat294_desc = "Wild: Species: Porygon2"
@@ -2357,7 +2357,7 @@ cheat294_code = "080B4E6C:360026E9"
 cheat294_format = "Torii"
 cheat294_folder = "Wild"
 cheat294_keys = "launch"
-cheat294_guide = "Every wild Pokémon is Porygon2, at the area's usual levels."
+cheat294_guide = "Every wild Pokémon is Porygon2, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat294_enable = false
 
 cheat295_desc = "Wild: Species: Stantler"
@@ -2365,7 +2365,7 @@ cheat295_code = "080B4E6C:360026EA"
 cheat295_format = "Torii"
 cheat295_folder = "Wild"
 cheat295_keys = "launch"
-cheat295_guide = "Every wild Pokémon is Stantler, at the area's usual levels."
+cheat295_guide = "Every wild Pokémon is Stantler, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat295_enable = false
 
 cheat296_desc = "Wild: Species: Smeargle"
@@ -2373,7 +2373,7 @@ cheat296_code = "080B4E6C:360026EB"
 cheat296_format = "Torii"
 cheat296_folder = "Wild"
 cheat296_keys = "launch"
-cheat296_guide = "Every wild Pokémon is Smeargle, at the area's usual levels."
+cheat296_guide = "Every wild Pokémon is Smeargle, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat296_enable = false
 
 cheat297_desc = "Wild: Species: Tyrogue"
@@ -2381,7 +2381,7 @@ cheat297_code = "080B4E6C:360026EC"
 cheat297_format = "Torii"
 cheat297_folder = "Wild"
 cheat297_keys = "launch"
-cheat297_guide = "Every wild Pokémon is Tyrogue, at the area's usual levels."
+cheat297_guide = "Every wild Pokémon is Tyrogue, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat297_enable = false
 
 cheat298_desc = "Wild: Species: Hitmontop"
@@ -2389,7 +2389,7 @@ cheat298_code = "080B4E6C:360026ED"
 cheat298_format = "Torii"
 cheat298_folder = "Wild"
 cheat298_keys = "launch"
-cheat298_guide = "Every wild Pokémon is Hitmontop, at the area's usual levels."
+cheat298_guide = "Every wild Pokémon is Hitmontop, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat298_enable = false
 
 cheat299_desc = "Wild: Species: Smoochum"
@@ -2397,7 +2397,7 @@ cheat299_code = "080B4E6C:360026EE"
 cheat299_format = "Torii"
 cheat299_folder = "Wild"
 cheat299_keys = "launch"
-cheat299_guide = "Every wild Pokémon is Smoochum, at the area's usual levels."
+cheat299_guide = "Every wild Pokémon is Smoochum, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat299_enable = false
 
 cheat300_desc = "Wild: Species: Elekid"
@@ -2405,7 +2405,7 @@ cheat300_code = "080B4E6C:360026EF"
 cheat300_format = "Torii"
 cheat300_folder = "Wild"
 cheat300_keys = "launch"
-cheat300_guide = "Every wild Pokémon is Elekid, at the area's usual levels."
+cheat300_guide = "Every wild Pokémon is Elekid, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat300_enable = false
 
 cheat301_desc = "Wild: Species: Magby"
@@ -2413,7 +2413,7 @@ cheat301_code = "080B4E6C:360026F0"
 cheat301_format = "Torii"
 cheat301_folder = "Wild"
 cheat301_keys = "launch"
-cheat301_guide = "Every wild Pokémon is Magby, at the area's usual levels."
+cheat301_guide = "Every wild Pokémon is Magby, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat301_enable = false
 
 cheat302_desc = "Wild: Species: Miltank"
@@ -2421,7 +2421,7 @@ cheat302_code = "080B4E6C:360026F1"
 cheat302_format = "Torii"
 cheat302_folder = "Wild"
 cheat302_keys = "launch"
-cheat302_guide = "Every wild Pokémon is Miltank, at the area's usual levels."
+cheat302_guide = "Every wild Pokémon is Miltank, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat302_enable = false
 
 cheat303_desc = "Wild: Species: Blissey"
@@ -2429,7 +2429,7 @@ cheat303_code = "080B4E6C:360026F2"
 cheat303_format = "Torii"
 cheat303_folder = "Wild"
 cheat303_keys = "launch"
-cheat303_guide = "Every wild Pokémon is Blissey, at the area's usual levels."
+cheat303_guide = "Every wild Pokémon is Blissey, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat303_enable = false
 
 cheat304_desc = "Wild: Species: Raikou"
@@ -2437,7 +2437,7 @@ cheat304_code = "080B4E6C:360026F3"
 cheat304_format = "Torii"
 cheat304_folder = "Wild"
 cheat304_keys = "launch"
-cheat304_guide = "Every wild Pokémon is Raikou, at the area's usual levels."
+cheat304_guide = "Every wild Pokémon is Raikou, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat304_enable = false
 
 cheat305_desc = "Wild: Species: Entei"
@@ -2445,7 +2445,7 @@ cheat305_code = "080B4E6C:360026F4"
 cheat305_format = "Torii"
 cheat305_folder = "Wild"
 cheat305_keys = "launch"
-cheat305_guide = "Every wild Pokémon is Entei, at the area's usual levels."
+cheat305_guide = "Every wild Pokémon is Entei, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat305_enable = false
 
 cheat306_desc = "Wild: Species: Suicune"
@@ -2453,7 +2453,7 @@ cheat306_code = "080B4E6C:360026F5"
 cheat306_format = "Torii"
 cheat306_folder = "Wild"
 cheat306_keys = "launch"
-cheat306_guide = "Every wild Pokémon is Suicune, at the area's usual levels."
+cheat306_guide = "Every wild Pokémon is Suicune, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat306_enable = false
 
 cheat307_desc = "Wild: Species: Larvitar"
@@ -2461,7 +2461,7 @@ cheat307_code = "080B4E6C:360026F6"
 cheat307_format = "Torii"
 cheat307_folder = "Wild"
 cheat307_keys = "launch"
-cheat307_guide = "Every wild Pokémon is Larvitar, at the area's usual levels."
+cheat307_guide = "Every wild Pokémon is Larvitar, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat307_enable = false
 
 cheat308_desc = "Wild: Species: Pupitar"
@@ -2469,7 +2469,7 @@ cheat308_code = "080B4E6C:360026F7"
 cheat308_format = "Torii"
 cheat308_folder = "Wild"
 cheat308_keys = "launch"
-cheat308_guide = "Every wild Pokémon is Pupitar, at the area's usual levels."
+cheat308_guide = "Every wild Pokémon is Pupitar, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat308_enable = false
 
 cheat309_desc = "Wild: Species: Tyranitar"
@@ -2477,7 +2477,7 @@ cheat309_code = "080B4E6C:360026F8"
 cheat309_format = "Torii"
 cheat309_folder = "Wild"
 cheat309_keys = "launch"
-cheat309_guide = "Every wild Pokémon is Tyranitar, at the area's usual levels."
+cheat309_guide = "Every wild Pokémon is Tyranitar, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat309_enable = false
 
 cheat310_desc = "Wild: Species: Lugia"
@@ -2485,7 +2485,7 @@ cheat310_code = "080B4E6C:360026F9"
 cheat310_format = "Torii"
 cheat310_folder = "Wild"
 cheat310_keys = "launch"
-cheat310_guide = "Every wild Pokémon is Lugia, at the area's usual levels."
+cheat310_guide = "Every wild Pokémon is Lugia, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat310_enable = false
 
 cheat311_desc = "Wild: Species: Ho-Oh"
@@ -2493,7 +2493,7 @@ cheat311_code = "080B4E6C:360026FA"
 cheat311_format = "Torii"
 cheat311_folder = "Wild"
 cheat311_keys = "launch"
-cheat311_guide = "Every wild Pokémon is Ho-Oh, at the area's usual levels."
+cheat311_guide = "Every wild Pokémon is Ho-Oh, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat311_enable = false
 
 cheat312_desc = "Wild: Species: Celebi"
@@ -2501,7 +2501,7 @@ cheat312_code = "080B4E6C:360026FB"
 cheat312_format = "Torii"
 cheat312_folder = "Wild"
 cheat312_keys = "launch"
-cheat312_guide = "Every wild Pokémon is Celebi, at the area's usual levels."
+cheat312_guide = "Every wild Pokémon is Celebi, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat312_enable = false
 
 cheat313_desc = "Wild: Species: Treecko"
@@ -2509,7 +2509,7 @@ cheat313_code = "080B4E6C:361626FF"
 cheat313_format = "Torii"
 cheat313_folder = "Wild"
 cheat313_keys = "launch"
-cheat313_guide = "Every wild Pokémon is Treecko, at the area's usual levels."
+cheat313_guide = "Every wild Pokémon is Treecko, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat313_enable = false
 
 cheat314_desc = "Wild: Species: Grovyle"
@@ -2517,7 +2517,7 @@ cheat314_code = "080B4E6C:361726FF"
 cheat314_format = "Torii"
 cheat314_folder = "Wild"
 cheat314_keys = "launch"
-cheat314_guide = "Every wild Pokémon is Grovyle, at the area's usual levels."
+cheat314_guide = "Every wild Pokémon is Grovyle, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat314_enable = false
 
 cheat315_desc = "Wild: Species: Sceptile"
@@ -2525,7 +2525,7 @@ cheat315_code = "080B4E6C:361826FF"
 cheat315_format = "Torii"
 cheat315_folder = "Wild"
 cheat315_keys = "launch"
-cheat315_guide = "Every wild Pokémon is Sceptile, at the area's usual levels."
+cheat315_guide = "Every wild Pokémon is Sceptile, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat315_enable = false
 
 cheat316_desc = "Wild: Species: Torchic"
@@ -2533,7 +2533,7 @@ cheat316_code = "080B4E6C:361926FF"
 cheat316_format = "Torii"
 cheat316_folder = "Wild"
 cheat316_keys = "launch"
-cheat316_guide = "Every wild Pokémon is Torchic, at the area's usual levels."
+cheat316_guide = "Every wild Pokémon is Torchic, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat316_enable = false
 
 cheat317_desc = "Wild: Species: Combusken"
@@ -2541,7 +2541,7 @@ cheat317_code = "080B4E6C:361A26FF"
 cheat317_format = "Torii"
 cheat317_folder = "Wild"
 cheat317_keys = "launch"
-cheat317_guide = "Every wild Pokémon is Combusken, at the area's usual levels."
+cheat317_guide = "Every wild Pokémon is Combusken, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat317_enable = false
 
 cheat318_desc = "Wild: Species: Blaziken"
@@ -2549,7 +2549,7 @@ cheat318_code = "080B4E6C:361B26FF"
 cheat318_format = "Torii"
 cheat318_folder = "Wild"
 cheat318_keys = "launch"
-cheat318_guide = "Every wild Pokémon is Blaziken, at the area's usual levels."
+cheat318_guide = "Every wild Pokémon is Blaziken, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat318_enable = false
 
 cheat319_desc = "Wild: Species: Mudkip"
@@ -2557,7 +2557,7 @@ cheat319_code = "080B4E6C:361C26FF"
 cheat319_format = "Torii"
 cheat319_folder = "Wild"
 cheat319_keys = "launch"
-cheat319_guide = "Every wild Pokémon is Mudkip, at the area's usual levels."
+cheat319_guide = "Every wild Pokémon is Mudkip, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat319_enable = false
 
 cheat320_desc = "Wild: Species: Marshtomp"
@@ -2565,7 +2565,7 @@ cheat320_code = "080B4E6C:361D26FF"
 cheat320_format = "Torii"
 cheat320_folder = "Wild"
 cheat320_keys = "launch"
-cheat320_guide = "Every wild Pokémon is Marshtomp, at the area's usual levels."
+cheat320_guide = "Every wild Pokémon is Marshtomp, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat320_enable = false
 
 cheat321_desc = "Wild: Species: Swampert"
@@ -2573,7 +2573,7 @@ cheat321_code = "080B4E6C:361E26FF"
 cheat321_format = "Torii"
 cheat321_folder = "Wild"
 cheat321_keys = "launch"
-cheat321_guide = "Every wild Pokémon is Swampert, at the area's usual levels."
+cheat321_guide = "Every wild Pokémon is Swampert, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat321_enable = false
 
 cheat322_desc = "Wild: Species: Poochyena"
@@ -2581,7 +2581,7 @@ cheat322_code = "080B4E6C:361F26FF"
 cheat322_format = "Torii"
 cheat322_folder = "Wild"
 cheat322_keys = "launch"
-cheat322_guide = "Every wild Pokémon is Poochyena, at the area's usual levels."
+cheat322_guide = "Every wild Pokémon is Poochyena, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat322_enable = false
 
 cheat323_desc = "Wild: Species: Mightyena"
@@ -2589,7 +2589,7 @@ cheat323_code = "080B4E6C:362026FF"
 cheat323_format = "Torii"
 cheat323_folder = "Wild"
 cheat323_keys = "launch"
-cheat323_guide = "Every wild Pokémon is Mightyena, at the area's usual levels."
+cheat323_guide = "Every wild Pokémon is Mightyena, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat323_enable = false
 
 cheat324_desc = "Wild: Species: Zigzagoon"
@@ -2597,7 +2597,7 @@ cheat324_code = "080B4E6C:362126FF"
 cheat324_format = "Torii"
 cheat324_folder = "Wild"
 cheat324_keys = "launch"
-cheat324_guide = "Every wild Pokémon is Zigzagoon, at the area's usual levels."
+cheat324_guide = "Every wild Pokémon is Zigzagoon, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat324_enable = false
 
 cheat325_desc = "Wild: Species: Linoone"
@@ -2605,7 +2605,7 @@ cheat325_code = "080B4E6C:362226FF"
 cheat325_format = "Torii"
 cheat325_folder = "Wild"
 cheat325_keys = "launch"
-cheat325_guide = "Every wild Pokémon is Linoone, at the area's usual levels."
+cheat325_guide = "Every wild Pokémon is Linoone, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat325_enable = false
 
 cheat326_desc = "Wild: Species: Wurmple"
@@ -2613,7 +2613,7 @@ cheat326_code = "080B4E6C:362326FF"
 cheat326_format = "Torii"
 cheat326_folder = "Wild"
 cheat326_keys = "launch"
-cheat326_guide = "Every wild Pokémon is Wurmple, at the area's usual levels."
+cheat326_guide = "Every wild Pokémon is Wurmple, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat326_enable = false
 
 cheat327_desc = "Wild: Species: Silcoon"
@@ -2621,7 +2621,7 @@ cheat327_code = "080B4E6C:362426FF"
 cheat327_format = "Torii"
 cheat327_folder = "Wild"
 cheat327_keys = "launch"
-cheat327_guide = "Every wild Pokémon is Silcoon, at the area's usual levels."
+cheat327_guide = "Every wild Pokémon is Silcoon, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat327_enable = false
 
 cheat328_desc = "Wild: Species: Beautifly"
@@ -2629,7 +2629,7 @@ cheat328_code = "080B4E6C:362526FF"
 cheat328_format = "Torii"
 cheat328_folder = "Wild"
 cheat328_keys = "launch"
-cheat328_guide = "Every wild Pokémon is Beautifly, at the area's usual levels."
+cheat328_guide = "Every wild Pokémon is Beautifly, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat328_enable = false
 
 cheat329_desc = "Wild: Species: Cascoon"
@@ -2637,7 +2637,7 @@ cheat329_code = "080B4E6C:362626FF"
 cheat329_format = "Torii"
 cheat329_folder = "Wild"
 cheat329_keys = "launch"
-cheat329_guide = "Every wild Pokémon is Cascoon, at the area's usual levels."
+cheat329_guide = "Every wild Pokémon is Cascoon, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat329_enable = false
 
 cheat330_desc = "Wild: Species: Dustox"
@@ -2645,7 +2645,7 @@ cheat330_code = "080B4E6C:362726FF"
 cheat330_format = "Torii"
 cheat330_folder = "Wild"
 cheat330_keys = "launch"
-cheat330_guide = "Every wild Pokémon is Dustox, at the area's usual levels."
+cheat330_guide = "Every wild Pokémon is Dustox, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat330_enable = false
 
 cheat331_desc = "Wild: Species: Lotad"
@@ -2653,7 +2653,7 @@ cheat331_code = "080B4E6C:362826FF"
 cheat331_format = "Torii"
 cheat331_folder = "Wild"
 cheat331_keys = "launch"
-cheat331_guide = "Every wild Pokémon is Lotad, at the area's usual levels."
+cheat331_guide = "Every wild Pokémon is Lotad, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat331_enable = false
 
 cheat332_desc = "Wild: Species: Lombre"
@@ -2661,7 +2661,7 @@ cheat332_code = "080B4E6C:362926FF"
 cheat332_format = "Torii"
 cheat332_folder = "Wild"
 cheat332_keys = "launch"
-cheat332_guide = "Every wild Pokémon is Lombre, at the area's usual levels."
+cheat332_guide = "Every wild Pokémon is Lombre, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat332_enable = false
 
 cheat333_desc = "Wild: Species: Ludicolo"
@@ -2669,7 +2669,7 @@ cheat333_code = "080B4E6C:362A26FF"
 cheat333_format = "Torii"
 cheat333_folder = "Wild"
 cheat333_keys = "launch"
-cheat333_guide = "Every wild Pokémon is Ludicolo, at the area's usual levels."
+cheat333_guide = "Every wild Pokémon is Ludicolo, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat333_enable = false
 
 cheat334_desc = "Wild: Species: Seedot"
@@ -2677,7 +2677,7 @@ cheat334_code = "080B4E6C:362B26FF"
 cheat334_format = "Torii"
 cheat334_folder = "Wild"
 cheat334_keys = "launch"
-cheat334_guide = "Every wild Pokémon is Seedot, at the area's usual levels."
+cheat334_guide = "Every wild Pokémon is Seedot, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat334_enable = false
 
 cheat335_desc = "Wild: Species: Nuzleaf"
@@ -2685,7 +2685,7 @@ cheat335_code = "080B4E6C:362C26FF"
 cheat335_format = "Torii"
 cheat335_folder = "Wild"
 cheat335_keys = "launch"
-cheat335_guide = "Every wild Pokémon is Nuzleaf, at the area's usual levels."
+cheat335_guide = "Every wild Pokémon is Nuzleaf, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat335_enable = false
 
 cheat336_desc = "Wild: Species: Shiftry"
@@ -2693,7 +2693,7 @@ cheat336_code = "080B4E6C:362D26FF"
 cheat336_format = "Torii"
 cheat336_folder = "Wild"
 cheat336_keys = "launch"
-cheat336_guide = "Every wild Pokémon is Shiftry, at the area's usual levels."
+cheat336_guide = "Every wild Pokémon is Shiftry, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat336_enable = false
 
 cheat337_desc = "Wild: Species: Taillow"
@@ -2701,7 +2701,7 @@ cheat337_code = "080B4E6C:363126FF"
 cheat337_format = "Torii"
 cheat337_folder = "Wild"
 cheat337_keys = "launch"
-cheat337_guide = "Every wild Pokémon is Taillow, at the area's usual levels."
+cheat337_guide = "Every wild Pokémon is Taillow, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat337_enable = false
 
 cheat338_desc = "Wild: Species: Swellow"
@@ -2709,7 +2709,7 @@ cheat338_code = "080B4E6C:363226FF"
 cheat338_format = "Torii"
 cheat338_folder = "Wild"
 cheat338_keys = "launch"
-cheat338_guide = "Every wild Pokémon is Swellow, at the area's usual levels."
+cheat338_guide = "Every wild Pokémon is Swellow, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat338_enable = false
 
 cheat339_desc = "Wild: Species: Wingull"
@@ -2717,7 +2717,7 @@ cheat339_code = "080B4E6C:363626FF"
 cheat339_format = "Torii"
 cheat339_folder = "Wild"
 cheat339_keys = "launch"
-cheat339_guide = "Every wild Pokémon is Wingull, at the area's usual levels."
+cheat339_guide = "Every wild Pokémon is Wingull, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat339_enable = false
 
 cheat340_desc = "Wild: Species: Pelipper"
@@ -2725,7 +2725,7 @@ cheat340_code = "080B4E6C:363726FF"
 cheat340_format = "Torii"
 cheat340_folder = "Wild"
 cheat340_keys = "launch"
-cheat340_guide = "Every wild Pokémon is Pelipper, at the area's usual levels."
+cheat340_guide = "Every wild Pokémon is Pelipper, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat340_enable = false
 
 cheat341_desc = "Wild: Species: Ralts"
@@ -2733,7 +2733,7 @@ cheat341_code = "080B4E6C:368926FF"
 cheat341_format = "Torii"
 cheat341_folder = "Wild"
 cheat341_keys = "launch"
-cheat341_guide = "Every wild Pokémon is Ralts, at the area's usual levels."
+cheat341_guide = "Every wild Pokémon is Ralts, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat341_enable = false
 
 cheat342_desc = "Wild: Species: Kirlia"
@@ -2741,7 +2741,7 @@ cheat342_code = "080B4E6C:368A26FF"
 cheat342_format = "Torii"
 cheat342_folder = "Wild"
 cheat342_keys = "launch"
-cheat342_guide = "Every wild Pokémon is Kirlia, at the area's usual levels."
+cheat342_guide = "Every wild Pokémon is Kirlia, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat342_enable = false
 
 cheat343_desc = "Wild: Species: Gardevoir"
@@ -2749,7 +2749,7 @@ cheat343_code = "080B4E6C:368B26FF"
 cheat343_format = "Torii"
 cheat343_folder = "Wild"
 cheat343_keys = "launch"
-cheat343_guide = "Every wild Pokémon is Gardevoir, at the area's usual levels."
+cheat343_guide = "Every wild Pokémon is Gardevoir, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat343_enable = false
 
 cheat344_desc = "Wild: Species: Surskit"
@@ -2757,7 +2757,7 @@ cheat344_code = "080B4E6C:363826FF"
 cheat344_format = "Torii"
 cheat344_folder = "Wild"
 cheat344_keys = "launch"
-cheat344_guide = "Every wild Pokémon is Surskit, at the area's usual levels."
+cheat344_guide = "Every wild Pokémon is Surskit, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat344_enable = false
 
 cheat345_desc = "Wild: Species: Masquerain"
@@ -2765,7 +2765,7 @@ cheat345_code = "080B4E6C:363926FF"
 cheat345_format = "Torii"
 cheat345_folder = "Wild"
 cheat345_keys = "launch"
-cheat345_guide = "Every wild Pokémon is Masquerain, at the area's usual levels."
+cheat345_guide = "Every wild Pokémon is Masquerain, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat345_enable = false
 
 cheat346_desc = "Wild: Species: Shroomish"
@@ -2773,7 +2773,7 @@ cheat346_code = "080B4E6C:363326FF"
 cheat346_format = "Torii"
 cheat346_folder = "Wild"
 cheat346_keys = "launch"
-cheat346_guide = "Every wild Pokémon is Shroomish, at the area's usual levels."
+cheat346_guide = "Every wild Pokémon is Shroomish, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat346_enable = false
 
 cheat347_desc = "Wild: Species: Breloom"
@@ -2781,7 +2781,7 @@ cheat347_code = "080B4E6C:363426FF"
 cheat347_format = "Torii"
 cheat347_folder = "Wild"
 cheat347_keys = "launch"
-cheat347_guide = "Every wild Pokémon is Breloom, at the area's usual levels."
+cheat347_guide = "Every wild Pokémon is Breloom, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat347_enable = false
 
 cheat348_desc = "Wild: Species: Slakoth"
@@ -2789,7 +2789,7 @@ cheat348_code = "080B4E6C:366D26FF"
 cheat348_format = "Torii"
 cheat348_folder = "Wild"
 cheat348_keys = "launch"
-cheat348_guide = "Every wild Pokémon is Slakoth, at the area's usual levels."
+cheat348_guide = "Every wild Pokémon is Slakoth, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat348_enable = false
 
 cheat349_desc = "Wild: Species: Vigoroth"
@@ -2797,7 +2797,7 @@ cheat349_code = "080B4E6C:366E26FF"
 cheat349_format = "Torii"
 cheat349_folder = "Wild"
 cheat349_keys = "launch"
-cheat349_guide = "Every wild Pokémon is Vigoroth, at the area's usual levels."
+cheat349_guide = "Every wild Pokémon is Vigoroth, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat349_enable = false
 
 cheat350_desc = "Wild: Species: Slaking"
@@ -2805,7 +2805,7 @@ cheat350_code = "080B4E6C:366F26FF"
 cheat350_format = "Torii"
 cheat350_folder = "Wild"
 cheat350_keys = "launch"
-cheat350_guide = "Every wild Pokémon is Slaking, at the area's usual levels."
+cheat350_guide = "Every wild Pokémon is Slaking, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat350_enable = false
 
 cheat351_desc = "Wild: Species: Nincada"
@@ -2813,7 +2813,7 @@ cheat351_code = "080B4E6C:362E26FF"
 cheat351_format = "Torii"
 cheat351_folder = "Wild"
 cheat351_keys = "launch"
-cheat351_guide = "Every wild Pokémon is Nincada, at the area's usual levels."
+cheat351_guide = "Every wild Pokémon is Nincada, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat351_enable = false
 
 cheat352_desc = "Wild: Species: Ninjask"
@@ -2821,7 +2821,7 @@ cheat352_code = "080B4E6C:362F26FF"
 cheat352_format = "Torii"
 cheat352_folder = "Wild"
 cheat352_keys = "launch"
-cheat352_guide = "Every wild Pokémon is Ninjask, at the area's usual levels."
+cheat352_guide = "Every wild Pokémon is Ninjask, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat352_enable = false
 
 cheat353_desc = "Wild: Species: Shedinja"
@@ -2829,7 +2829,7 @@ cheat353_code = "080B4E6C:363026FF"
 cheat353_format = "Torii"
 cheat353_folder = "Wild"
 cheat353_keys = "launch"
-cheat353_guide = "Every wild Pokémon is Shedinja, at the area's usual levels."
+cheat353_guide = "Every wild Pokémon is Shedinja, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat353_enable = false
 
 cheat354_desc = "Wild: Species: Whismur"
@@ -2837,7 +2837,7 @@ cheat354_code = "080B4E6C:367326FF"
 cheat354_format = "Torii"
 cheat354_folder = "Wild"
 cheat354_keys = "launch"
-cheat354_guide = "Every wild Pokémon is Whismur, at the area's usual levels."
+cheat354_guide = "Every wild Pokémon is Whismur, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat354_enable = false
 
 cheat355_desc = "Wild: Species: Loudred"
@@ -2845,7 +2845,7 @@ cheat355_code = "080B4E6C:367426FF"
 cheat355_format = "Torii"
 cheat355_folder = "Wild"
 cheat355_keys = "launch"
-cheat355_guide = "Every wild Pokémon is Loudred, at the area's usual levels."
+cheat355_guide = "Every wild Pokémon is Loudred, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat355_enable = false
 
 cheat356_desc = "Wild: Species: Exploud"
@@ -2853,7 +2853,7 @@ cheat356_code = "080B4E6C:367526FF"
 cheat356_format = "Torii"
 cheat356_folder = "Wild"
 cheat356_keys = "launch"
-cheat356_guide = "Every wild Pokémon is Exploud, at the area's usual levels."
+cheat356_guide = "Every wild Pokémon is Exploud, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat356_enable = false
 
 cheat357_desc = "Wild: Species: Makuhita"
@@ -2861,7 +2861,7 @@ cheat357_code = "080B4E6C:365026FF"
 cheat357_format = "Torii"
 cheat357_folder = "Wild"
 cheat357_keys = "launch"
-cheat357_guide = "Every wild Pokémon is Makuhita, at the area's usual levels."
+cheat357_guide = "Every wild Pokémon is Makuhita, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat357_enable = false
 
 cheat358_desc = "Wild: Species: Hariyama"
@@ -2869,7 +2869,7 @@ cheat358_code = "080B4E6C:365126FF"
 cheat358_format = "Torii"
 cheat358_folder = "Wild"
 cheat358_keys = "launch"
-cheat358_guide = "Every wild Pokémon is Hariyama, at the area's usual levels."
+cheat358_guide = "Every wild Pokémon is Hariyama, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat358_enable = false
 
 cheat359_desc = "Wild: Species: Azurill"
@@ -2877,7 +2877,7 @@ cheat359_code = "080B4E6C:365F26FF"
 cheat359_format = "Torii"
 cheat359_folder = "Wild"
 cheat359_keys = "launch"
-cheat359_guide = "Every wild Pokémon is Azurill, at the area's usual levels."
+cheat359_guide = "Every wild Pokémon is Azurill, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat359_enable = false
 
 cheat360_desc = "Wild: Species: Nosepass"
@@ -2885,7 +2885,7 @@ cheat360_code = "080B4E6C:364126FF"
 cheat360_format = "Torii"
 cheat360_folder = "Wild"
 cheat360_keys = "launch"
-cheat360_guide = "Every wild Pokémon is Nosepass, at the area's usual levels."
+cheat360_guide = "Every wild Pokémon is Nosepass, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat360_enable = false
 
 cheat361_desc = "Wild: Species: Skitty"
@@ -2893,7 +2893,7 @@ cheat361_code = "080B4E6C:363C26FF"
 cheat361_format = "Torii"
 cheat361_folder = "Wild"
 cheat361_keys = "launch"
-cheat361_guide = "Every wild Pokémon is Skitty, at the area's usual levels."
+cheat361_guide = "Every wild Pokémon is Skitty, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat361_enable = false
 
 cheat362_desc = "Wild: Species: Delcatty"
@@ -2901,7 +2901,7 @@ cheat362_code = "080B4E6C:363D26FF"
 cheat362_format = "Torii"
 cheat362_folder = "Wild"
 cheat362_keys = "launch"
-cheat362_guide = "Every wild Pokémon is Delcatty, at the area's usual levels."
+cheat362_guide = "Every wild Pokémon is Delcatty, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat362_enable = false
 
 cheat363_desc = "Wild: Species: Sableye"
@@ -2909,7 +2909,7 @@ cheat363_code = "080B4E6C:364326FF"
 cheat363_format = "Torii"
 cheat363_folder = "Wild"
 cheat363_keys = "launch"
-cheat363_guide = "Every wild Pokémon is Sableye, at the area's usual levels."
+cheat363_guide = "Every wild Pokémon is Sableye, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat363_enable = false
 
 cheat364_desc = "Wild: Species: Mawile"
@@ -2917,7 +2917,7 @@ cheat364_code = "080B4E6C:366426FF"
 cheat364_format = "Torii"
 cheat364_folder = "Wild"
 cheat364_keys = "launch"
-cheat364_guide = "Every wild Pokémon is Mawile, at the area's usual levels."
+cheat364_guide = "Every wild Pokémon is Mawile, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat364_enable = false
 
 cheat365_desc = "Wild: Species: Aron"
@@ -2925,7 +2925,7 @@ cheat365_code = "080B4E6C:367F26FF"
 cheat365_format = "Torii"
 cheat365_folder = "Wild"
 cheat365_keys = "launch"
-cheat365_guide = "Every wild Pokémon is Aron, at the area's usual levels."
+cheat365_guide = "Every wild Pokémon is Aron, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat365_enable = false
 
 cheat366_desc = "Wild: Species: Lairon"
@@ -2933,7 +2933,7 @@ cheat366_code = "080B4E6C:368026FF"
 cheat366_format = "Torii"
 cheat366_folder = "Wild"
 cheat366_keys = "launch"
-cheat366_guide = "Every wild Pokémon is Lairon, at the area's usual levels."
+cheat366_guide = "Every wild Pokémon is Lairon, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat366_enable = false
 
 cheat367_desc = "Wild: Species: Aggron"
@@ -2941,7 +2941,7 @@ cheat367_code = "080B4E6C:368126FF"
 cheat367_format = "Torii"
 cheat367_folder = "Wild"
 cheat367_keys = "launch"
-cheat367_guide = "Every wild Pokémon is Aggron, at the area's usual levels."
+cheat367_guide = "Every wild Pokémon is Aggron, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat367_enable = false
 
 cheat368_desc = "Wild: Species: Meditite"
@@ -2949,7 +2949,7 @@ cheat368_code = "080B4E6C:366526FF"
 cheat368_format = "Torii"
 cheat368_folder = "Wild"
 cheat368_keys = "launch"
-cheat368_guide = "Every wild Pokémon is Meditite, at the area's usual levels."
+cheat368_guide = "Every wild Pokémon is Meditite, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat368_enable = false
 
 cheat369_desc = "Wild: Species: Medicham"
@@ -2957,7 +2957,7 @@ cheat369_code = "080B4E6C:366626FF"
 cheat369_format = "Torii"
 cheat369_folder = "Wild"
 cheat369_keys = "launch"
-cheat369_guide = "Every wild Pokémon is Medicham, at the area's usual levels."
+cheat369_guide = "Every wild Pokémon is Medicham, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat369_enable = false
 
 cheat370_desc = "Wild: Species: Electrike"
@@ -2965,7 +2965,7 @@ cheat370_code = "080B4E6C:365226FF"
 cheat370_format = "Torii"
 cheat370_folder = "Wild"
 cheat370_keys = "launch"
-cheat370_guide = "Every wild Pokémon is Electrike, at the area's usual levels."
+cheat370_guide = "Every wild Pokémon is Electrike, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat370_enable = false
 
 cheat371_desc = "Wild: Species: Manectric"
@@ -2973,7 +2973,7 @@ cheat371_code = "080B4E6C:365326FF"
 cheat371_format = "Torii"
 cheat371_folder = "Wild"
 cheat371_keys = "launch"
-cheat371_guide = "Every wild Pokémon is Manectric, at the area's usual levels."
+cheat371_guide = "Every wild Pokémon is Manectric, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat371_enable = false
 
 cheat372_desc = "Wild: Species: Plusle"
@@ -2981,7 +2981,7 @@ cheat372_code = "080B4E6C:366226FF"
 cheat372_format = "Torii"
 cheat372_folder = "Wild"
 cheat372_keys = "launch"
-cheat372_guide = "Every wild Pokémon is Plusle, at the area's usual levels."
+cheat372_guide = "Every wild Pokémon is Plusle, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat372_enable = false
 
 cheat373_desc = "Wild: Species: Minun"
@@ -2989,7 +2989,7 @@ cheat373_code = "080B4E6C:366326FF"
 cheat373_format = "Torii"
 cheat373_folder = "Wild"
 cheat373_keys = "launch"
-cheat373_guide = "Every wild Pokémon is Minun, at the area's usual levels."
+cheat373_guide = "Every wild Pokémon is Minun, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat373_enable = false
 
 cheat374_desc = "Wild: Species: Volbeat"
@@ -2997,7 +2997,7 @@ cheat374_code = "080B4E6C:368326FF"
 cheat374_format = "Torii"
 cheat374_folder = "Wild"
 cheat374_keys = "launch"
-cheat374_guide = "Every wild Pokémon is Volbeat, at the area's usual levels."
+cheat374_guide = "Every wild Pokémon is Volbeat, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat374_enable = false
 
 cheat375_desc = "Wild: Species: Illumise"
@@ -3005,7 +3005,7 @@ cheat375_code = "080B4E6C:368426FF"
 cheat375_format = "Torii"
 cheat375_folder = "Wild"
 cheat375_keys = "launch"
-cheat375_guide = "Every wild Pokémon is Illumise, at the area's usual levels."
+cheat375_guide = "Every wild Pokémon is Illumise, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat375_enable = false
 
 cheat376_desc = "Wild: Species: Roselia"
@@ -3013,7 +3013,7 @@ cheat376_code = "080B4E6C:366C26FF"
 cheat376_format = "Torii"
 cheat376_folder = "Wild"
 cheat376_keys = "launch"
-cheat376_guide = "Every wild Pokémon is Roselia, at the area's usual levels."
+cheat376_guide = "Every wild Pokémon is Roselia, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat376_enable = false
 
 cheat377_desc = "Wild: Species: Gulpin"
@@ -3021,7 +3021,7 @@ cheat377_code = "080B4E6C:367026FF"
 cheat377_format = "Torii"
 cheat377_folder = "Wild"
 cheat377_keys = "launch"
-cheat377_guide = "Every wild Pokémon is Gulpin, at the area's usual levels."
+cheat377_guide = "Every wild Pokémon is Gulpin, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat377_enable = false
 
 cheat378_desc = "Wild: Species: Swalot"
@@ -3029,7 +3029,7 @@ cheat378_code = "080B4E6C:367126FF"
 cheat378_format = "Torii"
 cheat378_folder = "Wild"
 cheat378_keys = "launch"
-cheat378_guide = "Every wild Pokémon is Swalot, at the area's usual levels."
+cheat378_guide = "Every wild Pokémon is Swalot, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat378_enable = false
 
 cheat379_desc = "Wild: Species: Carvanha"
@@ -3037,7 +3037,7 @@ cheat379_code = "080B4E6C:364B26FF"
 cheat379_format = "Torii"
 cheat379_folder = "Wild"
 cheat379_keys = "launch"
-cheat379_guide = "Every wild Pokémon is Carvanha, at the area's usual levels."
+cheat379_guide = "Every wild Pokémon is Carvanha, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat379_enable = false
 
 cheat380_desc = "Wild: Species: Sharpedo"
@@ -3045,7 +3045,7 @@ cheat380_code = "080B4E6C:364C26FF"
 cheat380_format = "Torii"
 cheat380_folder = "Wild"
 cheat380_keys = "launch"
-cheat380_guide = "Every wild Pokémon is Sharpedo, at the area's usual levels."
+cheat380_guide = "Every wild Pokémon is Sharpedo, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat380_enable = false
 
 cheat381_desc = "Wild: Species: Wailmer"
@@ -3053,7 +3053,7 @@ cheat381_code = "080B4E6C:363A26FF"
 cheat381_format = "Torii"
 cheat381_folder = "Wild"
 cheat381_keys = "launch"
-cheat381_guide = "Every wild Pokémon is Wailmer, at the area's usual levels."
+cheat381_guide = "Every wild Pokémon is Wailmer, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat381_enable = false
 
 cheat382_desc = "Wild: Species: Wailord"
@@ -3061,7 +3061,7 @@ cheat382_code = "080B4E6C:363B26FF"
 cheat382_format = "Torii"
 cheat382_folder = "Wild"
 cheat382_keys = "launch"
-cheat382_guide = "Every wild Pokémon is Wailord, at the area's usual levels."
+cheat382_guide = "Every wild Pokémon is Wailord, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat382_enable = false
 
 cheat383_desc = "Wild: Species: Numel"
@@ -3069,7 +3069,7 @@ cheat383_code = "080B4E6C:365426FF"
 cheat383_format = "Torii"
 cheat383_folder = "Wild"
 cheat383_keys = "launch"
-cheat383_guide = "Every wild Pokémon is Numel, at the area's usual levels."
+cheat383_guide = "Every wild Pokémon is Numel, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat383_enable = false
 
 cheat384_desc = "Wild: Species: Camerupt"
@@ -3077,7 +3077,7 @@ cheat384_code = "080B4E6C:365526FF"
 cheat384_format = "Torii"
 cheat384_folder = "Wild"
 cheat384_keys = "launch"
-cheat384_guide = "Every wild Pokémon is Camerupt, at the area's usual levels."
+cheat384_guide = "Every wild Pokémon is Camerupt, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat384_enable = false
 
 cheat385_desc = "Wild: Species: Torkoal"
@@ -3085,7 +3085,7 @@ cheat385_code = "080B4E6C:364226FF"
 cheat385_format = "Torii"
 cheat385_folder = "Wild"
 cheat385_keys = "launch"
-cheat385_guide = "Every wild Pokémon is Torkoal, at the area's usual levels."
+cheat385_guide = "Every wild Pokémon is Torkoal, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat385_enable = false
 
 cheat386_desc = "Wild: Species: Spoink"
@@ -3093,7 +3093,7 @@ cheat386_code = "080B4E6C:366026FF"
 cheat386_format = "Torii"
 cheat386_folder = "Wild"
 cheat386_keys = "launch"
-cheat386_guide = "Every wild Pokémon is Spoink, at the area's usual levels."
+cheat386_guide = "Every wild Pokémon is Spoink, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat386_enable = false
 
 cheat387_desc = "Wild: Species: Grumpig"
@@ -3101,7 +3101,7 @@ cheat387_code = "080B4E6C:366126FF"
 cheat387_format = "Torii"
 cheat387_folder = "Wild"
 cheat387_keys = "launch"
-cheat387_guide = "Every wild Pokémon is Grumpig, at the area's usual levels."
+cheat387_guide = "Every wild Pokémon is Grumpig, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat387_enable = false
 
 cheat388_desc = "Wild: Species: Spinda"
@@ -3109,7 +3109,7 @@ cheat388_code = "080B4E6C:363526FF"
 cheat388_format = "Torii"
 cheat388_folder = "Wild"
 cheat388_keys = "launch"
-cheat388_guide = "Every wild Pokémon is Spinda, at the area's usual levels."
+cheat388_guide = "Every wild Pokémon is Spinda, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat388_enable = false
 
 cheat389_desc = "Wild: Species: Trapinch"
@@ -3117,7 +3117,7 @@ cheat389_code = "080B4E6C:364D26FF"
 cheat389_format = "Torii"
 cheat389_folder = "Wild"
 cheat389_keys = "launch"
-cheat389_guide = "Every wild Pokémon is Trapinch, at the area's usual levels."
+cheat389_guide = "Every wild Pokémon is Trapinch, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat389_enable = false
 
 cheat390_desc = "Wild: Species: Vibrava"
@@ -3125,7 +3125,7 @@ cheat390_code = "080B4E6C:364E26FF"
 cheat390_format = "Torii"
 cheat390_folder = "Wild"
 cheat390_keys = "launch"
-cheat390_guide = "Every wild Pokémon is Vibrava, at the area's usual levels."
+cheat390_guide = "Every wild Pokémon is Vibrava, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat390_enable = false
 
 cheat391_desc = "Wild: Species: Flygon"
@@ -3133,7 +3133,7 @@ cheat391_code = "080B4E6C:364F26FF"
 cheat391_format = "Torii"
 cheat391_folder = "Wild"
 cheat391_keys = "launch"
-cheat391_guide = "Every wild Pokémon is Flygon, at the area's usual levels."
+cheat391_guide = "Every wild Pokémon is Flygon, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat391_enable = false
 
 cheat392_desc = "Wild: Species: Cacnea"
@@ -3141,7 +3141,7 @@ cheat392_code = "080B4E6C:365926FF"
 cheat392_format = "Torii"
 cheat392_folder = "Wild"
 cheat392_keys = "launch"
-cheat392_guide = "Every wild Pokémon is Cacnea, at the area's usual levels."
+cheat392_guide = "Every wild Pokémon is Cacnea, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat392_enable = false
 
 cheat393_desc = "Wild: Species: Cacturne"
@@ -3149,7 +3149,7 @@ cheat393_code = "080B4E6C:365A26FF"
 cheat393_format = "Torii"
 cheat393_folder = "Wild"
 cheat393_keys = "launch"
-cheat393_guide = "Every wild Pokémon is Cacturne, at the area's usual levels."
+cheat393_guide = "Every wild Pokémon is Cacturne, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat393_enable = false
 
 cheat394_desc = "Wild: Species: Swablu"
@@ -3157,7 +3157,7 @@ cheat394_code = "080B4E6C:366726FF"
 cheat394_format = "Torii"
 cheat394_folder = "Wild"
 cheat394_keys = "launch"
-cheat394_guide = "Every wild Pokémon is Swablu, at the area's usual levels."
+cheat394_guide = "Every wild Pokémon is Swablu, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat394_enable = false
 
 cheat395_desc = "Wild: Species: Altaria"
@@ -3165,7 +3165,7 @@ cheat395_code = "080B4E6C:366826FF"
 cheat395_format = "Torii"
 cheat395_folder = "Wild"
 cheat395_keys = "launch"
-cheat395_guide = "Every wild Pokémon is Altaria, at the area's usual levels."
+cheat395_guide = "Every wild Pokémon is Altaria, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat395_enable = false
 
 cheat396_desc = "Wild: Species: Zangoose"
@@ -3173,7 +3173,7 @@ cheat396_code = "080B4E6C:367D26FF"
 cheat396_format = "Torii"
 cheat396_folder = "Wild"
 cheat396_keys = "launch"
-cheat396_guide = "Every wild Pokémon is Zangoose, at the area's usual levels."
+cheat396_guide = "Every wild Pokémon is Zangoose, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat396_enable = false
 
 cheat397_desc = "Wild: Species: Seviper"
@@ -3181,7 +3181,7 @@ cheat397_code = "080B4E6C:367C26FF"
 cheat397_format = "Torii"
 cheat397_folder = "Wild"
 cheat397_keys = "launch"
-cheat397_guide = "Every wild Pokémon is Seviper, at the area's usual levels."
+cheat397_guide = "Every wild Pokémon is Seviper, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat397_enable = false
 
 cheat398_desc = "Wild: Species: Lunatone"
@@ -3189,7 +3189,7 @@ cheat398_code = "080B4E6C:365D26FF"
 cheat398_format = "Torii"
 cheat398_folder = "Wild"
 cheat398_keys = "launch"
-cheat398_guide = "Every wild Pokémon is Lunatone, at the area's usual levels."
+cheat398_guide = "Every wild Pokémon is Lunatone, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat398_enable = false
 
 cheat399_desc = "Wild: Species: Solrock"
@@ -3197,7 +3197,7 @@ cheat399_code = "080B4E6C:365E26FF"
 cheat399_format = "Torii"
 cheat399_folder = "Wild"
 cheat399_keys = "launch"
-cheat399_guide = "Every wild Pokémon is Solrock, at the area's usual levels."
+cheat399_guide = "Every wild Pokémon is Solrock, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat399_enable = false
 
 cheat400_desc = "Wild: Species: Barboach"
@@ -3205,7 +3205,7 @@ cheat400_code = "080B4E6C:364426FF"
 cheat400_format = "Torii"
 cheat400_folder = "Wild"
 cheat400_keys = "launch"
-cheat400_guide = "Every wild Pokémon is Barboach, at the area's usual levels."
+cheat400_guide = "Every wild Pokémon is Barboach, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat400_enable = false
 
 cheat401_desc = "Wild: Species: Whiscash"
@@ -3213,7 +3213,7 @@ cheat401_code = "080B4E6C:364526FF"
 cheat401_format = "Torii"
 cheat401_folder = "Wild"
 cheat401_keys = "launch"
-cheat401_guide = "Every wild Pokémon is Whiscash, at the area's usual levels."
+cheat401_guide = "Every wild Pokémon is Whiscash, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat401_enable = false
 
 cheat402_desc = "Wild: Species: Corphish"
@@ -3221,7 +3221,7 @@ cheat402_code = "080B4E6C:364726FF"
 cheat402_format = "Torii"
 cheat402_folder = "Wild"
 cheat402_keys = "launch"
-cheat402_guide = "Every wild Pokémon is Corphish, at the area's usual levels."
+cheat402_guide = "Every wild Pokémon is Corphish, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat402_enable = false
 
 cheat403_desc = "Wild: Species: Crawdaunt"
@@ -3229,7 +3229,7 @@ cheat403_code = "080B4E6C:364826FF"
 cheat403_format = "Torii"
 cheat403_folder = "Wild"
 cheat403_keys = "launch"
-cheat403_guide = "Every wild Pokémon is Crawdaunt, at the area's usual levels."
+cheat403_guide = "Every wild Pokémon is Crawdaunt, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat403_enable = false
 
 cheat404_desc = "Wild: Species: Baltoy"
@@ -3237,7 +3237,7 @@ cheat404_code = "080B4E6C:363F26FF"
 cheat404_format = "Torii"
 cheat404_folder = "Wild"
 cheat404_keys = "launch"
-cheat404_guide = "Every wild Pokémon is Baltoy, at the area's usual levels."
+cheat404_guide = "Every wild Pokémon is Baltoy, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat404_enable = false
 
 cheat405_desc = "Wild: Species: Claydol"
@@ -3245,7 +3245,7 @@ cheat405_code = "080B4E6C:364026FF"
 cheat405_format = "Torii"
 cheat405_folder = "Wild"
 cheat405_keys = "launch"
-cheat405_guide = "Every wild Pokémon is Claydol, at the area's usual levels."
+cheat405_guide = "Every wild Pokémon is Claydol, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat405_enable = false
 
 cheat406_desc = "Wild: Species: Lileep"
@@ -3253,7 +3253,7 @@ cheat406_code = "080B4E6C:368526FF"
 cheat406_format = "Torii"
 cheat406_folder = "Wild"
 cheat406_keys = "launch"
-cheat406_guide = "Every wild Pokémon is Lileep, at the area's usual levels."
+cheat406_guide = "Every wild Pokémon is Lileep, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat406_enable = false
 
 cheat407_desc = "Wild: Species: Cradily"
@@ -3261,7 +3261,7 @@ cheat407_code = "080B4E6C:368626FF"
 cheat407_format = "Torii"
 cheat407_folder = "Wild"
 cheat407_keys = "launch"
-cheat407_guide = "Every wild Pokémon is Cradily, at the area's usual levels."
+cheat407_guide = "Every wild Pokémon is Cradily, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat407_enable = false
 
 cheat408_desc = "Wild: Species: Anorith"
@@ -3269,7 +3269,7 @@ cheat408_code = "080B4E6C:368726FF"
 cheat408_format = "Torii"
 cheat408_folder = "Wild"
 cheat408_keys = "launch"
-cheat408_guide = "Every wild Pokémon is Anorith, at the area's usual levels."
+cheat408_guide = "Every wild Pokémon is Anorith, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat408_enable = false
 
 cheat409_desc = "Wild: Species: Armaldo"
@@ -3277,7 +3277,7 @@ cheat409_code = "080B4E6C:368826FF"
 cheat409_format = "Torii"
 cheat409_folder = "Wild"
 cheat409_keys = "launch"
-cheat409_guide = "Every wild Pokémon is Armaldo, at the area's usual levels."
+cheat409_guide = "Every wild Pokémon is Armaldo, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat409_enable = false
 
 cheat410_desc = "Wild: Species: Feebas"
@@ -3285,7 +3285,7 @@ cheat410_code = "080B4E6C:364926FF"
 cheat410_format = "Torii"
 cheat410_folder = "Wild"
 cheat410_keys = "launch"
-cheat410_guide = "Every wild Pokémon is Feebas, at the area's usual levels."
+cheat410_guide = "Every wild Pokémon is Feebas, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat410_enable = false
 
 cheat411_desc = "Wild: Species: Milotic"
@@ -3293,7 +3293,7 @@ cheat411_code = "080B4E6C:364A26FF"
 cheat411_format = "Torii"
 cheat411_folder = "Wild"
 cheat411_keys = "launch"
-cheat411_guide = "Every wild Pokémon is Milotic, at the area's usual levels."
+cheat411_guide = "Every wild Pokémon is Milotic, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat411_enable = false
 
 cheat412_desc = "Wild: Species: Castform"
@@ -3301,7 +3301,7 @@ cheat412_code = "080B4E6C:368226FF"
 cheat412_format = "Torii"
 cheat412_folder = "Wild"
 cheat412_keys = "launch"
-cheat412_guide = "Every wild Pokémon is Castform, at the area's usual levels."
+cheat412_guide = "Every wild Pokémon is Castform, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat412_enable = false
 
 cheat413_desc = "Wild: Species: Kecleon"
@@ -3309,7 +3309,7 @@ cheat413_code = "080B4E6C:363E26FF"
 cheat413_format = "Torii"
 cheat413_folder = "Wild"
 cheat413_keys = "launch"
-cheat413_guide = "Every wild Pokémon is Kecleon, at the area's usual levels."
+cheat413_guide = "Every wild Pokémon is Kecleon, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat413_enable = false
 
 cheat414_desc = "Wild: Species: Shuppet"
@@ -3317,7 +3317,7 @@ cheat414_code = "080B4E6C:367A26FF"
 cheat414_format = "Torii"
 cheat414_folder = "Wild"
 cheat414_keys = "launch"
-cheat414_guide = "Every wild Pokémon is Shuppet, at the area's usual levels."
+cheat414_guide = "Every wild Pokémon is Shuppet, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat414_enable = false
 
 cheat415_desc = "Wild: Species: Banette"
@@ -3325,7 +3325,7 @@ cheat415_code = "080B4E6C:367B26FF"
 cheat415_format = "Torii"
 cheat415_folder = "Wild"
 cheat415_keys = "launch"
-cheat415_guide = "Every wild Pokémon is Banette, at the area's usual levels."
+cheat415_guide = "Every wild Pokémon is Banette, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat415_enable = false
 
 cheat416_desc = "Wild: Species: Duskull"
@@ -3333,7 +3333,7 @@ cheat416_code = "080B4E6C:366A26FF"
 cheat416_format = "Torii"
 cheat416_folder = "Wild"
 cheat416_keys = "launch"
-cheat416_guide = "Every wild Pokémon is Duskull, at the area's usual levels."
+cheat416_guide = "Every wild Pokémon is Duskull, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat416_enable = false
 
 cheat417_desc = "Wild: Species: Dusclops"
@@ -3341,7 +3341,7 @@ cheat417_code = "080B4E6C:366B26FF"
 cheat417_format = "Torii"
 cheat417_folder = "Wild"
 cheat417_keys = "launch"
-cheat417_guide = "Every wild Pokémon is Dusclops, at the area's usual levels."
+cheat417_guide = "Every wild Pokémon is Dusclops, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat417_enable = false
 
 cheat418_desc = "Wild: Species: Tropius"
@@ -3349,7 +3349,7 @@ cheat418_code = "080B4E6C:367226FF"
 cheat418_format = "Torii"
 cheat418_folder = "Wild"
 cheat418_keys = "launch"
-cheat418_guide = "Every wild Pokémon is Tropius, at the area's usual levels."
+cheat418_guide = "Every wild Pokémon is Tropius, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat418_enable = false
 
 cheat419_desc = "Wild: Species: Chimecho"
@@ -3357,7 +3357,7 @@ cheat419_code = "080B4E6C:369C26FF"
 cheat419_format = "Torii"
 cheat419_folder = "Wild"
 cheat419_keys = "launch"
-cheat419_guide = "Every wild Pokémon is Chimecho, at the area's usual levels."
+cheat419_guide = "Every wild Pokémon is Chimecho, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat419_enable = false
 
 cheat420_desc = "Wild: Species: Absol"
@@ -3365,7 +3365,7 @@ cheat420_code = "080B4E6C:367926FF"
 cheat420_format = "Torii"
 cheat420_folder = "Wild"
 cheat420_keys = "launch"
-cheat420_guide = "Every wild Pokémon is Absol, at the area's usual levels."
+cheat420_guide = "Every wild Pokémon is Absol, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat420_enable = false
 
 cheat421_desc = "Wild: Species: Wynaut"
@@ -3373,7 +3373,7 @@ cheat421_code = "080B4E6C:366926FF"
 cheat421_format = "Torii"
 cheat421_folder = "Wild"
 cheat421_keys = "launch"
-cheat421_guide = "Every wild Pokémon is Wynaut, at the area's usual levels."
+cheat421_guide = "Every wild Pokémon is Wynaut, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat421_enable = false
 
 cheat422_desc = "Wild: Species: Snorunt"
@@ -3381,7 +3381,7 @@ cheat422_code = "080B4E6C:365B26FF"
 cheat422_format = "Torii"
 cheat422_folder = "Wild"
 cheat422_keys = "launch"
-cheat422_guide = "Every wild Pokémon is Snorunt, at the area's usual levels."
+cheat422_guide = "Every wild Pokémon is Snorunt, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat422_enable = false
 
 cheat423_desc = "Wild: Species: Glalie"
@@ -3389,7 +3389,7 @@ cheat423_code = "080B4E6C:365C26FF"
 cheat423_format = "Torii"
 cheat423_folder = "Wild"
 cheat423_keys = "launch"
-cheat423_guide = "Every wild Pokémon is Glalie, at the area's usual levels."
+cheat423_guide = "Every wild Pokémon is Glalie, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat423_enable = false
 
 cheat424_desc = "Wild: Species: Spheal"
@@ -3397,7 +3397,7 @@ cheat424_code = "080B4E6C:365626FF"
 cheat424_format = "Torii"
 cheat424_folder = "Wild"
 cheat424_keys = "launch"
-cheat424_guide = "Every wild Pokémon is Spheal, at the area's usual levels."
+cheat424_guide = "Every wild Pokémon is Spheal, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat424_enable = false
 
 cheat425_desc = "Wild: Species: Sealeo"
@@ -3405,7 +3405,7 @@ cheat425_code = "080B4E6C:365726FF"
 cheat425_format = "Torii"
 cheat425_folder = "Wild"
 cheat425_keys = "launch"
-cheat425_guide = "Every wild Pokémon is Sealeo, at the area's usual levels."
+cheat425_guide = "Every wild Pokémon is Sealeo, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat425_enable = false
 
 cheat426_desc = "Wild: Species: Walrein"
@@ -3413,7 +3413,7 @@ cheat426_code = "080B4E6C:365826FF"
 cheat426_format = "Torii"
 cheat426_folder = "Wild"
 cheat426_keys = "launch"
-cheat426_guide = "Every wild Pokémon is Walrein, at the area's usual levels."
+cheat426_guide = "Every wild Pokémon is Walrein, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat426_enable = false
 
 cheat427_desc = "Wild: Species: Clamperl"
@@ -3421,7 +3421,7 @@ cheat427_code = "080B4E6C:367626FF"
 cheat427_format = "Torii"
 cheat427_folder = "Wild"
 cheat427_keys = "launch"
-cheat427_guide = "Every wild Pokémon is Clamperl, at the area's usual levels."
+cheat427_guide = "Every wild Pokémon is Clamperl, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat427_enable = false
 
 cheat428_desc = "Wild: Species: Huntail"
@@ -3429,7 +3429,7 @@ cheat428_code = "080B4E6C:367726FF"
 cheat428_format = "Torii"
 cheat428_folder = "Wild"
 cheat428_keys = "launch"
-cheat428_guide = "Every wild Pokémon is Huntail, at the area's usual levels."
+cheat428_guide = "Every wild Pokémon is Huntail, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat428_enable = false
 
 cheat429_desc = "Wild: Species: Gorebyss"
@@ -3437,7 +3437,7 @@ cheat429_code = "080B4E6C:367826FF"
 cheat429_format = "Torii"
 cheat429_folder = "Wild"
 cheat429_keys = "launch"
-cheat429_guide = "Every wild Pokémon is Gorebyss, at the area's usual levels."
+cheat429_guide = "Every wild Pokémon is Gorebyss, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat429_enable = false
 
 cheat430_desc = "Wild: Species: Relicanth"
@@ -3445,7 +3445,7 @@ cheat430_code = "080B4E6C:367E26FF"
 cheat430_format = "Torii"
 cheat430_folder = "Wild"
 cheat430_keys = "launch"
-cheat430_guide = "Every wild Pokémon is Relicanth, at the area's usual levels."
+cheat430_guide = "Every wild Pokémon is Relicanth, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat430_enable = false
 
 cheat431_desc = "Wild: Species: Luvdisc"
@@ -3453,7 +3453,7 @@ cheat431_code = "080B4E6C:364626FF"
 cheat431_format = "Torii"
 cheat431_folder = "Wild"
 cheat431_keys = "launch"
-cheat431_guide = "Every wild Pokémon is Luvdisc, at the area's usual levels."
+cheat431_guide = "Every wild Pokémon is Luvdisc, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat431_enable = false
 
 cheat432_desc = "Wild: Species: Bagon"
@@ -3461,7 +3461,7 @@ cheat432_code = "080B4E6C:368C26FF"
 cheat432_format = "Torii"
 cheat432_folder = "Wild"
 cheat432_keys = "launch"
-cheat432_guide = "Every wild Pokémon is Bagon, at the area's usual levels."
+cheat432_guide = "Every wild Pokémon is Bagon, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat432_enable = false
 
 cheat433_desc = "Wild: Species: Shelgon"
@@ -3469,7 +3469,7 @@ cheat433_code = "080B4E6C:368D26FF"
 cheat433_format = "Torii"
 cheat433_folder = "Wild"
 cheat433_keys = "launch"
-cheat433_guide = "Every wild Pokémon is Shelgon, at the area's usual levels."
+cheat433_guide = "Every wild Pokémon is Shelgon, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat433_enable = false
 
 cheat434_desc = "Wild: Species: Salamence"
@@ -3477,7 +3477,7 @@ cheat434_code = "080B4E6C:368E26FF"
 cheat434_format = "Torii"
 cheat434_folder = "Wild"
 cheat434_keys = "launch"
-cheat434_guide = "Every wild Pokémon is Salamence, at the area's usual levels."
+cheat434_guide = "Every wild Pokémon is Salamence, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat434_enable = false
 
 cheat435_desc = "Wild: Species: Beldum"
@@ -3485,7 +3485,7 @@ cheat435_code = "080B4E6C:368F26FF"
 cheat435_format = "Torii"
 cheat435_folder = "Wild"
 cheat435_keys = "launch"
-cheat435_guide = "Every wild Pokémon is Beldum, at the area's usual levels."
+cheat435_guide = "Every wild Pokémon is Beldum, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat435_enable = false
 
 cheat436_desc = "Wild: Species: Metang"
@@ -3493,7 +3493,7 @@ cheat436_code = "080B4E6C:369026FF"
 cheat436_format = "Torii"
 cheat436_folder = "Wild"
 cheat436_keys = "launch"
-cheat436_guide = "Every wild Pokémon is Metang, at the area's usual levels."
+cheat436_guide = "Every wild Pokémon is Metang, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat436_enable = false
 
 cheat437_desc = "Wild: Species: Metagross"
@@ -3501,7 +3501,7 @@ cheat437_code = "080B4E6C:369126FF"
 cheat437_format = "Torii"
 cheat437_folder = "Wild"
 cheat437_keys = "launch"
-cheat437_guide = "Every wild Pokémon is Metagross, at the area's usual levels."
+cheat437_guide = "Every wild Pokémon is Metagross, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat437_enable = false
 
 cheat438_desc = "Wild: Species: Regirock"
@@ -3509,7 +3509,7 @@ cheat438_code = "080B4E6C:369226FF"
 cheat438_format = "Torii"
 cheat438_folder = "Wild"
 cheat438_keys = "launch"
-cheat438_guide = "Every wild Pokémon is Regirock, at the area's usual levels."
+cheat438_guide = "Every wild Pokémon is Regirock, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat438_enable = false
 
 cheat439_desc = "Wild: Species: Regice"
@@ -3517,7 +3517,7 @@ cheat439_code = "080B4E6C:369326FF"
 cheat439_format = "Torii"
 cheat439_folder = "Wild"
 cheat439_keys = "launch"
-cheat439_guide = "Every wild Pokémon is Regice, at the area's usual levels."
+cheat439_guide = "Every wild Pokémon is Regice, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat439_enable = false
 
 cheat440_desc = "Wild: Species: Registeel"
@@ -3525,7 +3525,7 @@ cheat440_code = "080B4E6C:369426FF"
 cheat440_format = "Torii"
 cheat440_folder = "Wild"
 cheat440_keys = "launch"
-cheat440_guide = "Every wild Pokémon is Registeel, at the area's usual levels."
+cheat440_guide = "Every wild Pokémon is Registeel, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat440_enable = false
 
 cheat441_desc = "Wild: Species: Latias"
@@ -3533,7 +3533,7 @@ cheat441_code = "080B4E6C:369826FF"
 cheat441_format = "Torii"
 cheat441_folder = "Wild"
 cheat441_keys = "launch"
-cheat441_guide = "Every wild Pokémon is Latias, at the area's usual levels."
+cheat441_guide = "Every wild Pokémon is Latias, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat441_enable = false
 
 cheat442_desc = "Wild: Species: Latios"
@@ -3541,7 +3541,7 @@ cheat442_code = "080B4E6C:369926FF"
 cheat442_format = "Torii"
 cheat442_folder = "Wild"
 cheat442_keys = "launch"
-cheat442_guide = "Every wild Pokémon is Latios, at the area's usual levels."
+cheat442_guide = "Every wild Pokémon is Latios, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat442_enable = false
 
 cheat443_desc = "Wild: Species: Kyogre"
@@ -3549,7 +3549,7 @@ cheat443_code = "080B4E6C:369526FF"
 cheat443_format = "Torii"
 cheat443_folder = "Wild"
 cheat443_keys = "launch"
-cheat443_guide = "Every wild Pokémon is Kyogre, at the area's usual levels."
+cheat443_guide = "Every wild Pokémon is Kyogre, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat443_enable = false
 
 cheat444_desc = "Wild: Species: Groudon"
@@ -3557,7 +3557,7 @@ cheat444_code = "080B4E6C:369626FF"
 cheat444_format = "Torii"
 cheat444_folder = "Wild"
 cheat444_keys = "launch"
-cheat444_guide = "Every wild Pokémon is Groudon, at the area's usual levels."
+cheat444_guide = "Every wild Pokémon is Groudon, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat444_enable = false
 
 cheat445_desc = "Wild: Species: Rayquaza"
@@ -3565,7 +3565,7 @@ cheat445_code = "080B4E6C:369726FF"
 cheat445_format = "Torii"
 cheat445_folder = "Wild"
 cheat445_keys = "launch"
-cheat445_guide = "Every wild Pokémon is Rayquaza, at the area's usual levels."
+cheat445_guide = "Every wild Pokémon is Rayquaza, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat445_enable = false
 
 cheat446_desc = "Wild: Species: Jirachi"
@@ -3573,7 +3573,7 @@ cheat446_code = "080B4E6C:369A26FF"
 cheat446_format = "Torii"
 cheat446_folder = "Wild"
 cheat446_keys = "launch"
-cheat446_guide = "Every wild Pokémon is Jirachi, at the area's usual levels."
+cheat446_guide = "Every wild Pokémon is Jirachi, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat446_enable = false
 
 cheat447_desc = "Wild: Species: Deoxys"
@@ -3581,7 +3581,7 @@ cheat447_code = "080B4E6C:369B26FF"
 cheat447_format = "Torii"
 cheat447_folder = "Wild"
 cheat447_keys = "launch"
-cheat447_guide = "Every wild Pokémon is Deoxys, at the area's usual levels."
+cheat447_guide = "Every wild Pokémon is Deoxys, at the area's usual levels. Roaming Pokémon stay as they are."
 cheat447_enable = false
 
 cheat448_desc = "Wild: Level 5"
@@ -3589,7 +3589,7 @@ cheat448_code = "080B4C74:47702005"
 cheat448_format = "Torii"
 cheat448_folder = "Wild"
 cheat448_keys = "launch"
-cheat448_guide = "Every wild Pokémon is level 5."
+cheat448_guide = "Every wild Pokémon is level 5. Roaming and outbreak Pokémon keep theirs."
 cheat448_enable = false
 
 cheat449_desc = "Wild: Level 10"
@@ -3597,7 +3597,7 @@ cheat449_code = "080B4C74:4770200A"
 cheat449_format = "Torii"
 cheat449_folder = "Wild"
 cheat449_keys = "launch"
-cheat449_guide = "Every wild Pokémon is level 10."
+cheat449_guide = "Every wild Pokémon is level 10. Roaming and outbreak Pokémon keep theirs."
 cheat449_enable = false
 
 cheat450_desc = "Wild: Level 15"
@@ -3605,7 +3605,7 @@ cheat450_code = "080B4C74:4770200F"
 cheat450_format = "Torii"
 cheat450_folder = "Wild"
 cheat450_keys = "launch"
-cheat450_guide = "Every wild Pokémon is level 15."
+cheat450_guide = "Every wild Pokémon is level 15. Roaming and outbreak Pokémon keep theirs."
 cheat450_enable = false
 
 cheat451_desc = "Wild: Level 20"
@@ -3613,7 +3613,7 @@ cheat451_code = "080B4C74:47702014"
 cheat451_format = "Torii"
 cheat451_folder = "Wild"
 cheat451_keys = "launch"
-cheat451_guide = "Every wild Pokémon is level 20."
+cheat451_guide = "Every wild Pokémon is level 20. Roaming and outbreak Pokémon keep theirs."
 cheat451_enable = false
 
 cheat452_desc = "Wild: Level 25"
@@ -3621,7 +3621,7 @@ cheat452_code = "080B4C74:47702019"
 cheat452_format = "Torii"
 cheat452_folder = "Wild"
 cheat452_keys = "launch"
-cheat452_guide = "Every wild Pokémon is level 25."
+cheat452_guide = "Every wild Pokémon is level 25. Roaming and outbreak Pokémon keep theirs."
 cheat452_enable = false
 
 cheat453_desc = "Wild: Level 30"
@@ -3629,7 +3629,7 @@ cheat453_code = "080B4C74:4770201E"
 cheat453_format = "Torii"
 cheat453_folder = "Wild"
 cheat453_keys = "launch"
-cheat453_guide = "Every wild Pokémon is level 30."
+cheat453_guide = "Every wild Pokémon is level 30. Roaming and outbreak Pokémon keep theirs."
 cheat453_enable = false
 
 cheat454_desc = "Wild: Level 35"
@@ -3637,7 +3637,7 @@ cheat454_code = "080B4C74:47702023"
 cheat454_format = "Torii"
 cheat454_folder = "Wild"
 cheat454_keys = "launch"
-cheat454_guide = "Every wild Pokémon is level 35."
+cheat454_guide = "Every wild Pokémon is level 35. Roaming and outbreak Pokémon keep theirs."
 cheat454_enable = false
 
 cheat455_desc = "Wild: Level 40"
@@ -3645,7 +3645,7 @@ cheat455_code = "080B4C74:47702028"
 cheat455_format = "Torii"
 cheat455_folder = "Wild"
 cheat455_keys = "launch"
-cheat455_guide = "Every wild Pokémon is level 40."
+cheat455_guide = "Every wild Pokémon is level 40. Roaming and outbreak Pokémon keep theirs."
 cheat455_enable = false
 
 cheat456_desc = "Wild: Level 45"
@@ -3653,7 +3653,7 @@ cheat456_code = "080B4C74:4770202D"
 cheat456_format = "Torii"
 cheat456_folder = "Wild"
 cheat456_keys = "launch"
-cheat456_guide = "Every wild Pokémon is level 45."
+cheat456_guide = "Every wild Pokémon is level 45. Roaming and outbreak Pokémon keep theirs."
 cheat456_enable = false
 
 cheat457_desc = "Wild: Level 50"
@@ -3661,7 +3661,7 @@ cheat457_code = "080B4C74:47702032"
 cheat457_format = "Torii"
 cheat457_folder = "Wild"
 cheat457_keys = "launch"
-cheat457_guide = "Every wild Pokémon is level 50."
+cheat457_guide = "Every wild Pokémon is level 50. Roaming and outbreak Pokémon keep theirs."
 cheat457_enable = false
 
 cheat458_desc = "Wild: Level 55"
@@ -3669,7 +3669,7 @@ cheat458_code = "080B4C74:47702037"
 cheat458_format = "Torii"
 cheat458_folder = "Wild"
 cheat458_keys = "launch"
-cheat458_guide = "Every wild Pokémon is level 55."
+cheat458_guide = "Every wild Pokémon is level 55. Roaming and outbreak Pokémon keep theirs."
 cheat458_enable = false
 
 cheat459_desc = "Wild: Level 60"
@@ -3677,7 +3677,7 @@ cheat459_code = "080B4C74:4770203C"
 cheat459_format = "Torii"
 cheat459_folder = "Wild"
 cheat459_keys = "launch"
-cheat459_guide = "Every wild Pokémon is level 60."
+cheat459_guide = "Every wild Pokémon is level 60. Roaming and outbreak Pokémon keep theirs."
 cheat459_enable = false
 
 cheat460_desc = "Wild: Level 65"
@@ -3685,7 +3685,7 @@ cheat460_code = "080B4C74:47702041"
 cheat460_format = "Torii"
 cheat460_folder = "Wild"
 cheat460_keys = "launch"
-cheat460_guide = "Every wild Pokémon is level 65."
+cheat460_guide = "Every wild Pokémon is level 65. Roaming and outbreak Pokémon keep theirs."
 cheat460_enable = false
 
 cheat461_desc = "Wild: Level 70"
@@ -3693,7 +3693,7 @@ cheat461_code = "080B4C74:47702046"
 cheat461_format = "Torii"
 cheat461_folder = "Wild"
 cheat461_keys = "launch"
-cheat461_guide = "Every wild Pokémon is level 70."
+cheat461_guide = "Every wild Pokémon is level 70. Roaming and outbreak Pokémon keep theirs."
 cheat461_enable = false
 
 cheat462_desc = "Wild: Level 75"
@@ -3701,7 +3701,7 @@ cheat462_code = "080B4C74:4770204B"
 cheat462_format = "Torii"
 cheat462_folder = "Wild"
 cheat462_keys = "launch"
-cheat462_guide = "Every wild Pokémon is level 75."
+cheat462_guide = "Every wild Pokémon is level 75. Roaming and outbreak Pokémon keep theirs."
 cheat462_enable = false
 
 cheat463_desc = "Wild: Level 80"
@@ -3709,7 +3709,7 @@ cheat463_code = "080B4C74:47702050"
 cheat463_format = "Torii"
 cheat463_folder = "Wild"
 cheat463_keys = "launch"
-cheat463_guide = "Every wild Pokémon is level 80."
+cheat463_guide = "Every wild Pokémon is level 80. Roaming and outbreak Pokémon keep theirs."
 cheat463_enable = false
 
 cheat464_desc = "Wild: Level 85"
@@ -3717,7 +3717,7 @@ cheat464_code = "080B4C74:47702055"
 cheat464_format = "Torii"
 cheat464_folder = "Wild"
 cheat464_keys = "launch"
-cheat464_guide = "Every wild Pokémon is level 85."
+cheat464_guide = "Every wild Pokémon is level 85. Roaming and outbreak Pokémon keep theirs."
 cheat464_enable = false
 
 cheat465_desc = "Wild: Level 90"
@@ -3725,7 +3725,7 @@ cheat465_code = "080B4C74:4770205A"
 cheat465_format = "Torii"
 cheat465_folder = "Wild"
 cheat465_keys = "launch"
-cheat465_guide = "Every wild Pokémon is level 90."
+cheat465_guide = "Every wild Pokémon is level 90. Roaming and outbreak Pokémon keep theirs."
 cheat465_enable = false
 
 cheat466_desc = "Wild: Level 95"
@@ -3733,7 +3733,7 @@ cheat466_code = "080B4C74:4770205F"
 cheat466_format = "Torii"
 cheat466_folder = "Wild"
 cheat466_keys = "launch"
-cheat466_guide = "Every wild Pokémon is level 95."
+cheat466_guide = "Every wild Pokémon is level 95. Roaming and outbreak Pokémon keep theirs."
 cheat466_enable = false
 
 cheat467_desc = "Wild: Level 100"
@@ -3741,15 +3741,15 @@ cheat467_code = "080B4C74:47702064"
 cheat467_format = "Torii"
 cheat467_folder = "Wild"
 cheat467_keys = "launch"
-cheat467_guide = "Every wild Pokémon is level 100."
+cheat467_guide = "Every wild Pokémon is level 100. Roaming and outbreak Pokémon keep theirs."
 cheat467_enable = false
 
 cheat468_desc = "Wild: No wild encounters"
-cheat468_code = "320375D4 0000"
-cheat468_format = "CodeBreaker"
+cheat468_code = "020375D4:00"
+cheat468_format = "Torii"
 cheat468_folder = "Wild"
 cheat468_keys = "always"
-cheat468_guide = "No wild Pokémon in grass, caves or water. Fishing still works."
+cheat468_guide = "No wild Pokémon in grass, caves or water. Fishing, Rock Smash and Sweet Scent still find them."
 cheat468_enable = false
 
 cheat469_desc = "Wild: Encounter every step"
