@@ -32,7 +32,8 @@ git log, not here.
   opens it, as A first talks to what is in front (0a00ed28, 12f49636).
 - **Changed:** Emerald's menu Gifts has every Pokémon the game gives: the
   Mystery Gift's Surfing Pichu egg joins, Castform holds its Mystic Water,
-  and a gift sent to the PC says so (63194a25).
+  a gift sent to the PC says so, and Altering Cave's Pokémon are picked
+  there (63194a25, e7721b73).
 - **Changed:** Emerald's menu Shop sells every item but the key items:
   the five flutes join Medicine, and Mail is a mart of its own (89210d7e).
 - **Fixed:** Emerald's menu PC no longer leaves an impassable PC drawn
