@@ -13,12 +13,11 @@ raw for ROM patches and save-block pointer writes, and Torii's raw lines
 (AnyGBA's syntax) only where a value must be XORed with the save's key or
 bits ORed in: money, coins, badges, symbols, the National Pokédex flag.
 
-The shop and the field menu start nothing from RAM: the shop is a routine
-in the game's own Buy list (tools/golden/shop.c: L and R change the shelf),
-the field menu game scripts, strings and menu tables in the ROM's free
-space, opened by L+R+A from the game's own field input (tools/golden/
-field.c), as a sign's or a person's script opens. It borrows Emerald's
-unused multichoice menus (sMultichoiceLists) for its lists.
+The menu starts nothing from RAM: L+R+A opens it from the game's own field
+input (tools/golden/field.c), as a sign's or a person's script opens. Its
+lists are the game's scrolling list, shown by tools/golden/menu.c; its
+scripts, strings and lists are in the ROM's free space, a base cheat's and
+one cheat's for each section, which fills its own row of the main list.
 """
 
 import json
@@ -42,8 +41,6 @@ SB1, SB2 = 0x03005D8C, 0x03005D90  # gSaveBlock1Ptr, gSaveBlock2Ptr
 KEY = "[03005D90]+00AC"  # the save's encryption key, SaveBlock2 + 0xAC
 FLAGS = 0x1270  # SaveBlock1's event flags
 VARS = 0x139C  # SaveBlock1's vars, from VARS_START 0x4000
-MULTICHOICE = 0x0858B760  # sMultichoiceLists: {list, count} by multichoice id
-UNUSED_MENUS = [9, 10, 15, 19, 21, 22, 40, 41, 47, 51, 89, 90, 91, 92]  # MULTI_UNUSED_*
 
 
 def flag_byte(flag):
@@ -108,26 +105,17 @@ OP = {
     "releaseall": 0x6B,
     "waitbuttonpress": 0x6D,
     "checkitem": 0x47,
-    "multichoice": 0x6F,
     "givemon": 0x79,
     "giveegg": 0x7A,
     "bufferspeciesname": 0x7D,
     "pokemart": 0x86,
     "pokemartdecoration": 0x87,
 }
-VAR_RESULT, VAR_8000, VAR_8001, VAR_8004, VAR_8005 = (
-    0x800D,
-    0x8000,
-    0x8001,
-    0x8004,
-    0x8005,
-)
+VAR_RESULT, VAR_8000, VAR_8001 = 0x800D, 0x8000, 0x8001
 SPECIAL = {  # indexes into gSpecials (0x081DBA64), counted from 0
     "HealPlayerParty": 0,
-    "ChooseMonForMoveRelearner": 222,
-    "TeachMoveRelearnerMove": 227,
-    "IsSelectedMonEgg": 330,
 }
+HOW_MAY_I_SERVE_YOU = 0x08272A2A  # gText_HowMayIServeYou past its "Welcome!" page
 PC_SCRIPT = (
     0x08271D9B  # EventScript_PC past its turn-on effect (GameHacking's "Access PC")
 )
@@ -198,76 +186,68 @@ class Blob:
         self.cmd("closemessage")
 
 
-class Menus:
-    """Scripts plus the multichoice lists they show, in one ROM blob"""
+MENU = 0x08F00000  # tools/golden/menu.c: the routine that shows every list
+MENU_CORE = 0x08F00800  # the base cheat's scripts, then the main list
+SECTION_BASE = 0x08F01000  # each section's scripts, strings and lists, 0x1000 apiece
+SECTION_SIZE = 0x1000
+SLOTS = 12  # the main list's rows, one a section
+FIELD_HOOK = 0x08001A4C  # tools/golden/field.c, over Unused_LoadBgPalette (0x88 bytes)
+FIELD_CALL = 0x08085DDE  # DoCB1_Overworld's bl ProcessPlayerFieldInput
+FIELD_MENU = MENU_CORE  # field.c starts the menu here, the base's first script
 
-    def __init__(self, base, menu_ids):
+
+class Menu:
+    """Scripts, their strings and the lists menu.c shows, in one ROM blob.
+    A list is a script (callnative menu.c, the list's address, waitstate)
+    then the list: its back and empty scripts, row count, cursor memory,
+    and each row's name and script."""
+
+    memories = iter(range(32))  # each list's cursor memory in menu.c
+
+    def __init__(self, base, size=SECTION_SIZE):
         self.s = Blob(base)
-        self.ids = list(menu_ids)
-        self.lists = []  # (menu id, [label of each entry's text])
+        self.size = size
         self.texts = {}  # text -> label
+        self.lists = []  # (label, back, empty, rows)
 
     def t(self, s):
         if s not in self.texts:
             self.texts[s] = f"t{len(self.texts)}"
         return self.texts[s]
 
-    def menu(self, name, entries, back):
-        """A paged menu: entries are (title, target label); 9 a page, the
-        last row MORE when more follow. B goes to back."""
-        pages = []
-        rest = list(entries)
-        while rest:
-            n = 9 if len(rest) <= 9 else 8
-            pages.append(rest[:n])
-            rest = rest[n:]
-        for p, page in enumerate(pages):
-            more = p + 1 < len(pages)
-            rows = page + ([("MORE", f"{name}{p + 1}")] if more else [])
-            mid = self.ids.pop(0)
-            # A title is text, or the address of the game's own (an int)
-            self.lists.append(
-                (
-                    mid,
-                    [
-                        title if isinstance(title, int) else self.t(title)
-                        for title, _ in rows
-                    ],
-                )
-            )
-            s = self.s
-            s.label(name if p == 0 else f"{name}{p}")
-            s.cmd("multichoice", ("b", 0), ("b", 0), ("b", mid), ("b", 0))
-            for i, (_, target) in enumerate(rows):
-                s.when(VAR_RESULT, i, target)
-            s.goto(back)
+    def list(self, name, rows, back, empty=None, count=None):
+        """rows: (name, script label), a name text or the address of the
+        game's own (an int)"""
+        s = self.s
+        s.label(name)
+        s.cmd("callnative", ("w", MENU | 1))
+        s.ptr(f"{name}.list")
+        s.cmd("waitstate")
+        rows = [(r if isinstance(r, int) else self.t(r), target) for r, target in rows]
+        n = len(rows) if count is None else count
+        self.lists.append((name, back, empty or back, rows, n, next(Menu.memories)))
 
     def blob(self):
+        """The blob as ROM patches: scripts, then strings, then lists"""
         s = self.s
         for txt, lbl in self.texts.items():
             s.label(lbl)
             s.raw(text(txt))
         s.align()
-        tables = []
-        for mid, labels in self.lists:
-            s.label(f"m{mid}")
-            for lbl in labels:
-                s.ptr(lbl)
-                s.w(0)
-            tables.append((mid, f"m{mid}", len(labels)))
+        for name, back, empty, rows, count, memory in self.lists:
+            s.label(f"{name}.list")
+            s.ptr(back)
+            s.ptr(empty)
+            s.b(count, memory, 0, 0)
+            for title, target in rows:
+                s.ptr(title)
+                s.ptr(target)
         data = s.bytes()
-        patches = [
+        assert len(data) <= self.size, (hex(s.base), len(data))
+        return [
             (s.base + i, int.from_bytes(data[i : i + 2], "little"))
             for i in range(0, len(data), 2)
         ]
-        for mid, lbl, n in tables:
-            a = MULTICHOICE + 8 * mid
-            patches += [
-                (a, s.addr(lbl) & 0xFFFF),
-                (a + 2, s.addr(lbl) >> 16),
-                (a + 4, n),
-            ]
-        return patches
 
 
 def rom_code(patches, code=None):
@@ -428,47 +408,6 @@ TICKETS = [  # name, item, the ferry flag its event sets (FLAG_ENABLE_SHIP_*)
 ]
 
 
-SHOP = 0x08F00000  # tools/golden/shop.c's routine, then its shelves' table
-SHOP_TABLE = 0x08F00400
-SHOP_HOOKS = (
-    0x080DFE0C,
-    0x080E10E8,
-)  # the literals of Task_BuyMenu (CB2_InitBuyMenu, BuyMenuReturnToItemList)
-TASK_BUY_MENU = 0x080E0AC9
-
-
-def shop():
-    """Every shop's Buy list with more shelves on L and R (tools/golden/shop.c):
-    a Poké Mart's the item categories, a decoration shop's every decoration.
-    The routine, its table (two kinds of shop: a count and 15 lists each) and
-    the lists, as ROM patches; the hook is the two literals that set the
-    Buy list's task."""
-    code = (Path(__file__).with_name("shop.bin")).read_bytes()
-    assert len(code) <= SHOP_TABLE - SHOP, "shop.bin runs into its table"
-    lists = [[ITEM[it] for it in items] for items in MART.values()]
-    decor = [list(range(1, NUM_DECORATIONS + 1))]
-    kinds = [lists, decor]
-    at = SHOP_TABLE + len(kinds) * 4 * 16
-    data, body = b"", b""
-    for shelves in kinds:
-        assert len(shelves) <= 15
-        ptrs = []
-        for items in shelves:
-            ptrs.append(at + len(body))
-            body += b"".join(v.to_bytes(2, "little") for v in items + [0])
-        data += len(shelves).to_bytes(4, "little")
-        data += b"".join(v.to_bytes(4, "little") for v in ptrs + [0] * (15 - len(ptrs)))
-    blob = code + b"\xff" * (SHOP_TABLE - SHOP - len(code)) + data + body
-    blob += b"\xff" * (len(blob) & 1)
-    patches = [
-        (SHOP + i, int.from_bytes(blob[i : i + 2], "little"))
-        for i in range(0, len(blob), 2)
-    ]
-    for a in SHOP_HOOKS:
-        patches += [(a, (SHOP | 1) & 0xFFFF), (a + 2, SHOP >> 16)]
-    return patches
-
-
 TOWNS = [  # name, map group, map number, x, y: the heal locations (outside each Pokémon Center)
     ("LITTLEROOT", 0, 9, 5, 9),
     ("OLDALE", 0, 10, 6, 17),
@@ -608,13 +547,8 @@ def item_name(item):
     return ITEMS + 44 * ITEM[item]
 
 
-FIELD_MENU = 0x08F08000  # the field menu's scripts, its first the menu
-FIELD_HOOK = 0x08001A4C  # tools/golden/field.c, over Unused_LoadBgPalette (0x88 bytes)
-FIELD_CALL = 0x08085DDE  # DoCB1_Overworld's bl ProcessPlayerFieldInput
-
-
 def field_hook():
-    """L+R+A opens the field menu where the game opens its own scripts
+    """L+R+A opens the menu where the game opens its own scripts
     (tools/golden/field.c): the routine, and DoCB1_Overworld's call to
     ProcessPlayerFieldInput sent through it"""
     code = Path(__file__).with_name("field.bin").read_bytes()
@@ -628,48 +562,122 @@ def field_hook():
     ] + [(FIELD_CALL, bl[0]), (FIELD_CALL + 2, bl[1])]
 
 
-def field_menu():
-    m = Menus(FIELD_MENU, UNUSED_MENUS)
+def menu_base():
+    """The menu's base: L+R+A, the routine that shows its lists and the main
+    list, laid out last: its rows are slots past the base's end that each
+    section's cheat fills (the ROM's free space, 0xFF, is unset and left
+    out). Returns the patches, the main list's script (a section's way back)
+    and the slots' address."""
+    code = Path(__file__).with_name("menu.bin").read_bytes()
+    assert len(code) <= MENU_CORE - MENU, "menu.bin runs into the base's scripts"
+    code += b"\0" * (len(code) & 1)
+    m = Menu(MENU_CORE, SECTION_BASE - MENU_CORE - 8 * SLOTS)
     s = m.s
-    s.label("main")
+    s.label("open")
     s.cmd("lockall")
-    m.menu(
-        "field",
-        [
-            ("PC", "pc"),
-            ("HEAL", "heal"),
-            ("WARP", "warp"),
-            ("LEGENDS", "legends"),
-            ("GIFTS", "gifts"),
-            ("MOVES", "moves"),
-            ("UNLOCK", "unlock"),
-        ],
-        "done",
-    )
+    m.list("main", [], "done", "empty", count=SLOTS)
     s.label("done")
     s.cmd("releaseall")
     s.cmd("end")
-    s.label("pc")
-    s.goto(PC_SCRIPT)
+    s.label("empty")
+    s.say(m.t("No menu sections are picked.\nPick them in Torii's Menu cheats."))
+    s.goto("done")
+    patches = m.blob()
+    assert s.addr("open") == FIELD_MENU, (
+        "tools/golden/field.c's MENU starts the menu here"
+    )
+    patches += [
+        (MENU + i, int.from_bytes(code[i : i + 2], "little"))
+        for i in range(0, len(code), 2)
+    ]
+    return patches + field_hook(), s.addr("main"), s.base + s.size()
+
+
+SECTIONS = []  # (slot, cheat name, guide, build(menu, back) -> entry label)
+
+
+def section(name, guide):
+    def add(build):
+        SECTIONS.append((len(SECTIONS), name, guide, build))
+        return build
+
+    return add
+
+
+@section("Heal", "Heals your party, as a Pokémon Center does.")
+def heal_section(m, back):
+    s = m.s
     s.label("heal")
-    s.cmd("lockall")
     s.cmd("special", ("h", SPECIAL["HealPlayerParty"]))
     s.say(m.t("Your POKéMON are fully healed."))
-    s.goto("done")
-    m.menu(
+    s.goto(back)
+    return "HEAL", "heal"
+
+
+@section("PC", "Opens the PC: your boxes, your items, Hall of Fame.")
+def pc_section(m, back):
+    m.s.label("pc")
+    m.s.goto(PC_SCRIPT)
+    return "PC", "pc"
+
+
+@section(
+    "Shop",
+    "A Poké Mart for each kind of item (Medicine, Balls, Training, TMs & HMs, Held items, Berries, "
+    "Valuables) and one for every decoration. Game prices; sell there too.",
+)
+def shop_section(m, back):
+    s = m.s
+    rows = [(name, f"mart{i}") for i, name in enumerate(MART)] + [
+        ("DECORATIONS", "decor")
+    ]
+    m.list("shop", rows, back)
+    for i in range(len(MART)):
+        s.label(f"mart{i}")
+        s.cmd("message", ("p", HOW_MAY_I_SERVE_YOU))
+        s.cmd("waitmessage")
+        s.cmd("pokemart", ("p", f"items{i}"))
+        s.cmd("closemessage")
+        s.goto("shop")
+    s.label("decor")
+    s.cmd("message", ("p", HOW_MAY_I_SERVE_YOU))
+    s.cmd("waitmessage")
+    s.cmd("pokemartdecoration", ("p", "decorations"))
+    s.cmd("closemessage")
+    s.goto("shop")
+    s.align(2)
+    for i, items in enumerate(MART.values()):
+        s.label(f"items{i}")
+        for it in items:
+            s.h(ITEM[it])
+        s.h(0)
+    s.label("decorations")
+    for d in range(1, NUM_DECORATIONS + 1):
+        s.h(d)
+    s.h(0)
+    return "SHOP", "shop"
+
+
+@section(
+    "Warp",
+    "Takes you to any town (outside its Pokémon Center), dungeon or island you choose.",
+)
+def warp_section(m, back):
+    s = m.s
+    m.list(
         "warp",
         [("TOWNS", "towns"), ("DUNGEONS", "dungeons"), ("ISLANDS", "islands")],
-        "field",
+        back,
     )
-    m.menu(
+    m.list(
         "towns", [(MAP_NAMES[n], f"wt{i}") for i, (n, *_) in enumerate(TOWNS)], "warp"
     )
-    m.menu(
+    m.list(
         "dungeons",
         [(MAP_NAMES[n], f"wd{i}") for i, (n, *_) in enumerate(DUNGEONS)],
         "warp",
     )
-    m.menu(
+    m.list(
         "islands",
         [(MAP_NAMES[n], f"wi{i}") for i, (n, *_) in enumerate(ISLANDS)],
         "warp",
@@ -683,27 +691,22 @@ def field_menu():
         s.label(f"wd{i}")
         s.cmd("warp", ("b", group), ("b", num), ("b", 0), ("h", 0xFFFF), ("h", 0xFFFF))
         s.cmd("waitstate")
-    m.menu(
-        "legends",
-        [
-            (n if "&" in n else species_name(n), f"lg{i}")
-            for i, (n, _) in enumerate(LEGENDS)
-        ],
-        "field",
-    )
-    for i, (_, flags) in enumerate(LEGENDS):
-        s.label(f"lg{i}")
-        for f in flags:
-            s.cmd("clearflag", ("h", f))
-        s.say(m.t("It waits in its lair again."))
-        s.goto("legends")
-    m.menu(
+    return "WARP", "warp"
+
+
+@section(
+    "Gifts",
+    "The game's gift Pokémon and eggs, again: the starters, fossils, Castform, Beldum and more.",
+)
+def gifts_section(m, back):
+    s = m.s
+    m.list(
         "gifts",
         [
             (species_name(sp) if level else n, f"gf{i}")
             for i, (n, sp, level) in enumerate(GIFTS)
         ],
-        "field",
+        back,
     )
     for i, (_, sp, level) in enumerate(GIFTS):
         s.label(f"gf{i}")
@@ -732,23 +735,44 @@ def field_menu():
     s.label("full")
     s.say(m.t("There is no room for it."))
     s.goto("gifts")
-    m.menu(
-        "unlock",
+    return "GIFTS", "gifts"
+
+
+@section(
+    "Legends", "Brings back a legendary Pokémon you defeated or caught, in its lair."
+)
+def legends_section(m, back):
+    s = m.s
+    m.list(
+        "legends",
         [
-            ("ALL BADGES", "ub"),
-            ("ALL SYMBOLS", "us"),
-            ("POKéDEX", "ud"),
-            ("TICKETS", "tickets"),
+            (n if "&" in n else species_name(n), f"lg{i}")
+            for i, (n, _) in enumerate(LEGENDS)
         ],
-        "field",
+        back,
     )
-    m.menu(
+    for i, (_, flags) in enumerate(LEGENDS):
+        s.label(f"lg{i}")
+        for f in flags:
+            s.cmd("clearflag", ("h", f))
+        s.say(m.t("It waits in its lair again."))
+        s.goto("legends")
+    return "LEGENDS", "legends"
+
+
+@section(
+    "Tickets",
+    "The event tickets: Eon, Aurora, Mystic and Old Sea Map. The ferry in Lilycove takes you.",
+)
+def tickets_section(m, back):
+    s = m.s
+    m.list(
         "tickets",
-        [(item_name(it), "tk" + str(i)) for i, (_, it, _) in enumerate(TICKETS)],
-        "unlock",
+        [(item_name(it), f"tk{i}") for i, (_, it, _) in enumerate(TICKETS)],
+        back,
     )
     for i, (_, item, flag) in enumerate(TICKETS):
-        s.label("tk" + str(i))
+        s.label(f"tk{i}")
         s.cmd("setflag", ("h", flag))
         s.cmd("checkitem", ("h", ITEM[item]), ("h", 1))
         s.when(VAR_RESULT, 1, "have")  # one is enough: the flag is what opens the ferry
@@ -759,10 +783,27 @@ def field_menu():
     s.label("have")
     s.say(m.t("You have it, and the ferry will take you."))
     s.goto("tickets")
+    return "TICKETS", "tickets"
+
+
+@section(
+    "Unlock", "All 8 badges, all 14 Frontier symbols, or a complete National Pokédex."
+)
+def unlock_section(m, back):
+    s = m.s
+    m.list(
+        "unlock",
+        [("BADGES", "ub"), ("FRONTIER SYMBOLS", "us"), ("POKéDEX", "ud")],
+        back,
+    )
     for tag, flags, msg in (
         ("ub", range(0x867, 0x86F), "All 8 badges are yours."),  # FLAG_BADGE01-08_GET
-        ("us", range(0x8C4, 0x8D2), "All 14 Frontier symbols are yours."),
-    ):  # FLAG_SYS_*_SILVER/GOLD
+        (
+            "us",
+            range(0x8C4, 0x8D2),
+            "All 14 Frontier symbols are yours.",
+        ),  # FLAG_SYS_*_SILVER/GOLD
+    ):
         s.label(tag)
         for f in flags:
             s.cmd("setflag", ("h", f))
@@ -776,23 +817,26 @@ def field_menu():
     s.cmd("callnative", ("p", "dex+1"))
     s.say(m.t("All 386 POKéMON are seen and caught."))
     s.goto("unlock")
-    s.label("moves")  # FallarborTown_MoveRelearnersHouse, without the Heart Scale
-    s.cmd("special", ("h", SPECIAL["ChooseMonForMoveRelearner"]))
-    s.cmd("waitstate")
-    s.when(VAR_8004, 0xFF, "done")
-    s.cmd("special", ("h", SPECIAL["IsSelectedMonEgg"]))
-    s.when(VAR_RESULT, 1, "done")
-    s.when(VAR_8005, 0, "nomoves")
-    s.cmd("special", ("h", SPECIAL["TeachMoveRelearnerMove"]))
-    s.cmd("waitstate")
-    s.goto("done")
-    s.label("nomoves")
-    s.say(m.t("It has no move to remember."))
-    s.goto("done")
     s.align()
     s.label("dex")
     s.raw((Path(__file__).with_name("dex.bin")).read_bytes())
-    return m.blob(), {k: s.addr(k) for k in ("main", "heal", "pc", "warp", "moves")}
+    return "UNLOCK", "unlock"
+
+
+def menu_sections(back, slots):
+    """Each section's cheat: (name, guide, patches), its blob and its row in
+    the main list"""
+    out = []
+    for slot, name, guide, build in SECTIONS:
+        m = Menu(SECTION_BASE + slot * SECTION_SIZE)
+        title, entry = build(m, back)
+        label = m.t(title)
+        patches = m.blob()
+        row = slots + 8 * slot
+        for k, v in enumerate((m.s.addr(label), m.s.addr(entry))):
+            patches += [(row + 4 * k, v & 0xFFFF), (row + 4 * k + 2, v >> 16)]
+        out.append((name, guide, patches))
+    return out
 
 
 # --- The cheats --------------------------------------------------------------
@@ -877,31 +921,29 @@ def cheats():
     def add(folder, name, code, guide, keys="always"):
         out.append(Cheat(folder, f"{folder}: {name}", code, guide, keys))
 
-    # The shop (D9, D20-D22): no menu, more shelves in the game's own shops
+    # The menu (D9, D20-D22): a base that opens it, and a cheat for each of
+    # its sections, so only the picked ones are listed
+    base, back, slots = menu_base()
     out.append(
         Cheat(
-            "Menus",
-            "Menus: Every item in shops (L/R)",
-            vba(*Mixed(shop(), None).lines),
-            "In a shop's Buy list, L and R change the shelf: a Poké Mart's Medicine, Balls, Training, TMs & HMs, "
-            "Held items, Berries, Valuables; a decoration shop's every decoration. Game prices. Tickets: field menu.",
-            None,
-        )
-    )
-    field, at = field_menu()
-    assert at["main"] == FIELD_MENU, (
-        "tools/golden/field.c opens the menu at its first script"
-    )
-    out.append(
-        Cheat(
-            "Menus",
-            "Menus: Field menu (L+R+A)",
-            vba(*Mixed(field + field_hook(), None).lines),
-            "Hold L and R, press A where nothing is in front of you: PC, Heal, Warp, Legends, Gifts, Moves, "
-            "Unlock (badges, symbols, Pokédex, event tickets).",
+            "Menu",
+            "Menu: Open with L+R+A",
+            vba(*Mixed(base, None).lines),
+            "Hold L and R, press A where nothing is in front of you. Lists the Menu sections you picked: "
+            "pick this and any of them. UP/DOWN move, LEFT/RIGHT a page, A chooses, B goes back.",
             "hold L+R+A",  # field.c's (ROM patches only): shown, never a gate
         )
     )
+    for name, guide, patches in menu_sections(back, slots):
+        out.append(
+            Cheat(
+                "Menu",
+                f"Menu: {name}",
+                vba(*Mixed(patches, None).lines),
+                guide + " Needs Menu: Open with L+R+A.",
+                "hold L+R+A",
+            )
+        )
 
     # Money (D8)
     add(
