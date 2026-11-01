@@ -35,6 +35,9 @@ git log, not here.
   written into free ROM) now fit about 23,000 patches where 4,096 did, and a
   cheat may have 4,096. The cheat screen shows the room in percent, and
   the cheat list's cache is built again once (ad7b48e9).
+- **Changed:** Emerald's Wild cheats are all Torii code, and their guides
+  say what each leaves alone: roaming Pokémon, outbreak levels, and
+  fishing, Rock Smash and Sweet Scent (070c6b18).
 - **Fixed:** Emerald's EXP shared with the party now shares the second
   foe's EXP in double battles too, and all of Emerald's Battle cheats are
   Torii code (bd2fac53).
