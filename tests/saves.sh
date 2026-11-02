@@ -173,7 +173,10 @@ rom-read-error)
   # stops the launch at block 3)
   rm -rf "$cart" && mkdir -p "$cart"
   mkfs.fat -C -F 32 -n SAVES "$cart/sd.img" 65536 >/dev/null
-  { cat tests/roms/savetest/flash128.gba; head -c $((0x60000 - $(stat -c %s tests/roms/savetest/flash128.gba))) /dev/zero; } >"$cart/big.gba"
+  {
+    cat tests/roms/savetest/flash128.gba
+    head -c $((0x60000 - $(stat -c %s tests/roms/savetest/flash128.gba))) /dev/zero
+  } >"$cart/big.gba"
   mcopy -i "$cart/sd.img" "$cart/big.gba" ::/Test.gba
   sectors=$(sd_sectors "$cart/sd.img" /Test.gba)
   late=$((${sectors%-*} + 0x40000 / 512))-${sectors#*-}
