@@ -4,7 +4,7 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
-## Unreleased
+## v0.9.21
 
 - **Changed:** the static analysis's baseline went from 97 findings to 8. The
   code now hoists assignments out of `if`s, compares `strcmp`/`memcmp` results
