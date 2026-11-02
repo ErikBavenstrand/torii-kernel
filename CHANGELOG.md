@@ -6,6 +6,14 @@ git log, not here.
 
 ## Unreleased
 
+- **Added:** GB and GBC GameShark codes run. Jagoomba Color calls a small
+  function as each GB frame's vertical blank starts (inside `newframe_vblank`,
+  which has saved every register) that writes the kernel's table: type 01
+  writes where the game maps D000, 90-97 (the GBC's WRAM banks 1-7) a given
+  bank, to WRAM and its echo or HRAM; a code to the ROM, VRAM, cart RAM or I/O,
+  or another type, greyed. With an empty table the hook leaves five games'
+  screens and WRAM as they were. (d551aa46)
+
 - **Added:** NES raw RAM codes (`AAAA:VV`) run. The kernel writes them into
   a table inside its copy of PocketNES in PSRAM (found by its `TORIICHT`
   magic; the emulator gets a small patch) and PocketNES applies it to its RAM
