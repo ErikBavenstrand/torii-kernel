@@ -35,6 +35,9 @@ git log, not here.
   written into free ROM) now fit about 23,000 patches where 4,096 did, and a
   cheat may have 4,096. The cheat screen shows the room in percent, and
   the cheat list's cache is built again once (ad7b48e9).
+- **Changed:** Emerald's cheats have clearer names and guides, and
+  Minigames is now Safari & Contests, with a few cheats moved to the
+  folder they belong in (33f87b64).
 - **Added:** Emerald cheats: Ability (first or second, for every new
   Pokémon), Forget HMs (HM moves replaced like any other), and Always
   escape (from wild battles) (017517d2).
