@@ -4,7 +4,7 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
-## Unreleased
+## v0.9.19
 
 - **Added:** kerning. A pair such as T and o sits a pixel closer: the font has,
   for each of 13 left glyphs (A F L P T V W Y f r v w y), a variant a pixel
@@ -20,7 +20,7 @@ git log, not here.
   fonts draw those characters where they drew the replacement box, in file
   names and in the pack's own text. A launch fills PSRAM, so the in-game menu
   and the launch's dialogs still show the box; the menu loads the font again
-  when a launch comes back. No pack has a font yet (e922729a).
+  when a launch comes back. No pack has a font yet (e922729a, af0d3b09).
 - **Fixed:** the debug frame-timing figures counted a log flush inside the
   frame as the screen's time, and their summary lines could push older lines
   out of a nearly full log buffer; the figures now leave the flush out, and
