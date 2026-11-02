@@ -35,6 +35,9 @@ git log, not here.
   written into free ROM) now fit about 23,000 patches where 4,096 did, and a
   cheat may have 4,096. The cheat screen shows the room in percent, and
   the cheat list's cache is built again once (ad7b48e9).
+- **Added:** Emerald cheats: Ability (first or second, for every new
+  Pokémon), Forget HMs (HM moves replaced like any other), and Always
+  escape (from wild battles) (017517d2).
 - **Fixed:** Emerald's contest cheats no longer write into the game's
   heap every frame: Quick contests ends after one appeal, Max contest
   score holds your first-round points at their most. Level 80 Pokéblock
