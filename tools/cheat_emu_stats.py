@@ -28,9 +28,9 @@ def classify(console, line):
     if console != "NES" and re.search(r"[^0-9A-Fa-f$-]", s):
         return "bad-chars"  # wildcards ('?', 'X', 'Y') or text
     if console == "NES":
-        if re.fullmatch(r"[%s]{6}" % NES_LETTERS, s, re.I):
+        if re.fullmatch(f"[{NES_LETTERS}]{{6}}", s, re.IGNORECASE):
             return "gg6"
-        if re.fullmatch(r"[%s]{8}" % NES_LETTERS, s, re.I):
+        if re.fullmatch(f"[{NES_LETTERS}]{{8}}", s, re.IGNORECASE):
             return "gg8"
         if re.fullmatch(r"[0-9A-Fa-f]{4}:[0-9A-Fa-f]{2}", s):
             return "raw"

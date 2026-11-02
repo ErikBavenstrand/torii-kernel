@@ -76,9 +76,11 @@ static int nes_line(const char *s, u32 n, struct emucheat *e)
 {
 	if (n == 6 || n == 8) {
 		int d[8];
-		for (u32 i = 0; i < n; i++)
-			if ((d[i] = nes_nibble(s[i])) < 0)
+		for (u32 i = 0; i < n; i++) {
+			d[i] = nes_nibble(s[i]);
+			if (d[i] < 0)
 				return 0;
+		}
 		u32 addr = 0x8000u | (u32)(d[3] & 7) << 12 | (u32)(d[5] & 7) << 8 | (u32)(d[4] & 8) << 8 |
 			   (u32)(d[2] & 7) << 4 | (u32)(d[1] & 8) << 4 | (u32)(d[4] & 7) | (u32)(d[3] & 8);
 		u32 value = (u32)(d[1] & 7) << 4 | (u32)(d[0] & 8) << 4 | (u32)(d[0] & 7);

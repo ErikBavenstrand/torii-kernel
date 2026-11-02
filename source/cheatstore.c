@@ -1438,11 +1438,11 @@ static int emu_cheat_file(const char *path)
 	u32 n = (u32)strlen(path), dir = (u32)strlen(CHEATS_DIR);
 	char rom[SAFEFILE_PATH_MAX];
 	static const char *const exts[] = {".gb", ".gbc", ".nes"};
-	if (n <= dir + 4 || n + 5 >= sizeof(rom) || strncmp(path, CHEATS_DIR, dir) || path[dir] != '/')
+	if (n <= dir + 4 || n + 5 >= sizeof(rom) || strncmp(path, CHEATS_DIR, dir) != 0 || path[dir] != '/')
 		return 0;
 	for (u32 i = 0; i < 3; i++) {
 		memcpy(rom, path + dir, n - dir - 4);
-		strcpy(rom + n - dir - 4, exts[i]);
+		memcpy(rom + n - dir - 4, exts[i], strlen(exts[i]) + 1);
 		FILINFO info;
 		if (f_stat(rom, &info) == FR_OK)
 			return 1;

@@ -167,7 +167,7 @@ games-fav/screen B32AE54A23A64FB4
 games-fav/starred 13AA2B738C96C6DC
 games-fav/toggled C2D6474DCA6907ED
 games-fav-r/star 456A71AF76464CD3
-games-gb/popup 4245FD125A4CA623
+games-gb/popup 98DE82445CDA83F7
 games-gb/screen B2898C8843FA4B4F
 games-gba/cancelled A2080755C6477EE6
 games-gba/closed 2AB211FF03F8337C
@@ -392,7 +392,7 @@ info/frames 7-20 741A7A65700A0B53
 info-about/about 1BCCD2148F0E45AB
 info-about/about-2 6F35A559BBD5F047
 info-about/about-end B3725D765034E1CB
-info-about/cheats 5BA7383B974472E3
+info-about/cheats 2B36A2038A3DC80F
 info-about/help 7709670D29AB463D
 info-about/ingame A761B693C85E61DD
 info-about/saves 50CC0B19FFD01A0B
@@ -845,7 +845,7 @@ sv-home/frames 10-12 0B2C673E7DF2D87B
 sv-info-about/about 4E749825E4F88906
 sv-info-about/about-2 18132DCFC8FED6CE
 sv-info-about/about-end 32316FB368EBEE28
-sv-info-about/cheats EC4B237FFD80235A
+sv-info-about/cheats FA90636F6E77DDB6
 sv-info-about/help 1B30145884B6D974
 sv-info-about/ingame 7BCA4F3624E8A550
 sv-info-about/saves C5D7160EBF9DCEBC

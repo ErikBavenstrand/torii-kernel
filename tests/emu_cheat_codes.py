@@ -38,12 +38,12 @@ def nes_genie(addr: int, value: int, compare: int | None = None) -> str:
 def gb_genie(addr: int, value: int, compare: int | None = None) -> str:
     assert addr < 0x8000
     d = [value >> 4, value & 15, (addr >> 8) & 15, (addr >> 4) & 15, addr & 15, ((addr >> 12) & 15) ^ 15]
-    code = "%X%X%X-%X%X%X" % tuple(d)
+    code = "{:X}{:X}{:X}-{:X}{:X}{:X}".format(*d)
     if compare is not None:
         y = compare ^ 0x45
         x = ((y << 2) | (y >> 6)) & 0xFF
         z = x ^ 0xFF
-        code += "-%X%X%X" % (z >> 4, 0, z & 15)
+        code += f"-{z >> 4:X}0{z & 15:X}"
     return code
 
 
