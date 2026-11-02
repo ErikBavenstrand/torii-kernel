@@ -4,6 +4,15 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Changed:** the static analysis's baseline went from 97 findings to 8. The
+  code now hoists assignments out of `if`s, compares `strcmp`/`memcmp` results
+  explicitly, and copies names with bounded copies (`strcpy` is gone from
+  `slotstore.c` and `ezkernelnew.c`); dead `res` stores, switches without a
+  default and two cloned branches are fixed, and `cheatstore()` is declared
+  non-null. Behaviour is the same (`686f9fdb`).
+
 ## v0.9.20
 
 - **Changed:** Info's Credits names the kernel's base (EZ-Flash's open source
