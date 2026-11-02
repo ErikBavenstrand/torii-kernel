@@ -246,6 +246,17 @@ EOF
       grep -q "in-game code: in-game menu (RTS_ReplaceIRQ) at ROM 01FFF000\|in-game code: reset and sleep keys (Sleep_ReplaceIRQ) at ROM 01FFFD00" "$cart/run.txt" ||
         fail "full: the area without cheats moved: $(grep -a 'in-game code' "$cart/run.txt")"
       [ "$(mem 09FFD000)" = "$(rom_at $((0x1FFD000)))" ] || fail "full: the data at 01FFD000 changed"
+      # The second launch needs no scan: the .pat remembers the cheats were left out
+      # (A first answers the boot's question about the game's save)
+      # shellcheck disable=SC2046 # nav.sh's options
+      boot -k 100:A -k 104:- $(nav_launch /Hello.gba addon at=200) -w "launch: starting the game" -m @120:0x0203F000:2 \
+        -f 6000 >"$cart/run2.txt" 2>&1 || true
+      grep -q "launch: starting the game" "$cart/run2.txt" || fail "full: the second launch didn't start"
+      grep -q "launch: IRQ hook from PATCH/ (cached scan)" "$cart/run2.txt" ||
+        fail "full: the second launch scanned the ROM again: $(grep -a 'launch: ' "$cart/run2.txt" | tail -5)"
+      grep -q "launch: the cheats are left out as the cached scan found no padding" "$cart/run2.txt" ||
+        fail "full: the second launch didn't leave the cheats out: $(grep -a 'launch: ' "$cart/run2.txt" | tail -5)"
+      [ "$(mem 0203F000)" != efbe ] || fail "full: the cheat ran on the second launch"
       ;;
     padded)
       grep -q "launch: the patch area at 01FFD000 is on the game's data: cut to" "$cart/run.txt" ||

@@ -38,6 +38,7 @@ static const struct {
 	{"menu_code_fits", test_menu_code_fits},
 	{"spend_lowering", test_spend_lowering},
 	{"pat_cache", test_pat_cache},
+	{"pat_cheats_left_out", test_pat_cheats_left_out},
 	{"build_id_matches_the_rom", test_build_id_matches_the_rom},
 	{"engine_res_alloc", test_engine_res_alloc},
 	{"engine_budget", test_engine_budget},

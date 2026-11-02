@@ -77,6 +77,10 @@ u32 Check_pat(TCHAR *gamefilename, u32 rom_size, u32 head_crc);
 // Why a .pat file's words (EMax slots, then 16 words) can't be used for this
 // ROM with patch_length bytes kept at its end, or NULL if they can
 const char *pat_cache_check(const u32 *words, u32 rom_size, u32 head_crc, u32 patch_length);
+// 1 if a .pat file written with the cheats off (file_cheat_on 0) after they found no
+// padding (dropped_need, its last word) still stands with them on (cheat_on 1) and
+// need bytes wanted, so the launch needs no scan to leave them out again
+u32 pat_cheats_left_out(u32 file_cheat_on, u32 cheat_on, u32 dropped_need, u32 need);
 void Make_pat_file(char *filename);
 // A GBA game's save type (0 AUTO, 1-5) and its boot mode (ACTION_BOOT_*,
 // actions.h) are in its record, game.ini in its folder of saves (gamerec.h,

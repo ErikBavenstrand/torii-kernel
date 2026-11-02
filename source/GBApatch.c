@@ -39,6 +39,7 @@ u32 w_rts_on;
 u32 w_sleep_on;
 u32 w_cheat_on;
 static u32 w_patch_length;  // Torii: the patch length a .pat file kept room for
+static u32 cheats_dropped;  // Torii: the need (Patch_need) that found no padding, so the cheats were left out; else 0
 
 SPatchInfo2 iPatchInfo2[EMax];
 u32 iCount2;
@@ -49,8 +50,8 @@ u32 spend_address;
 u32 cheat_live_at;
 u32 spend_live;
 static const char *patch_kind;  //Torii: for Log_patches
-static u32 patch_room;          //Torii: the bytes at iTrimSize the patch may use
-static u32 rom_bytes;           //Torii: the game's size in PSRAM (GBApatch_PSRAM)
+static u32 patch_room;  //Torii: the bytes at iTrimSize the patch may use
+static u32 rom_bytes;  //Torii: the game's size in PSRAM (GBApatch_PSRAM)
 
 //Torii: the ROM ranges a launch's patches wrote, for the cheats' ROM patches
 //to keep off (rom_guard_hits); past ROM_GUARDS ranges, everything is guarded
@@ -127,14 +128,14 @@ bool IWRAM_CODE PatchDragonBallZ(u32 *Data)
 	(void)Data;
 	bool res = false;
 	const u32 game_codes_DragonBallZ[] = {
-		0x45464c42, //2 Games in 1 - Dragon Ball Z - The Legacy of Goku I & II (USA).gba
-		0x50474c41, //Dragon Ball Z - The Legacy of Goku (Europe) (En,Fr,De,Es,It).gba
-		0x45474c41, //Dragon Ball Z - The Legacy of Goku (USA).gba
-		0x50464c41, //Dragon Ball Z - The Legacy of Goku II (Europe) (En,Fr,De,Es,It).gba
-		0x45464c41, //Dragon Ball Z - The Legacy of Goku II (USA).gba
+		0x45464c42,  //2 Games in 1 - Dragon Ball Z - The Legacy of Goku I & II (USA).gba
+		0x50474c41,  //Dragon Ball Z - The Legacy of Goku (Europe) (En,Fr,De,Es,It).gba
+		0x45474c41,  //Dragon Ball Z - The Legacy of Goku (USA).gba
+		0x50464c41,  //Dragon Ball Z - The Legacy of Goku II (Europe) (En,Fr,De,Es,It).gba
+		0x45464c41,  //Dragon Ball Z - The Legacy of Goku II (USA).gba
 		0x4a464c41,  //Dragon Ball Z - The Legacy of Goku II International (Japan).gba
 
-		0x45593241   //1928 - Top Gun - Combat Zones(US).gba
+		0x45593241  //1928 - Top Gun - Combat Zones(US).gba
 
 	};
 	const u32 patch_1_offsets[] = {0x033C, 0x0340, 0x0356, 0x035A, 0x035E, 0x0384, 0x0388,
@@ -151,40 +152,40 @@ bool IWRAM_CODE PatchDragonBallZ(u32 *Data)
 		u16 patch = 0;
 		res = true;
 		switch (index_DragonBallZ) {
-		case 0: //2in1 us
+		case 0:  //2in1 us
 			for (u32 ii = 0; ii < sizeofa(patch_2_offsets); ii++) {
 				Write(patch_2_offsets[ii] + 0x40000, (u8 *)&patch, sizeof(patch));
 			}
 			patch = 0x1001;
 			Write(0xbb9016, (u8 *)&patch, sizeof(patch));
 			break;
-		case 1: //I eu
+		case 1:  //I eu
 			patch = 0x46c0;
 			for (u32 ii = 0; ii < sizeofa(patch_1_offsets); ii++) {
 				Write(patch_1_offsets[ii], (u8 *)&patch, sizeof(patch));
 			}
 			break;
-		case 2: //I us
+		case 2:  //I us
 			for (u32 ii = 0; ii < sizeofa(patch_2_offsets); ii++) {
 				Write(patch_2_offsets[ii], (u8 *)&patch, sizeof(patch));
 			}
 			break;
-		case 3: //II eu
+		case 3:  //II eu
 			patch = 0x1001;
 			Write(0x6f42b2, (u8 *)&patch, sizeof(patch));
 			break;
-		case 4: //II us
+		case 4:  //II us
 			patch = 0x1001;
 			Write(0x3b8e9e, (u8 *)&patch, sizeof(patch));
 			break;
-		case 5: //II jp
+		case 5:  //II jp
 			patch = 0x1001;
 			Write(0x3fc8f6, (u8 *)&patch, sizeof(patch));
 			break;
-		case 6: //1928 - Top Gun - Combat Zones(US).gba
+		case 6:  //1928 - Top Gun - Combat Zones(US).gba
 			patch = 0x3401;
 			Write(0x088816, (u8 *)&patch, sizeof(patch));
-			patch = 0x46c0; //only need one
+			patch = 0x46c0;  //only need one
 			Write(0x088814, (u8 *)&patch, sizeof(patch));
 			Write(0x088932, (u8 *)&patch, sizeof(patch));
 			Write(0x088938, (u8 *)&patch, sizeof(patch));
@@ -261,11 +262,11 @@ void IWRAM_CODE PatchInternal(u32 *Data, int iSize, u32 offset)
 
 	for (u32 ii = 0; ii < search_size; ii++) {
 		switch (Data[ii]) {
-		case 0x3007FFC: // IRQ handler
+		case 0x3007FFC:  // IRQ handler
 		{
-			Add2(ii, 0x3007FF4);//0x3007FFC的位置
+			Add2(ii, 0x3007FF4);  //0x3007FFC的位置
 		} break;
-		case 0x3FFFFFC: // IRQ handler
+		case 0x3FFFFFC:  // IRQ handler
 		{
 			Add2(ii, 0x3007FF4);
 		} break;
@@ -386,38 +387,38 @@ void SetTrimSize(u8 *buffer, u32 romsize, u32 iSize, u32 mode, BYTE saveMODE)
 		}
 	}
 	//DEBUG_printf("iTrimSize %08X ", iTrimSize);
-	if (mode == 1)//nor
+	if (mode == 1)  //nor
 	{
-		if (((iTrimSize & 0x1FFFF) + PATCH_LENGTH) > 0x20000)//Greater than one flash sector
+		if (((iTrimSize & 0x1FFFF) + PATCH_LENGTH) > 0x20000)  //Greater than one flash sector
 		{
 			iTrimSize = ((romsize + 0x1FFFF) / 0x20000) * 0x20000;
 		}
 		if (romsize <= 0x1000000) {
 			if ((iTrimSize + PATCH_LENGTH) > 16 * 1024 * 1024) {
-				if ((saveMODE == 0x21) || (saveMODE == 0x22))//eeprom game
+				if ((saveMODE == 0x21) || (saveMODE == 0x22))  //eeprom game
 				{
-					iTrimSize = 0x1000000 - PATCH_LENGTH;//can not greater 16MB
-				} else {//sram and flash
-					iTrimSize = 0x1000000; //page
+					iTrimSize = 0x1000000 - PATCH_LENGTH;  //can not greater 16MB
+				} else {  //sram and flash
+					iTrimSize = 0x1000000;  //page
 				}
 			}
 		}
 	} else {
 		if (romsize <= 0x800000) {
 			if ((iTrimSize + PATCH_LENGTH) > 8 * 1024 * 1024)
-				iTrimSize = 0x800000; //page
+				iTrimSize = 0x800000;  //page
 		} else if (romsize <= 0x1000000) {
 			if ((iTrimSize + PATCH_LENGTH) > 16 * 1024 * 1024) {
-				if ((saveMODE == 0x21) || (saveMODE == 0x22))//eeprom game
+				if ((saveMODE == 0x21) || (saveMODE == 0x22))  //eeprom game
 				{
-					iTrimSize = 0x1000000 - PATCH_LENGTH;//can not greater 16MB
-				} else {//sram and flash
-					iTrimSize = 0x1000000; //page
+					iTrimSize = 0x1000000 - PATCH_LENGTH;  //can not greater 16MB
+				} else {  //sram and flash
+					iTrimSize = 0x1000000;  //page
 				}
 			}
 		} else {
 			if ((iTrimSize + PATCH_LENGTH) > 32 * 1024 * 1024)
-				iTrimSize = 0x2000000 - PATCH_LENGTH; //page
+				iTrimSize = 0x2000000 - PATCH_LENGTH;  //page
 		}
 	}
 	patch_room = PATCH_LENGTH;
@@ -450,6 +451,7 @@ void SetTrimSize(u8 *buffer, u32 romsize, u32 iSize, u32 mode, BYTE saveMODE)
 	tlog("launch: the patch area at %08lX is on the game's data, and the cheats' %lX bytes would be too: the "
 	     "cheats that run in game are left out",
 	     (unsigned long)iTrimSize, (unsigned long)need);
+	cheats_dropped = need;  // the .pat keeps it: the next launch needs no scan to know
 	gl_cheat_on = 0;
 	gl_cheat_count = gl_cheat_bytes = 0;
 	SetTrimSize(buffer, romsize, iSize, mode, saveMODE);  // as without cheats
@@ -461,7 +463,7 @@ static void Patch_B_address(void)
 		return;
 	u32 B_install_handler;
 	B_install_handler = 0xEA000000 | ((iTrimSize - 8) / 4);
-	Write(0, (u8 *)&B_install_handler, 4); //B
+	Write(0, (u8 *)&B_install_handler, 4);  //B
 
 	for (u32 ii = 0; ii < iCount2; ii++) {
 		Write(iPatchInfo2[ii].iOffset * 4, (u8 *)&(iPatchInfo2[ii].iValue), sizeof(iPatchInfo2[ii].iValue));
@@ -492,7 +494,7 @@ static void Patch_Reset_Sleep(u32 *Data)
 	u32 Return_address_offset = p_patch_Return_address_L - p_patch_start;
 
 	dmaCopy((void *)p_patch_start, patchbuffer, p_patch_end - p_patch_start);
-	*(vu32 *)(patchbuffer + Return_address_offset) = Return_address;//修改gba_sleep_patch_bin里面的返回地址
+	*(vu32 *)(patchbuffer + Return_address_offset) = Return_address;  //修改gba_sleep_patch_bin里面的返回地址
 
 	u16 sleep_key, reset_key;
 	Read_hotkeys(&reset_key, &sleep_key);
@@ -547,7 +549,7 @@ static void Patch_RTS_Cheat(u32 *Data)
 	u32 Return_address_offset = p_patch_Return_address_L - p_patch_start;
 
 	dmaCopy((void *)p_patch_start, patchbuffer, p_patch_end - p_patch_start);
-	*(vu32 *)(patchbuffer + Return_address_offset) = Return_address;//modify gba_sleep_patch_bin return address
+	*(vu32 *)(patchbuffer + Return_address_offset) = Return_address;  //modify gba_sleep_patch_bin return address
 
 	if (spend_address != 0x0) {
 		*(vu32 *)(patchbuffer + Return_address_offset + 4) = spend_address;
@@ -624,7 +626,7 @@ static void Patch_RTS_Cheat(u32 *Data)
 	rom_guard_add(iTrimSize, room);
 }
 //------------------------------------------------------------------
-void GBApatch_Cleanrom(u32 *address, int filesize)//Only once
+void GBApatch_Cleanrom(u32 *address, int filesize)  //Only once
 {
 	(void)filesize;
 	windows_offset = 0;
@@ -655,7 +657,7 @@ u32 Get_spend_address(u32 *Data)
 		}
 	}
 	if (ii == search_size) {
-		return 0;//Find_spend_address_SpecialROM(Data);
+		return 0;  //Find_spend_address_SpecialROM(Data);
 	}
 
 	u32 address;
@@ -693,7 +695,7 @@ u32 Get_spend_address(u32 *Data)
 		return 0;
 }
 //------------------------------------------------------------------
-void GBApatch_PSRAM(u32 *address, int filesize)//Only once
+void GBApatch_PSRAM(u32 *address, int filesize)  //Only once
 {
 	windows_offset = 0;
 	is_NORpatch = 0;
@@ -766,7 +768,7 @@ void GBApatch_NOR(u32 *address, int filesize, u32 offset)
 
 		u32 B_install_handler;
 		B_install_handler = 0xEA000000 | ((iTrimSize - 8) / 4);
-		Write(0, (u8 *)&B_install_handler, 4); //B
+		Write(0, (u8 *)&B_install_handler, 4);  //B
 		spend_address = Get_spend_address(address);
 
 		Patch_somegame(address);
@@ -805,6 +807,7 @@ static void GBA_patch_init(void)
 	w_sleep_on = 0;
 	w_cheat_on = 0;
 	w_patch_length = 0;
+	cheats_dropped = 0;
 
 	memset(iPatchInfo2, 0x00, sizeof(iPatchInfo2));
 }
@@ -829,6 +832,7 @@ static void GBA_patch_init_buffer(u32 *buffer)
 	w_cheat_on = buffer[start + 11];
 	w_patch_length = buffer[start + 12];
 	patch_room = w_patch_length;
+	cheats_dropped = buffer[start + 15];
 }
 //------------------------------------------------------------------
 //Torii: the ROM a .pat file is for (its words 13 and 14), Check_pat's to
@@ -856,6 +860,15 @@ const char *pat_cache_check(const u32 *words, u32 rom_size, u32 head_crc, u32 pa
 	return NULL;
 }
 //------------------------------------------------------------------
+//Torii: a launch whose cheats found no padding left them out (cheats_dropped,
+//kept in the .pat's last word) and wrote the file with them off. The file holds
+//for the next launch while the cheats are on again and still need that much or
+//more (a bigger need finds no more room); a smaller one is scanned again.
+u32 pat_cheats_left_out(u32 file_cheat_on, u32 cheat_on, u32 dropped_need, u32 need)
+{
+	return cheat_on == 1 && file_cheat_on == 0 && dropped_need && need >= dropped_need;
+}
+//------------------------------------------------------------------
 u32 Check_pat(TCHAR *gamefilename, u32 rom_size, u32 head_crc)
 {
 	UINT ret;
@@ -871,7 +884,7 @@ u32 Check_pat(TCHAR *gamefilename, u32 rom_size, u32 head_crc)
 	if (res == FR_OK) {
 		res = f_open(&gfile, patnamebuf, FA_READ);
 
-		if (res == FR_OK)//have a old file
+		if (res == FR_OK)  //have a old file
 		{
 			patfilesize = f_size(&gfile);
 			//Torii: only a file of this kernel's layout (EMax slots, then 16 words);
@@ -896,7 +909,7 @@ u32 Check_pat(TCHAR *gamefilename, u32 rom_size, u32 head_crc)
 			find_the_patfile = 0;
 		}
 		//res=f_chdir("/");
-	} else//no PATCH folder
+	} else  //no PATCH folder
 	{
 		find_the_patfile = 0;
 	}
@@ -907,10 +920,16 @@ u32 Check_pat(TCHAR *gamefilename, u32 rom_size, u32 head_crc)
 
 		//Torii: and, with cheats, room for this launch's picks (before v0.7,
 		//cheats kept 0x2000 bytes and no length was saved)
+		u32 left_out = pat_cheats_left_out(w_cheat_on, gl_cheat_on, cheats_dropped, Patch_need());
 		if ((w_reset_on != gl_reset_on) || (w_rts_on != gl_rts_on) || (w_sleep_on != gl_sleep_on) ||
-		    (w_cheat_on != gl_cheat_on) || (gl_cheat_on == 1 && w_patch_length < Patch_need())) {
+		    (w_cheat_on != gl_cheat_on && !left_out) ||
+		    (gl_cheat_on == 1 && !left_out && w_patch_length < Patch_need())) {
 			GBA_patch_init();
 			find_the_patfile = 0;
+		} else if (left_out) {
+			tlog("launch: the cheats are left out as the cached scan found no padding for them");
+			gl_cheat_on = 0;
+			gl_cheat_count = gl_cheat_bytes = 0;
 		}
 	} else {
 		GBA_patch_init();
@@ -953,6 +972,7 @@ void Make_pat_file(TCHAR *gamefilename)
 			w_buffer[12] = patch_room;  // Torii: the room iTrimSize kept
 			w_buffer[13] = pat_rom_bytes;  // Torii: the ROM it is for (Check_pat's)
 			w_buffer[14] = pat_rom_crc;
+			w_buffer[15] = cheats_dropped;  // Torii: the cheats left out, and how much they needed
 
 			res = f_write(&gfile, (void *)w_buffer, sizeof(w_buffer), (UINT *)&written);
 			f_close(&gfile);
@@ -1043,7 +1063,7 @@ u32 use_internal_engine(u8 gamecode[], TCHAR *gamefilename)
 	g_Offset = 0;
 	iCount2 = 0;
 	for (int ii = 0; ii < count; ii++) {
-		Add2(offsets[ii], 0x3007FF4);//0x3007FFC offset
+		Add2(offsets[ii], 0x3007FF4);  //0x3007FFC offset
 	}
 	return 1;
 }
@@ -1070,141 +1090,141 @@ void Patch_SpecialROM_sleepmode(void)
 	g_Offset = 0;
 	//
 	switch (*(u32 *)GAMECODE) {
-	case 0x4A4E4941://0414 - Initial D - Another Stage(JP)
-		Add2(0x11C / 4, 0xE241100C);//sub r1,r1,0xC
+	case 0x4A4E4941:  //0414 - Initial D - Another Stage(JP)
+		Add2(0x11C / 4, 0xE241100C);  //sub r1,r1,0xC
 		break;
-	case 0x504D3941://0643 - Motoracer Advance(EU) OK
+	case 0x504D3941:  //0643 - Motoracer Advance(EU) OK
 		Add2(0x2608 / 4, 0xE5810FF4);
 		break;
-	case 0x455A5641://0826 - Super Bubble Pop(US)
+	case 0x455A5641:  //0826 - Super Bubble Pop(US)
 		Add2(0xDC / 4, 0xE3A01A07);
 		Add2(0x147D8 / 4, 0xE58030F4);
 		break;
-	case 0x45533841://0854 - Digimon - Battle Spirit(US) OK
+	case 0x45533841:  //0854 - Digimon - Battle Spirit(US) OK
 		Add2(0x110 / 4, 0xE241100C);
 		break;
-	case 0x45523241://0911 Bratz(US)
+	case 0x45523241:  //0911 Bratz(US)
 		Add2(0x28610 / 4, 0x39284939);
 		break;
-	case 0x454E3941://0913 - Piglet's Big Game(US)
+	case 0x454E3941:  //0913 - Piglet's Big Game(US)
 		Add2(0x97A8 / 4, 0xE5810FF4);
 		break;
-	case 0x50523241://1017 Bratz(EU)
+	case 0x50523241:  //1017 Bratz(EU)
 		Add2(0x28614 / 4, 0x39284939);
 		break;
-	case 0x50464C41://1056 - Dragon Ball Z - The Legacy of Goku II(EU)
+	case 0x50464C41:  //1056 - Dragon Ball Z - The Legacy of Goku II(EU)
 		Add2(0x211D8 / 4, 0x63484916);
 		break;
-	case 0x45464C41://1085 - Dragon Ball Z - The Legacy of Goku II(US)
+	case 0x45464C41:  //1085 - Dragon Ball Z - The Legacy of Goku II(US)
 		Add2(0x20D28 / 4, 0x63484916);
 		break;
-	case 0x50533841://1133 - Digimon - Battle Spirit(EU)
+	case 0x50533841:  //1133 - Digimon - Battle Spirit(EU)
 		Add2(0x110 / 4, 0xE241100C);
 		break;
-	case 0x584E3941://1178 - Piglet's Big Game(EU)
+	case 0x584E3941:  //1178 - Piglet's Big Game(EU)
 		Add2(0x100 / 4, 0xE1A00000);
 		Add2(0x9834 / 4, 0xE5810FF4);
 		break;
-	case 0x45524E41://1260 - Cartoon Network - Speedway(US)
+	case 0x45524E41:  //1260 - Cartoon Network - Speedway(US)
 		Add2(0x79B8 / 4, 0x63504A31);
 		break;
-	case 0x505A5641://1361 - Super Bubble Pop(EU)
+	case 0x505A5641:  //1361 - Super Bubble Pop(EU)
 		Add2(0xDC / 4, 0xE3A01A07);
 		Add2(0x14938 / 4, 0xE58030F4);
 		break;
-	case 0x454D5842://1534 - XS Moto(US)
+	case 0x454D5842:  //1534 - XS Moto(US)
 		Add2(0x7A7C / 4, 0x63504A31);
 		break;
-	case 0x45474c41://0434 - Dragon Ball Z - The Legacy of Goku(US)
+	case 0x45474c41:  //0434 - Dragon Ball Z - The Legacy of Goku(US)
 		Add2(0x9A14 / 4, 0x3007FBC);
 		break;
-	case 0x4A464C41://1591 - Dragon Ball Z - The Legacy of Goku II International(JP)
+	case 0x4A464C41:  //1591 - Dragon Ball Z - The Legacy of Goku II International(JP)
 		Add2(0x22CA8 / 4, 0x63484916);
 		break;
-	case 0x45334742://1646 - Dragon Ball Z - Buu's Fury(US) OK
+	case 0x45334742:  //1646 - Dragon Ball Z - Buu's Fury(US) OK
 		Add2(0x3F3DC / 4, 0x63484916);
 		break;
-	case 0x45554642://1786 - Fear Factor - Unleashed(US)
+	case 0x45554642:  //1786 - Fear Factor - Unleashed(US)
 		Add2(0x2E20C / 4, 0x4A576350);
 		break;
-	case 0x45574C42://1953 - LEGO Star Wars - The Video Game(UE)
-	case 0x4A574C42://2052 - LEGO Star Wars - The Video Game(JP)
+	case 0x45574C42:  //1953 - LEGO Star Wars - The Video Game(UE)
+	case 0x4A574C42:  //2052 - LEGO Star Wars - The Video Game(JP)
 		Add2(0x14C / 4, 0x03007FF0);
 		break;
-	case 0x45345442://2079 - Dragon Ball GT - Transformation(US)
+	case 0x45345442:  //2079 - Dragon Ball GT - Transformation(US)
 		Add2(0x34FF8 / 4, 0x63484916);
 		break;
-	case 0x45455742://2151 - Whac-A-Mole(US)
+	case 0x45455742:  //2151 - Whac-A-Mole(US)
 		Add2(0xBDAC / 4, 0x49296348);
 		break;
-	case 0x45444342://2152 - Cinderella - Magical Dreams(US)
+	case 0x45444342:  //2152 - Cinderella - Magical Dreams(US)
 		Add2(0xA7A8 / 4, 0x49266348);
 		break;
-	case 0x45363842://2242 - Hello Kitty - Happy Party Pals(US)
+	case 0x45363842:  //2242 - Hello Kitty - Happy Party Pals(US)
 		Add2(0x292BC / 4, 0x63484916);
 		break;
-	case 0x50495742://2255 - Winx Club(EU)
+	case 0x50495742:  //2255 - Winx Club(EU)
 		Add2(0xB22C / 4, 0x49296348);
 		break;
-	case 0x45495742://2301 - Winx Club(US)
+	case 0x45495742:  //2301 - Winx Club(US)
 		Add2(0xB22C / 4, 0x49296348);
 		break;
-	case 0x58363842://2305 - Hello Kitty - Happy Party Pals(EU)
+	case 0x58363842:  //2305 - Hello Kitty - Happy Party Pals(EU)
 		Add2(0x2245C / 4, 0x63484916);
 		break;
-	case 0x50444342://2430 - Cinderella - Magical Dreams(EU)
+	case 0x50444342:  //2430 - Cinderella - Magical Dreams(EU)
 		Add2(0xA7A8 / 4, 0x49296348);
 		break;
-	case 0x45545A42://2466 - VeggieTales - LarryBoy and the Bad Apple(US)
+	case 0x45545A42:  //2466 - VeggieTales - LarryBoy and the Bad Apple(US)
 		Add2(0xB448 / 4, 0x63514A31);
 		break;
-	case 0x45465542://2472 - 2 Games in 1 - Dragon Ball Z - Buu's Fury + Dragon Ball GT - Transformation(US)
+	case 0x45465542:  //2472 - 2 Games in 1 - Dragon Ball Z - Buu's Fury + Dragon Ball GT - Transformation(US)
 		Add2(0x307C / 4, 0x63484916);
 		Add2(0x6FAA8 / 4, 0x63484916);
 		Add2(0x835244 / 4, 0x63484916);
 		break;
-	case 0x45364C42://2487 - My Little Pony - Crystal Princess - The Runaway Rainbow(US)
+	case 0x45364C42:  //2487 - My Little Pony - Crystal Princess - The Runaway Rainbow(US)
 		Add2(0x228B0 / 4, 0x63484916);
 		break;
-	case 0x45375442://2597 - Tonka - On the Job(US)
+	case 0x45375442:  //2597 - Tonka - On the Job(US)
 		Add2(0x21548 / 4, 0x63484916);
 		break;
-	case 0x454D3941://2602 - Motoracer Advance(US)
+	case 0x454D3941:  //2602 - Motoracer Advance(US)
 		Add2(0x2654 / 4, 0xE5810FF4);
 		break;
-	case 0x50363842://2627 - Hello Kitty - Happy Party Pals(EU)
+	case 0x50363842:  //2627 - Hello Kitty - Happy Party Pals(EU)
 		Add2(0x292BC / 4, 0x63484916);
 		break;
 
 		//one 0x3007FFC
-	case 0x45544641://0096 - F-14 Tomcat(UE)
+	case 0x45544641:  //0096 - F-14 Tomcat(UE)
 		Add2(0xE0 / 4, 0xE3A01A07);
 		break;
-	case 0x454D5041://0241 - Planet Monsters(US)
+	case 0x454D5041:  //0241 - Planet Monsters(US)
 		Add2(0x1421C / 4, 0x494D6345);
 		break;
-	case 0x504D5041://0314 - Planet Monsters(EU)
+	case 0x504D5041:  //0314 - Planet Monsters(EU)
 		Add2(0x1508C / 4, 0x494D6345);
 		break;
-	case 0x50534341://0338 - Casper(EU)
+	case 0x50534341:  //0338 - Casper(EU)
 		Add2(0xAD64 / 4, 0x494D6345);
 		break;
-	case 0x50514B41://0500 - Kong - The Animated Series(EU)
+	case 0x50514B41:  //0500 - Kong - The Animated Series(EU)
 		Add2(0x13A0 / 4, 0x494D6345);
 		break;
-	case 0x50505641://0549 - V.I.P.(EU)
+	case 0x50505641:  //0549 - V.I.P.(EU)
 		Add2(0x1374 / 4, 0x494D6345);
 		break;
-	case 0x45413541://0685 - Bionicle - Matoran Adventures(UE)
+	case 0x45413541:  //0685 - Bionicle - Matoran Adventures(UE)
 		Add2(0x14B7C8 / 4, 0xE58320F4);
 		break;
-	case 0x50524941://0843 - Inspector Gadget Racing(EU)
+	case 0x50524941:  //0843 - Inspector Gadget Racing(EU)
 		Add2(0x158 / 4, 0xE3A00005);
 		break;
-	case 0x45514B41://1915 - Kong - The Animated Series(US)
+	case 0x45514B41:  //1915 - Kong - The Animated Series(US)
 		Add2(0x13A0 / 4, 0x494D6345);
 		break;
-	case 0x45534341://2117 - Casper(US)
+	case 0x45534341:  //2117 - Casper(US)
 		Add2(0xAD64 / 4, 0x494D6345);
 		break;
 	}
@@ -1213,19 +1233,19 @@ void Patch_SpecialROM_sleepmode(void)
 void Patch_SpecialROM_TrimSize(void)
 {
 	switch (*(u32 *)GAMECODE) {
-	case 0x4A4D4F41://1058 - Disney Sports - Motocross(JP)
-	case 0x504D4F41://1068 - Disney Sports - Motocross(EU)
+	case 0x4A4D4F41:  //1058 - Disney Sports - Motocross(JP)
+	case 0x504D4F41:  //1068 - Disney Sports - Motocross(EU)
 		iTrimSize = 0xFE3000;
 		break;
-	case 0x4A494442://1176 - Koinu to Issho - Aijou Monogatari(JP)
-	case 0x4A324942://1741 - Koinu to Issho 2(JP)
-	case 0x454A4142://1864 - Banjo Pilot(US)
-	case 0x504A4142://1899 - Banjo Pilot(EU)
-	case 0x4A324D42://2045 - Momotarou Densetsu G - Gold Deck wo Tsukure!(JP)
-	case 0x4A464842://2071 - Twin Series 4 - Hamu Hamu Monster EX + F Puzzle Hamusuta(JP)
-	case 0x50514442://2214 - Donkey Kong Country 3(EU)
-	case 0x45514442://2220 - Donkey Kong Country 3(US)
-	case 0x4A514442://2270 - Super Donkey Kong Country 3(JP)
+	case 0x4A494442:  //1176 - Koinu to Issho - Aijou Monogatari(JP)
+	case 0x4A324942:  //1741 - Koinu to Issho 2(JP)
+	case 0x454A4142:  //1864 - Banjo Pilot(US)
+	case 0x504A4142:  //1899 - Banjo Pilot(EU)
+	case 0x4A324D42:  //2045 - Momotarou Densetsu G - Gold Deck wo Tsukure!(JP)
+	case 0x4A464842:  //2071 - Twin Series 4 - Hamu Hamu Monster EX + F Puzzle Hamusuta(JP)
+	case 0x50514442:  //2214 - Donkey Kong Country 3(EU)
+	case 0x45514442:  //2220 - Donkey Kong Country 3(US)
+	case 0x4A514442:  //2270 - Super Donkey Kong Country 3(JP)
 	case 0x4A564642:  //2286 - Twin Series 1 - Mezase Debut! Fashion Designer Monogatari + Kawaii Pet Game Gallery 2(JP)
 	case 0x4A575A42:  //2335 - Akagi(JP)
 	case 0x50385442:  //2342 - 2 Games in 1 - Teenage Mutant Ninja Turtles + Teenage Mutant Ninja Turtles 2 - Battle Nexus(EU)

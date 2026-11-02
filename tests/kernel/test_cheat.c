@@ -116,6 +116,16 @@ static void pat_fill(void)
 	w[13] = 0x400000;  // the ROM's size and head CRC
 	w[14] = 0x12345678;
 }
+void test_pat_cheats_left_out(void)
+{
+	// the file was written with the cheats off after a need of 0x3000 found no padding
+	CHECK(pat_cheats_left_out(0, 1, 0x3000, 0x3000));
+	CHECK(pat_cheats_left_out(0, 1, 0x3000, 0x4000));  // more picks: no more room
+	CHECK(!pat_cheats_left_out(0, 1, 0x3000, 0x2000));  // fewer: may fit now, scan again
+	CHECK(!pat_cheats_left_out(0, 1, 0, 0x3000));  // an ordinary file with them off
+	CHECK(!pat_cheats_left_out(0, 0, 0x3000, 0x3000));  // the cheats off now: the plain check
+	CHECK(!pat_cheats_left_out(1, 1, 0x3000, 0x3000));  // a file written with them on
+}
 void test_pat_cache(void)
 {
 	u32 *w = pat_words + EMax * 2;

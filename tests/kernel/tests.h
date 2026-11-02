@@ -39,6 +39,7 @@ void test_nor_scan_keeps_interrupts(void);
 void test_menu_code_fits(void);
 void test_spend_lowering(void);
 void test_pat_cache(void);
+void test_pat_cheats_left_out(void);
 void test_build_id_matches_the_rom(void);
 void test_text_blit(void);
 void test_text_draw(void);
