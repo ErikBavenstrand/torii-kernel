@@ -6,6 +6,17 @@ git log, not here.
 
 ## Unreleased
 
+- **Added:** cheats for GB, GBC and NES games, the first stage. The game
+  popup's Cheats row and the cheat screen now open for them, over the same
+  `/torii/cheats/<game>.cht` files. A picked Game Genie code (GB `XXX-YYY` and
+  `XXX-YYY-ZZZ`, NES six or eight letters) patches the game's copy in PSRAM
+  after the emulator loads, before it starts; a compare byte, or the NES
+  mapper's bank size, decides which bank it goes to, and bytes the emulators'
+  ROM checksum samples are left alone (they key states and palettes on it).
+  GameShark and raw RAM codes list greyed ("RAM codes don't run here yet"), and
+  the screen hides Buttons, Edit code and + Add code for these games. Settings'
+  clean-up leaves their files alone. (be4d50e8)
+
 - **Changed:** the last 8 static-analysis findings (cppcheck's
   `constParameterCallback` on job steps and text providers, whose parameter
   types the callback types fix) are marked beside the code with their reason,
