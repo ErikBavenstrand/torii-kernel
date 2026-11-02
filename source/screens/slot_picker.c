@@ -11,6 +11,7 @@
 #include "slot_picker.h"
 #include "save_page.h"
 #include "slot_flow.h"
+#include "../Ezcard_OP.h"
 #include "../ez_define.h"
 #include "../ezkernel.h"
 #include "../lang.h"
@@ -36,6 +37,8 @@ int slot_picker_wanted(const char *rom_path, int force)
 {
 	if (force)
 		return 1;
+	if (Read_SET_info(assress_slot_ask) == 0)
+		return 0;
 	return slot_flow_slots(rom_path, 0) >= 2;
 }
 

@@ -6,7 +6,7 @@
 -k @8:LEFT -k @12:- -k @16:LEFT -k @20:- -k @24:A -k @28:-
 -w "nav: page settings ready"
 -k @8:R -k @12:- -k @20:R -k @24:- -k @32:R -k @36:- -k @44:R -k @48:- -k @56:R -k @60:-
--w "settings: row 21"
+-w "settings: row 22"
 -s @8:armed.png
 -k @12:A -k @16:- -k @24:RIGHT -k @28:-
 -s @40:after-a.png

@@ -243,6 +243,9 @@
 #define assress_history \
 	37  //versions of a save kept per slot: an index into settings_history_keep, else 5 (source/slotstore.h)
 
+#define assress_slot_ask \
+	38  //a launch asks which slot to play when a game has several: 0 no (plays the active one), else yes (source/screens/slot_picker.h)
+
 #define assress_saveMODE 64
 #define assress_max 65
 

@@ -62,6 +62,7 @@ enum settings_id {
 	// Saves
 	SET_AUTO_SAVE,  // a game's save copied to the card without asking
 	SET_HISTORY,    // versions of a save kept per slot: index into settings_history_keep
+	SET_SLOT_ASK,   // a launch asks which slot to play when a game has several; off plays the active one
 	SET_GAME_SAVES, // opens Game saves, the games with saves (screens/saves.h)
 	SET_SAVES,      // opens the global save manager (screens/saves.h)
 	// Cart

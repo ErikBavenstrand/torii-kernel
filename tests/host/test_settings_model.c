@@ -424,11 +424,12 @@ void test_settings_visible_rows(void)
 	CHECK_EQ(ids[1], SET_LANGUAGE);
 	// Saves: what happens to a save, then the games' saves, then the page
 	// that tidies them
-	CHECK_EQ(settings_section_rows(&v, SET_SEC_SAVES, ids), 4);
+	CHECK_EQ(settings_section_rows(&v, SET_SEC_SAVES, ids), 5);
 	CHECK_EQ(ids[0], SET_AUTO_SAVE);
 	CHECK_EQ(ids[1], SET_HISTORY);
-	CHECK_EQ(ids[2], SET_GAME_SAVES);
-	CHECK_EQ(ids[3], SET_SAVES);
+	CHECK_EQ(ids[2], SET_SLOT_ASK);
+	CHECK_EQ(ids[3], SET_GAME_SAVES);
+	CHECK_EQ(ids[4], SET_SAVES);
 	CHECK_EQ(settings_section_rows(&v, SET_SEC_LIBRARY, ids), 4);
 	CHECK_EQ(ids[0], SET_RESCAN);
 	CHECK_EQ(ids[1], SET_IDENTIFY);

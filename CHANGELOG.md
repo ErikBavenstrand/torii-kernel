@@ -13,6 +13,11 @@ git log, not here.
   default and two cloned branches are fixed, and `cheatstore()` is declared
   non-null. Behaviour is the same (`686f9fdb`).
 
+- **Added:** Settings, Saves, Ask for a slot (on by default). Off, a launch of
+  a game with several slots plays its active slot at once; SELECT with A still
+  asks. Info's Controls and Saves pages say so, in Swedish too. It answers the
+  old open question, whether a launch should ask at all.
+
 ## v0.9.20
 
 - **Changed:** Info's Credits names the kernel's base (EZ-Flash's open source
