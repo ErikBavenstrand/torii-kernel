@@ -97,7 +97,19 @@ def poke_rom(gbc: bool = False) -> bytes:
     code += bytes(
         [0xFA, lo, hi, 0xFE, 0x55, 0x20, 0xF9]  # loop: LD A,(watch); CP $55; JR NZ,loop
         + [0xAF, 0xEA, lo, hi]  # XOR A; LD (watch),A
-        + [0xFA, 0x02, 0xC1, 0xFE, 0xF0, 0x30, 0x01, 0x3C, 0xEA, 0x02, 0xC1]  # count, saturating
+        + [
+            0xFA,
+            0x02,
+            0xC1,
+            0xFE,
+            0xF0,
+            0x30,
+            0x01,
+            0x3C,
+            0xEA,
+            0x02,
+            0xC1,
+        ]  # count, saturating
         + [0x18, 0xE8]  # JR loop
     )
     data[0x150 : 0x150 + len(code)] = code
