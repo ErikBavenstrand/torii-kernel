@@ -35,6 +35,11 @@ git log, not here.
   written into free ROM) now fit about 23,000 patches where 4,096 did, and a
   cheat may have 4,096. The cheat screen shows the room in percent, and
   the cheat list's cache is built again once (ad7b48e9).
+- **Fixed:** Emerald's contest cheats no longer write into the game's
+  heap every frame: Quick contests ends after one appeal, Max contest
+  score holds your first-round points at their most. Level 80 Pokéblock
+  is Max Pokéblock (it was Lv. 255), and every Emerald cheat is Torii
+  code (fe357f10).
 - **Fixed:** Emerald's Free Day Care no longer zeroes a script variable
   every frame that other scripts and the menu use (the Day Care now
   charges 0), and Any Pokémon in the Frontier lets Mew in too (e674d662).
