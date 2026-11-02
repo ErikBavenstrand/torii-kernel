@@ -76,8 +76,7 @@ off)
   ;;
 nor)
   head -c $((64 << 20)) /dev/urandom >"$cart/game-nor.bin"
-  every_slots="0=0xE1E1 1=1 2=0 3=0 4=0 5=9 6=8 7=2 8=9 9=8 10=1 11=1 12=0 13=1 14=1 25=1 32=2"
-  python3 tests/setnor.py set "$cart/kernel-nor.bin" $every_slots
+  python3 tests/setnor.py set "$cart/kernel-nor.bin" 0=0xE1E1 1=1 2=0 3=0 4=0 5=9 6=8 7=2 8=9 9=8 10=1 11=1 12=0 13=1 14=1 25=1 32=2
   # Power-on 1: Hello written to the NOR with the addons' hook
   # shellcheck disable=SC2046 # option lists
   boot $(nav_launch /Hello.gba nor-addon at=150) -f 600 >/dev/null 2>"$cart/log-write" || fail "the NOR write failed"

@@ -323,10 +323,12 @@ grep -q "cheats: .*Hello.cht: 500 cheats, 499 greyed" "$cart/big.txt" ||
   fail "the big file was read more than once"
 popups=$(sed -n 's/.*cheats: popup: \(-\{0,1\}[0-9]*\) listed.*/\1/p' "$cart/big.txt" | tr '\n' ' ')
 [ "$popups" = "-1 500 " ] || fail "the popup counted ${popups:-nothing}, not -1 (no count) and then 500"
-again=$(tac "$cart/big.txt" | sed '/screen ready: game-popup/q' | tac) # from the last popup on
-echo "$again" | grep -q "cheats: .*Hello.cht: 500 cheats listed from its cache" ||
-  fail "the second visit didn't take the list from its cache: $(echo "$again" | grep -a 'cheats:' | head -3)"
-! echo "$again" | grep -q "screen ready: progress" || fail "a progress dialog on the second visit"
+# from the last popup on (awk, not tac | sed q: sed quitting early can send tac a SIGPIPE,
+# and under pipefail that ended the script with no FAIL line, now and then)
+again=$(awk '/screen ready: game-popup/ { buf = "" } { buf = buf $0 "\n" } END { printf "%s", buf }' "$cart/big.txt")
+grep -q "cheats: .*Hello.cht: 500 cheats listed from its cache" <<<"$again" ||
+  fail "the second visit didn't take the list from its cache: $(grep -a 'cheats:' <<<"$again" | head -3)"
+! grep -q "screen ready: progress" <<<"$again" || fail "a progress dialog on the second visit"
 echo "PASS: cheats: a file of 500 cheats is read once and listed once, picks at once, and opens again from its list; the popup counts it once the screen has"
 
 # big_cht OUT COUNT BYTES [user] [from]: a file of COUNT cheats padded to
