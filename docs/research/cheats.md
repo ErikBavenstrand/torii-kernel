@@ -43,6 +43,73 @@ Research for v0.7 (2026-10-25), before the design in `docs/plans/roadmap.md`.
 - ❔ How RetroArch scopes a type-9 key across cheats. (The other `D` lines in libretro's files are encrypted lines, not other `D` types; see v0.7.1 below.)
 - ❔ EnHacklopedia's device notes: real ROM-patch slot limits, and slowdown codes on a flash cart.
 
+## GB, GBC and NES codes (stage 0 of docs/plans/emulator-cheats.md, 2026-11-02)
+
+`tools/cheat_emu_stats.py` counts libretro-database's `cht/Nintendo - Game Boy`,
+`... Game Boy Color` and `... Nintendo Entertainment System` folders (commit
+2fdd069d, fetched into `dist/cheat-emu-corpus`, never committed). A cheat is a
+`cheatN_code` string; `+` joins lines; a line is classified by its shape.
+
+| Console | Files | Cheats with a code | Lines | Game Genie | GameShark / raw | Other |
+| --- | --- | --- | --- | --- | --- | --- |
+| GB | 1,496 | 16,849 (667 empty) | 19,528 | 7,970 nine-digit, 687 six-digit | 9,903 type 01; 27 type 00; 14 type 80; 12 type 90; 4 each 91 and 11; 2 type 0D; 1 each 03, F1, 99, 08 | 284 Xploder `$XXXXXXXX`, 279 wildcards (`01??DCC4`), 338 other |
+| GBC | 960 | 9,275 (17,590 empty) | 10,959 | 1,555 nine-digit, 267 six-digit | 6,277 type 01; 1,202 type 91; 235 type 96; 228 type 92; 101 type 93; 56 type 90; 13 type 97; 12 type 94; 11 type 95; 2 each 10 and 11 | 686 Xploder, 305 wildcards, 7 other |
+| NES | 2,262 | 43,687 (817 empty) | 55,647 | 30,723 eight-letter, 4,731 six-letter | 20,044 raw `AAAA:VV` | 149 other or wildcards |
+
+- 🟢 Game Genie is the larger half for GB (45% of lines) and the main half for
+  NES (63%); GameShark RAM pokes are about half of GB's lines and raw RAM
+  pokes 36% of NES's. Stage 1 (Game Genie only) covers about 44% of GB, 63%
+  of NES and 17% of GBC lines (GBC's GameShark codes are mostly types 91 to
+  97, the CGB WRAM banks 1 to 7; 01 is the plain write).
+- 🟢 No NES line has the compare-poke form `AAAA?CC:VV`; no cheat file has a
+  `cheatN_format` line. 24 GB, 4 GBC and 42 NES cheats mix kinds on one line
+  set (the rest are one kind); Torii refuses the mix whole (CANT_RUN) rather
+  than run a part of it.
+- 🟢 Six-digit GB genies exist (954 lines): they have no compare, so the
+  patch goes to every bank that can be mapped there.
+- 🟡 176 of the 4,731 six-letter NES lines have the length flag set in their
+  third letter (a letter of the second group, which marks an eight-letter
+  code) and one eight-letter line has it clear; the decoders ignore the flag,
+  as FCEUX and fceumm do, so such a line decodes as its length says.
+
+**NES Game Genie format** (verified against nesdev's `nesgg.txt`, "NES Game
+Genie Code Format DOC v0.71" by Benzene, https://www.nesdev.org/nesgg.txt, and
+the cartridge's registers on https://www.nesdev.org/wiki/Game_Genie):
+- The letters `A P Z L G I T Y E O X U K S V N` are the nibbles 0 to F in that
+  order. Per letter, from the top bit, the bits stand for (six letters):
+  `1678 H234 -IJK LABC DMNO 5EFG`; eight letters: `1678 H234 -IJK LABC DMNO
+  %EFG !^&* 5@#$`, where `1`-`8` are the value's bits (1 the top), `A`-`O`
+  the address's 15 bits (A the top, bit 14), `!@#$%^&*` the compare byte (`!`
+  the top) and `-` the length flag (set in an eight-letter code).
+- The CPU address is `0x8000 + A..O`. Worked example from the document:
+  `SXIOPO` is value `AD` at `91D9` (infinite lives, Super Mario Bros.). The
+  bit shuffle the kernel uses
+  (`addr = 8000 | (n3&7)<<12 | (n5&7)<<8 | (n4&8)<<8 | (n2&7)<<4 | (n1&8)<<4 |
+  (n4&7) | (n3&8)`, with n0 the first letter) is the same map; the host test
+  checks it letter by letter and on a million random codes against the table
+  as the document gives it.
+- A Game Genie replaces what the CPU reads: with a compare byte only when the
+  ROM byte equals it. A static patch of the PRG image does the same where the
+  address belongs to one PRG byte; with banks, the kernel patches every bank
+  the mapper could map there and lets the compare byte choose (mapper sizes
+  in `source/cheatemu.c`).
+
+**GB Game Genie format** (checked against gambatte's `applyGameGenie`,
+`libgambatte/src/mem/cartridge.cpp`, and mGBA's `GBCheatAddGameGenieLine`,
+`src/gb/cheats.c`, two arrangements of one code):
+- `XXX-YYY` or `XXX-YYY-ZZZ`, hex digits `d0..d8`: value `d0 d1`; address
+  `d2 << 8 | d3 << 4 | d4 | (d5 ^ F) << 12`; with the third group, compare
+  `((x >> 2 | x << 6) ^ 0x45) & FF` where `x = (d6 << 4 | d8) ^ FF` (`d7` is not
+  used). An address from 8000 is no ROM address: refused.
+- gambatte applies a code to every ROM bank whose address range can hold it
+  (bank 0 for 0000-3FFF, any other for 4000-7FFF) and whose byte equals the
+  compare; Torii does the same to the PSRAM copy at launch.
+- GameShark: eight hex digits `TT VV LL HH`: write VV at `HHLL` each frame; TT
+  is `01` for the plain write, `90`-`97` for a CGB WRAM bank (type `91` to `97`
+  hold 1,802 GBC lines), other bytes touch cartridge RAM. Not run in stage 1.
+- The Xploder form (`$` and eight digits) is a different device's code and is
+  read as unreadable.
+
 ## What the kernel does where devices and mGBA differ (v0.7)
 
 The interpreter (`source/cheatrun.s`) runs each picked cheat's ops as mGBA's
