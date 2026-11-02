@@ -136,6 +136,8 @@ static void bg_bitmap(const struct ppu_frame *f, u32 mode, u32 y, u16 *out)
 		return;
 	}
 	for (u32 x = 0; x < PPU_W; x++, cx += m[0], cy += m[2]) {
+		// The shift is arithmetic (GCC defines it for a negative cx: floor division by 256)
+		// cppcheck-suppress shiftNegativeLHS
 		s32 tx = cx >> 8, ty = cy >> 8;
 		out[x] = LAYER_NONE;
 		if (tx < 0 || ty < 0 || tx >= w || ty >= h)

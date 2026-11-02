@@ -109,7 +109,7 @@ void delay(u32 R0)
 {
 	int volatile i;
 
-	for (i = R0; i; --i)
+	for (i = (int)R0; i; --i)
 		;
 	return;
 }
@@ -728,7 +728,7 @@ static u32 SavefileWrite(TCHAR *filename, u32 savesize)
 			tlog("save: made a blank %s, %lu bytes", filename, (unsigned long)total);
 
 		return 1;
-	} break;
+	}
 	default:
 		tlog_error("save: can't create %s: f_open gave %lu", filename, (unsigned long)ret);
 		return SAVE_FAILED;
@@ -1047,6 +1047,16 @@ static void Show_error_num(u8 error_num)
 	dialog_message(NULL, msg, DIALOG_ERROR);
 }
 //---------------------------------------------------------------------------------
+// Puts text into the pending-save record at at: up to max bytes, and the NUL
+// after them (the record's buffer was zeroed, so the rest is NULs). The callers
+// check the lengths (SAV_INFO_NAME_MAX, SAV_INFO_HIST_MAX); this keeps a
+// longer one from writing past its room.
+static void record_text(u16 *at, u32 max, const char *text)
+{
+	u32 n = (u32)strnlen(text, max);
+	memcpy(at, text, n);
+}
+//---------------------------------------------------------------------------------
 u32 Get_savefilesize(BYTE saveMODE)
 {
 	u32 savefilesize;
@@ -1060,27 +1070,19 @@ u32 Get_savefilesize(BYTE saveMODE)
 	case 0x21:
 		savefilesize = 0x200;
 		break;//EEPROM_TYPE 512
-	case 0x22:
+	case 0x22:  //EEPROM_TYPE 8k
+	case 0x23:  //EEPROM_TYPE v125 v126 must use 8k
 		savefilesize = 0x2000;
-		break;//EEPROM_TYPE 8k
-	case 0x23:
-		savefilesize = 0x2000;
-		break;//EEPROM_TYPE v125 v126 must use 8k
-	case 0x32:
-		savefilesize = 0x10000;
-		break;//FLASH_TYPE 64k
-	case 0x33:
-		savefilesize = 0x10000;
-		break;//FLASH512_TYPE 64k
+		break;
 	case 0x31:
 		savefilesize = 0x20000;
 		break;//FLASH1M_TYPE 128k
-	case 0xee:
+	case 0x32:  //FLASH_TYPE 64k
+	case 0x33:  //FLASH512_TYPE 64k
+	case 0xee:  //EMU 64k
+	default:    //UNKNOW,FF  for homebrew SRAM_TYPE	//2018-4-23 some emu homebrew need 64kByte
 		savefilesize = 0x10000;
-		break;//EMU 64k
-	default:
-		savefilesize = 0x10000;
-		break;//UNKNOW,FF  for homebrew SRAM_TYPE	//2018-4-23 some emu homebrew need 64kByte
+		break;
 	}
 	return savefilesize;
 }
@@ -1280,9 +1282,9 @@ static u8 Process_savefile_steps(u32 is_EMU, const char *rom_path, u32 gamefiles
 		SAV_info_buffer[0] = 0x11;
 		SAV_info_buffer[1] = savefilesize >> 9;
 		//memcpy(&SAV_info_buffer[2],savfilename,100);
-		strcpy((char *)&SAV_info_buffer[2], savfilename);
+		record_text(&SAV_info_buffer[2], SAV_INFO_NAME_MAX, savfilename);
 		SAV_info_buffer[SAV_INFO_TYPE] = saveMODE;
-		strcpy((char *)&SAV_info_buffer[SAV_INFO_HIST], launch_save.hist);
+		record_text(&SAV_info_buffer[SAV_INFO_HIST], SAV_INFO_HIST_MAX, launch_save.hist);
 		Save_sav_info(SAV_info_buffer, 0x200);
 	}
 
@@ -1588,7 +1590,7 @@ int main(void)
 	//TCHAR currentpath[MAX_path_len];
 	memset(currentpath, 00, MAX_path_len);
 
-	res = f_getcwd(currentpath, sizeof currentpath / sizeof *currentpath);
+	f_getcwd(currentpath, sizeof currentpath / sizeof *currentpath);
 
 	Read_NOR_info();
 	gl_norOffset = 0x000000;
@@ -1939,7 +1941,7 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 				Show_error_num(1);
 				return 0;
 			}
-			GBApatch_Cleanrom(PSRAMBase_S98, gamefilesize);
+			GBApatch_Cleanrom(PSRAMBase_S98, (int)gamefilesize);
 			progress_done(NULL);
 			//wait_btn();
 			Launch_now(0x200, key_L, "CLEAN BOOT");
@@ -2037,7 +2039,7 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 				if (iCount2 > found)
 					tlog("launch: exact-ROM patch for %.4s (irqpatch.c rom_patches)",
 					     (char *)GAMECODE);
-				GBApatch_PSRAM(PSRAMBase_S98, gamefilesize);
+				GBApatch_PSRAM(PSRAMBase_S98, (int)gamefilesize);
 				Log_patches();
 			} else {  //no select switch ,CLEAN
 				tlog("launch: no addon on, so no patches");

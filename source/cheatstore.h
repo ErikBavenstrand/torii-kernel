@@ -153,7 +153,8 @@ struct cheatstore {
 	struct cheatlist list;  // the cheat screen's (cheatlist.h)
 	u8 listed_decode;  // the model's decoded state came from the list: the decoder itself wasn't run
 };
-struct cheatstore *cheatstore(void);
+// The store in pReadCache (never NULL: the analyzer is told so)
+__attribute__((returns_nonnull)) struct cheatstore *cheatstore(void);
 // A long call's progress (decoding a larger file's windows, cleaning cheat
 // files): done of total, for a progress bar
 typedef void (*cheatstore_progress_fn)(u32 done, u32 total);

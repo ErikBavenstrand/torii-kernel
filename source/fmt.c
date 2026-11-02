@@ -127,6 +127,8 @@ int fmt_vsnprintf(char *out, size_t room, const char *f, va_list ap)
 			if (lng == 2 || lng == 3)
 				sv = lng == 2 ? va_arg(ap, long long) : (long long)va_arg(ap, ptrdiff_t);
 			else if (lng == 1)
+				// int and long are one width on the GBA only
+				// NOLINTNEXTLINE(bugprone-branch-clone)
 				sv = va_arg(ap, long);
 			else
 				sv = va_arg(ap, int);
@@ -138,6 +140,8 @@ int fmt_vsnprintf(char *out, size_t room, const char *f, va_list ap)
 			else if (lng == 2)
 				v = va_arg(ap, unsigned long long);
 			else if (lng == 3)
+				// size_t, long and int are one width on the GBA only
+				// NOLINTNEXTLINE(bugprone-branch-clone)
 				v = va_arg(ap, size_t);
 			else if (lng == 1)
 				v = va_arg(ap, unsigned long);

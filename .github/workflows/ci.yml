@@ -136,7 +136,8 @@ jobs:
     runs-on: ubuntu-26.04
     timeout-minutes: 30
     # Fails on findings missing from tools/analyze-baseline.txt (the baseline's
-    # 97 findings are triaged: style, or false alarms; see the roadmap).
+    # 8 findings are left: cppcheck's constParameterCallback, fixed by the job and
+    # text-provider callback types; see the roadmap).
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0

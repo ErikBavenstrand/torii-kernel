@@ -472,7 +472,7 @@ u32 lib_path(const u8 *slot, u32 rec, char *out, u32 size)
 		f = 0;  // the root: "/name"
 	if (f + 1 + n + 1 > size)
 		return 0;
-	memcpy(out, folder, f);
+	memcpy(out, folder, f);  // NOLINT(bugprone-not-null-terminated-result): the path goes on, the NUL is the name's
 	out[f] = '/';
 	memcpy(out + f + 1, name, n + 1);
 	return f + 1 + n;

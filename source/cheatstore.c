@@ -1935,7 +1935,9 @@ static void kept_put(u32 a, const void *src, u32 n)
 {
 	vu8 *at = (vu8 *)(CARTLOG_CHEAT_PATCHES + a);
 	for (u32 b = 0; b < n; b++)
-		at[b] = ((const u8 *)src)[b];
+		// Every caller's src is filled: a run's head, or a decoded patch (the decoder wrote
+		// the patches through put_patch, out of the analyzer's sight)
+		at[b] = ((const u8 *)src)[b];  // NOLINT(clang-analyzer-core.uninitialized.Assign)
 }
 
 static void kept_get(u32 a, void *dst, u32 n)
@@ -1967,7 +1969,8 @@ static const char *kept_name(u16 number)
 static void keep_patches(const struct cheatfile *f, const struct cheatfile_cheat *c, const struct cheatfile_work *w)
 {
 	TLOG_ASSERT(kept.used + (u32)c->patches * CHEATFILE_PATCH_UNIT <= CARTLOG_CHEAT_PATCHES_SIZE);
-	if (w->n_patches && kept.names_used < KEPT_NAMES) {
+	const u32 n_patches = w->n_patches;  // read once: the calls below can't change it
+	if (n_patches && kept.names_used < KEPT_NAMES) {
 		kept.numbers[kept.names_used] = c->number;
 		snprintf(kept.names[kept.names_used++], KEPT_NAME_LEN, "%.*s",
 			 c->desc != CHEATFILE_NONE ? (int)c->desc_len : 0,
@@ -1977,7 +1980,7 @@ static void keep_patches(const struct cheatfile *f, const struct cheatfile_cheat
 	struct kept_run run = {0, 0, c->number};
 	struct cheat_patch prev = {0, 0, 0};
 	u32 head = 0;
-	for (u32 p = 0; p < w->n_patches; p++) {
+	for (u32 p = 0; p < n_patches; p++) {
 		struct cheat_patch pt = w->patches[p];
 		int masked = cheatfile_run_masked(&pt);
 		if (!p || !cheatfile_run_goes_on(&prev, &pt)) {

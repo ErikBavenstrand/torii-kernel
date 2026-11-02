@@ -69,6 +69,19 @@ static int __attribute__((format(printf, 3, 4))) ss_snprintf(char *dst, u32 size
 	return n;
 }
 
+// A bounded string copy: dst holds size bytes, the NUL included. Every source
+// fits its destination by construction (a valid name, a cleaned name); the
+// bound keeps a bad one from writing past it
+static void ss_copy_str(char *dst, u32 size, const char *src)
+{
+	u32 n = (u32)strlen(src);
+	if (n >= size)
+		n = size - 1;
+	memcpy(dst, src, n);
+	dst[n] = 0;
+}
+#define SS_STR(dst, src) ss_copy_str((dst), sizeof(dst), (src))
+
 /* ---- The clock and the setting ---- */
 
 void slotstore_now(struct saveslot_stamp *out)
@@ -171,7 +184,7 @@ static int ss_same(const char *x, const char *y)
 		u32 len = chunk_of(total, off);
 		if (!read_full(a, W->buf[0], len) || !read_full(b, W->buf[1], len))
 			same = -1;
-		else if (memcmp(W->buf[0], W->buf[1], len))
+		else if (memcmp(W->buf[0], W->buf[1], len) != 0)
 			same = 0;
 	}
 	f_close(a);
@@ -444,7 +457,8 @@ static u32 oldest_listed(u32 count)
 static void note_stray(const char *name)
 {
 	if (stray_count < SS_STRAYS && strlen(name) < sizeof(W->strays[0]))
-		strcpy(W->strays[stray_count++], name);
+		SS_STR(W->strays[stray_count], name);
+	stray_count++;
 }
 
 // Removes the .new files the last scan of dir found: the file one is the
@@ -515,7 +529,7 @@ static int ss_scan_hist(const char *dir, u32 *count, u32 *maxn, u32 *newest)
 		} else {
 			(*count)++;
 		}
-		strcpy(W->names[at], W->fno.fname);
+		SS_STR(W->names[at], W->fno.fname);
 		W->sizes[at] = (u32)W->fno.fsize;
 		if (n > top_stored) {
 			top_stored = n;
@@ -546,7 +560,7 @@ static int ss_prune_unlisted(const char *dir, u32 count)
 			continue;
 		int listed = 0;
 		for (u32 i = 0; i < count && !listed; i++)
-			listed = !strcmp(W->names[i], W->fno.fname);
+			listed = strcmp(W->names[i], W->fno.fname) == 0;
 		if (listed)
 			continue;
 		ss_snprintf(path, SS_PATH, "%s/%s", dir, W->fno.fname);
@@ -678,10 +692,10 @@ static int ss_list(const char *rom)
 			continue;
 		memcpy(base, name, blen);
 		base[blen] = 0;
-		if (saveslot_clean_name(clean, base) != blen || strcmp(clean, base))
+		if (saveslot_clean_name(clean, base) != blen || strcmp(clean, base) != 0)
 			continue;
 		if (found < SLOTSTORE_MAX_SLOTS) {
-			strcpy(W->slots[found].name, base);
+			SS_STR(W->slots[found].name, base);
 			W->slots[found].size = (u32)W->fno.fsize;
 			W->slots[found].saved = fat_time(W->fno.fdate, W->fno.ftime);
 		}
@@ -718,7 +732,7 @@ int slotstore_current(const char *rom_path, char *slot)
 {
 	struct gamerec rec;
 	gamesave_record_read(rom_path, &rec);
-	strcpy(slot, rec.slot);
+	ss_copy_str(slot, SAVESLOT_NAME_BYTES, rec.slot);
 	return SLOTSTORE_OK;
 }
 
@@ -732,9 +746,9 @@ static int op_set_current(const char *rom_path, const char *slot)
 		return SLOTSTORE_NO_SLOT;
 	struct gamerec rec;
 	gamesave_record_read(rom_path, &rec);
-	if (!strcmp(rec.slot, W->slots[i].name))
+	if (strcmp(rec.slot, W->slots[i].name) == 0)
 		return SLOTSTORE_OK;
-	strcpy(rec.slot, W->slots[i].name);
+	SS_STR(rec.slot, W->slots[i].name);
 	return gamesave_record_write(rom_path, &rec) ? SLOTSTORE_OK : SLOTSTORE_CARD;
 }
 
@@ -820,9 +834,9 @@ static int record_follows(const char *rom, const char *old_name, const char *new
 {
 	struct gamerec rec;
 	gamesave_record_read(rom, &rec);
-	if (!saveslot_names_equal(rec.slot, old_name) || !strcmp(rec.slot, new_name))
+	if (!saveslot_names_equal(rec.slot, old_name) || strcmp(rec.slot, new_name) == 0)
 		return SLOTSTORE_OK;
-	strcpy(rec.slot, new_name);
+	SS_STR(rec.slot, new_name);
 	return gamesave_record_write(rom, &rec) ? SLOTSTORE_OK : SLOTSTORE_CARD;
 }
 
@@ -871,17 +885,21 @@ static int rename_steps(const char *rom, const char *old_name, const char *new_n
 			return r;
 		}
 	} else {
-		if ((r = ss_mkdirs_parent(ns)))
+		r = ss_mkdirs_parent(ns);
+		if (r != 0)
 			return r;
-		if ((r = ss_move(os, ns)))
+		r = ss_move(os, ns);
+		if (r != 0)
 			return r;
 		cutpoint("rename: save moved");
 	}
 	// The history folder follows (a game that has none has nothing to move)
 	if (ss_exists(oh) == 1) {
-		if ((r = ss_mkdirs_parent(nh)))
+		r = ss_mkdirs_parent(nh);
+		if (r != 0)
 			return r;
-		if ((r = ss_move(oh, nh)))
+		r = ss_move(oh, nh);
+		if (r != 0)
 			return r;
 		cutpoint("rename: history moved");
 	}
@@ -897,7 +915,7 @@ static int op_rename(const char *rom_path, const char *slot, const char *name, c
 	if (!saveslot_clean_name(clean, name))
 		return SLOTSTORE_NAME;
 	if (clean_out)
-		strcpy(clean_out, clean);
+		ss_copy_str(clean_out, SAVESLOT_NAME_BYTES, clean);
 	if (slotstore_recover() < 0)
 		return SLOTSTORE_CARD;
 	int n = ss_list(rom_path);
@@ -912,8 +930,8 @@ static int op_rename(const char *rom_path, const char *slot, const char *name, c
 	if (saveslot_name_taken(clean, W->slotp, (u32)n, (u32)i))
 		return SLOTSTORE_TAKEN;
 	char old_name[SAVESLOT_NAME_BYTES];
-	strcpy(old_name, W->slots[i].name);  // the name as the file spells it
-	if (!strcmp(old_name, clean))
+	SS_STR(old_name, W->slots[i].name);  // the name as the file spells it
+	if (strcmp(old_name, clean) == 0)
 		return SLOTSTORE_OK;
 	int r = both_paths(W->a, W->b, rom_path, clean);
 	if (r)
@@ -974,7 +992,7 @@ static int create_steps(const char *rom_path, const char *name, const char *copy
 	if (!saveslot_clean_name(clean, name))
 		return SLOTSTORE_NAME;
 	if (clean_out)
-		strcpy(clean_out, clean);
+		ss_copy_str(clean_out, SAVESLOT_NAME_BYTES, clean);
 	if (slotstore_recover() < 0)
 		return SLOTSTORE_CARD;
 	int n = ss_list(rom_path);
@@ -1010,7 +1028,8 @@ static int create_steps(const char *rom_path, const char *name, const char *copy
 		return SLOTSTORE_TAKEN;
 	if (ss_snprintf(W->c, SS_PATH, "%s.new", W->a) >= SS_PATH)
 		return SLOTSTORE_PATH;
-	if ((r = ss_mkdirs_parent(W->a)))
+	r = ss_mkdirs_parent(W->a);
+	if (r != 0)
 		return r;
 	// A stray .new of an earlier cut goes; this one starts fresh anyway
 	f_unlink(W->c);
@@ -1080,7 +1099,10 @@ static int trash_steps(const char *rom, const char *slot, const char *trash)
 	    ss_snprintf(W->d, SS_PATH, "%s/backups%s/%s", trash, rom, slot) >= SS_PATH)
 		return SLOTSTORE_PATH;
 	if (ss_exists(W->a) == 1) {
-		if ((r = ss_mkdirs_parent(W->c)) || (r = ss_move(W->a, W->c)))
+		r = ss_mkdirs_parent(W->c);
+		if (r == 0)
+			r = ss_move(W->a, W->c);
+		if (r != 0)
 			return r;
 		cutpoint("delete: save in the trash");
 	} else if (ss_exists(W->c) != 1 && ss_exists(W->b) != 1) {
@@ -1096,14 +1118,15 @@ static int trash_steps(const char *rom, const char *slot, const char *trash)
 			return n;
 		int j = find_slot((u32)n, SAVESLOT_MAIN);
 		if (n > 0) {
-			strcpy(rec.slot, W->slots[j < 0 ? 0 : j].name);
+			SS_STR(rec.slot, W->slots[j < 0 ? 0 : j].name);
 			if (!gamesave_record_write(rom, &rec))
 				return SLOTSTORE_CARD;
 			cutpoint("delete: another slot is current");
 		}
 	}
 	if (ss_exists(W->b) == 1) {
-		if ((r = ss_move_files(W->b, W->d)))
+		r = ss_move_files(W->b, W->d);
+		if (r != 0)
 			return r;
 		cutpoint("delete: history in the trash");
 	}
@@ -1123,7 +1146,7 @@ static int op_delete(const char *rom_path, const char *slot)
 	if (n < 2)
 		return SLOTSTORE_LAST;
 	char name[SAVESLOT_NAME_BYTES];
-	strcpy(name, W->slots[i].name);
+	SS_STR(name, W->slots[i].name);
 	// The trash folder: today's stamp, the first n not used
 	struct saveslot_stamp now;
 	slotstore_now(&now);
@@ -1383,7 +1406,7 @@ static int push(const char *file, const char *hist_dir, u32 keep, int how)
 				if (ss_snprintf(hn, SS_PATH, "%s/%s", hist_dir, kept) >= SS_PATH ||
 				    f_rename(hp, hn) != FR_OK)
 					return SLOTSTORE_CARD;
-				strcpy(W->names[newest], kept);
+				SS_STR(W->names[newest], kept);
 			}
 			if (move && aliased)
 				cutpoint("history: second name dropped");
@@ -1405,8 +1428,11 @@ static int push(const char *file, const char *hist_dir, u32 keep, int how)
 		saveslot_backup_name(name, maxn + 1, &now);
 	if (ss_snprintf(hp, SS_PATH, "%s/%s", hist_dir, name) >= SS_PATH - 5)
 		return SLOTSTORE_PATH;
-	if (!count && (r = ss_mkdirs(hist_dir)))  // with versions in it, the folder is there
-		return r;
+	if (!count) {  // with versions in it, the folder is there
+		r = ss_mkdirs(hist_dir);
+		if (r)
+			return r;
+	}
 	if (move) {
 		FRESULT m = f_rename(file, hp);
 		if (m != FR_OK) {
@@ -1416,7 +1442,8 @@ static int push(const char *file, const char *hist_dir, u32 keep, int how)
 		cutpoint("history: file moved in");
 	} else {
 		ss_snprintf(hn, SS_PATH, "%s.new", hp);
-		if ((r = ss_copy(file, hn)))
+		r = ss_copy(file, hn);
+		if (r != 0)
 			return r;
 		cutpoint("history: version written");
 		if (f_rename(hn, hp) != FR_OK) {
@@ -1427,7 +1454,7 @@ static int push(const char *file, const char *hist_dir, u32 keep, int how)
 	}
 	tlog("slot: %s %s to %s", move ? "moved" : "pushed", file, hp);
 	if (count < SS_NAMES) {
-		strcpy(W->names[count], name);
+		SS_STR(W->names[count], name);
 		count++;
 	} else {
 		// The newest takes the oldest listed one's place, which is now
@@ -1472,7 +1499,8 @@ int slotstore_history(const char *rom_path, const char *slot, struct slotstore_v
 	if (r)
 		return r;
 	u32 count, maxn, newest;
-	if ((r = ss_scan_hist(W->b, &count, &maxn, &newest)))
+	r = ss_scan_hist(W->b, &count, &maxn, &newest);
+	if (r != 0)
 		return r;
 	// Newest first: each version goes in by its n, the ones past max fall off
 	u32 given = 0;
@@ -1561,7 +1589,8 @@ static int op_restore(const char *rom_path, const char *slot, u32 n)
 	if (ss_exists(W->a) != 1)
 		return SLOTSTORE_NO_SLOT;
 	u32 count, maxn, newest;
-	if ((r = ss_scan_hist(W->b, &count, &maxn, &newest)))
+	r = ss_scan_hist(W->b, &count, &maxn, &newest);
+	if (r != 0)
 		return r;
 	int found = -1;
 	for (u32 i = 0; i < count; i++) {
@@ -1640,8 +1669,8 @@ static int journal_read(char *lines[4], char *kind)
 	hex[8] = 0;
 	char want[9];
 	ss_snprintf(want, sizeof(want), "%08lx", (unsigned long)crc32(t, body));
-	if (strcmp(hex, want) || body < sizeof(JOURNAL_HEADER) - 1 ||
-	    memcmp(t, JOURNAL_HEADER, sizeof(JOURNAL_HEADER) - 1))
+	if (strcmp(hex, want) != 0 || body < sizeof(JOURNAL_HEADER) - 1 ||
+	    memcmp(t, JOURNAL_HEADER, sizeof(JOURNAL_HEADER) - 1) != 0)
 		return 0;
 	t[body] = 0;
 	char *p = t + sizeof(JOURNAL_HEADER) - 1;
@@ -1714,16 +1743,16 @@ int slotstore_recover(void)
 		return 1;
 	}
 	if (kind == 'R') {
-		if (saveslot_clean_name(clean, x) != strlen(x) || strcmp(clean, x) ||
-		    saveslot_clean_name(clean, y) != strlen(y) || strcmp(clean, y)) {
+		if (saveslot_clean_name(clean, x) != strlen(x) || strcmp(clean, x) != 0 ||
+		    saveslot_clean_name(clean, y) != strlen(y) || strcmp(clean, y) != 0) {
 			journal_clear();
 			return 1;
 		}
 		tlog("slot: finishing the rename of %s to %s of %s", x, y, rom);
 		r = rename_steps(rom, x, y, 1);
 	} else {
-		if (saveslot_clean_name(clean, x) != strlen(x) || strcmp(clean, x) ||
-		    strncmp(y, SAVESLOT_TRASH_DIR "/", sizeof(SAVESLOT_TRASH_DIR))) {
+		if (saveslot_clean_name(clean, x) != strlen(x) || strcmp(clean, x) != 0 ||
+		    strncmp(y, SAVESLOT_TRASH_DIR "/", sizeof(SAVESLOT_TRASH_DIR)) != 0) {
 			journal_clear();
 			return 1;
 		}

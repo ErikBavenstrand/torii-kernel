@@ -141,7 +141,7 @@ int orphanplan_read(char *data, u32 len, struct orphanplan_job *job)
 	memcpy(hex, data + body, 8);
 	hex[8] = 0;
 	snprintf(want, sizeof(want), "%08lx", (unsigned long)crc32(data, body));
-	if (strcmp(hex, want) || memcmp(data, HEADER, sizeof(HEADER) - 1))
+	if (strcmp(hex, want) != 0 || memcmp(data, HEADER, sizeof(HEADER) - 1) != 0)
 		return 0;
 	data[body] = 0;
 	char *p = data + sizeof(HEADER) - 1;

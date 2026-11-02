@@ -851,7 +851,7 @@ void ingame_refused_notice(void)
 
 void ingame_after_game(void)
 {
-	u32 words[INGAME_SESSION_HEAD / 4];  // the head alone: the whole block is 22 KB
+	u32 words[INGAME_SESSION_HEAD / 4] = {0};  // the head alone: the whole block is 22 KB
 	const struct ingame_session *h = (const struct ingame_session *)(void *)words;
 	struct ingame_out out;
 	char path[INGAME_PATH_BYTES];

@@ -1103,7 +1103,9 @@ u32 cheatfile_text(void *ctx, u32 pos, char *buf, u32 max)
 			buf[n++] = o->line[o->k++];
 			continue;
 		}
-		if (o->t == o->edit) {
+		// (next_edit's "none" is len + 1, past any t, so t == edit means o->cheat is set; the
+		// test says so to the reader and the analyzer)
+		if (o->t == o->edit && o->cheat != CHEATFILE_NONE) {
 			// The new value, then on past the old one
 			const char *v = pick_text[f->cheats[o->cheat].picked];
 			u32 vl = (u32)strlen(v);

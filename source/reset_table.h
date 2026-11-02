@@ -2817,7 +2817,7 @@ const int  __attribute__((aligned(4))) reset_table[] = {
 0x43494942,0x00000002,0x0000003F,0x000000D4,//Polarium_Advance_(Prototype,_iQue).zip
 0x434C4741,0x00000002,0x00000074,0x000F08AC,//Tomato_Adventure_(Prototype,_iQue).zip
 
-0xFFFFFFFF
+(int)0xFFFFFFFF
 
 };
 // clang-format on

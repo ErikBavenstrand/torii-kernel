@@ -178,7 +178,7 @@ u32 statestore_scan(const char *rom_path, const char *save_slot, struct statesto
 	for (u32 s = 1; s <= STATESTORE_SLOTS; s++) {
 		struct statestore_slot *e = &l->slot[s];
 		for (u32 bak = 0; bak < 2; bak++) {
-			u32 h_words[sizeof(struct statestore_head) / 4];  // word-aligned for f_read
+			u32 h_words[sizeof(struct statestore_head) / 4] = {0};  // word-aligned for f_read
 			struct statestore_head *h = (struct statestore_head *)(void *)h_words;
 			if (statestore_path(path, rom_path, save_slot, s, bak) < 0 || !head_read(path, s, h))
 				continue;
@@ -211,7 +211,7 @@ static int copy_load(const char *path, u32 slot, u32 *data_crc)
 	struct states_work *w = work();
 	FIL *f = &w->fil;
 	UINT got = 0;
-	u32 h_words[sizeof(struct statestore_head) / 4];
+	u32 h_words[sizeof(struct statestore_head) / 4] = {0};
 	struct statestore_head *h = (struct statestore_head *)(void *)h_words;
 	if (f_open(f, path, FA_READ) != FR_OK)
 		return 0;
@@ -374,7 +374,7 @@ static int copy_write(char *path, u32 slot, u32 seq, u32 order)
 	struct states_work *w = work();
 	FIL *f = &w->fil;
 	UINT put = 0;
-	u32 h_words[sizeof(struct statestore_head) / 4];
+	u32 h_words[sizeof(struct statestore_head) / 4] = {0};
 	struct statestore_head *h = (struct statestore_head *)(void *)h_words;
 	memset(h, 0, sizeof(*h));
 	FRESULT r = make_parents(path) ? f_open(f, path, FA_CREATE_ALWAYS | FA_WRITE) : FR_DENIED;

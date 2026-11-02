@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <gba_base.h>
 #include <string.h>
@@ -44,7 +45,9 @@ static u32 cheats_dropped;  // Torii: the need (Patch_need) that found no paddin
 SPatchInfo2 iPatchInfo2[EMax];
 u32 iCount2;
 
-#define sizeofa(array) (sizeof(array) / sizeof(array[0]))
+// The bytes from a to b, two addresses of code that are not an array
+#define byte_span(a, b) ((u32)((uintptr_t)(b) - (uintptr_t)(a)))
+#define sizeofa(array) (sizeof(array) / sizeof((array)[0]))
 
 u32 spend_address;
 u32 cheat_live_at;
@@ -144,7 +147,7 @@ bool IWRAM_CODE PatchDragonBallZ(u32 *Data)
 	s32 index_DragonBallZ = -1;
 	for (u32 ii = 0; ii < sizeofa(game_codes_DragonBallZ); ii++) {
 		if (*(u32 *)GAMECODE == game_codes_DragonBallZ[ii]) {
-			index_DragonBallZ = ii;
+			index_DragonBallZ = (s32)ii;
 			break;
 		}
 	}
@@ -262,14 +265,13 @@ void IWRAM_CODE PatchInternal(u32 *Data, int iSize, u32 offset)
 
 	for (u32 ii = 0; ii < search_size; ii++) {
 		switch (Data[ii]) {
-		case 0x3007FFC:  // IRQ handler
-		{
-			Add2(ii, 0x3007FF4);  //0x3007FFC的位置
-		} break;
-		case 0x3FFFFFC:  // IRQ handler
+		case 0x3007FFC:  // IRQ handler (at 0x3007FFC)
+		case 0x3FFFFFC:  // IRQ handler (its mirror)
 		{
 			Add2(ii, 0x3007FF4);
 		} break;
+		default:
+			break;
 		}
 	}
 }
@@ -491,9 +493,9 @@ static void Patch_Reset_Sleep(u32 *Data)
 	u8 *p_patch_Return_address_L = (u8 *)Return_address_L;
 
 	u8 *patchbuffer = (u8 *)_UnusedVram;
-	u32 Return_address_offset = p_patch_Return_address_L - p_patch_start;
+	u32 Return_address_offset = byte_span(p_patch_start, p_patch_Return_address_L);
 
-	dmaCopy((void *)p_patch_start, patchbuffer, p_patch_end - p_patch_start);
+	dmaCopy((void *)p_patch_start, patchbuffer, byte_span(p_patch_start, p_patch_end));
 	*(vu32 *)(patchbuffer + Return_address_offset) = Return_address;  //修改gba_sleep_patch_bin里面的返回地址
 
 	u16 sleep_key, reset_key;
@@ -546,9 +548,9 @@ static void Patch_RTS_Cheat(u32 *Data)
 	u8 *p_patch_Return_address_L = (u8 *)RTS_Return_address_L;
 
 	u8 *patchbuffer = (u8 *)_UnusedVram;
-	u32 Return_address_offset = p_patch_Return_address_L - p_patch_start;
+	u32 Return_address_offset = byte_span(p_patch_start, p_patch_Return_address_L);
 
-	dmaCopy((void *)p_patch_start, patchbuffer, p_patch_end - p_patch_start);
+	dmaCopy((void *)p_patch_start, patchbuffer, byte_span(p_patch_start, p_patch_end));
 	*(vu32 *)(patchbuffer + Return_address_offset) = Return_address;  //modify gba_sleep_patch_bin return address
 
 	if (spend_address != 0x0) {
@@ -943,7 +945,7 @@ void Make_pat_file(TCHAR *gamefilename)
 	u32 written;
 	u32 w_buffer[16];
 
-	res = f_mkdir("/PATCH");
+	f_mkdir("/PATCH");  // (it may be there already: f_chdir says)
 	res = f_chdir("/PATCH");
 
 	memset(w_buffer, 0x00, sizeof(w_buffer));
@@ -955,7 +957,7 @@ void Make_pat_file(TCHAR *gamefilename)
 		res = f_open(&gfile, patnamebuf, FA_WRITE | FA_OPEN_ALWAYS);
 		if (res == FR_OK) {
 			f_lseek(&gfile, 0x0000);
-			res = f_write(&gfile, (void *)iPatchInfo2, sizeof(iPatchInfo2), (UINT *)&written);
+			f_write(&gfile, (void *)iPatchInfo2, sizeof(iPatchInfo2), (UINT *)&written);
 			w_buffer[0] = is_NORpatch;
 			w_buffer[1] = windows_offset;
 			w_buffer[2] = is_Nes;
@@ -974,11 +976,11 @@ void Make_pat_file(TCHAR *gamefilename)
 			w_buffer[14] = pat_rom_crc;
 			w_buffer[15] = cheats_dropped;  // Torii: the cheats left out, and how much they needed
 
-			res = f_write(&gfile, (void *)w_buffer, sizeof(w_buffer), (UINT *)&written);
+			f_write(&gfile, (void *)w_buffer, sizeof(w_buffer), (UINT *)&written);
 			f_close(&gfile);
 		}
 	}
-	res = f_chdir("/");
+	f_chdir("/");
 }
 //------------------------------------------------------------------
 // A GBA game's save type and boot mode are in its record (gamerec.h), in its
@@ -1164,8 +1166,6 @@ void Patch_SpecialROM_sleepmode(void)
 		Add2(0x292BC / 4, 0x63484916);
 		break;
 	case 0x50495742:  //2255 - Winx Club(EU)
-		Add2(0xB22C / 4, 0x49296348);
-		break;
 	case 0x45495742:  //2301 - Winx Club(US)
 		Add2(0xB22C / 4, 0x49296348);
 		break;
@@ -1226,6 +1226,8 @@ void Patch_SpecialROM_sleepmode(void)
 		break;
 	case 0x45534341:  //2117 - Casper(US)
 		Add2(0xAD64 / 4, 0x494D6345);
+		break;
+	default:
 		break;
 	}
 }
@@ -1291,6 +1293,8 @@ void Patch_SpecialROM_TrimSize(void)
 	case 0x50504C42:  //2745 - 2 Games in 1 - Lion King, The + Disney Princess(EU)
 	case 0x50425742:  //2780 - 2 Games in 1 - Disney Princess + Brother Bear(EU)
 		iTrimSize = 0x738000;
+		break;
+	default:
 		break;
 	}
 }

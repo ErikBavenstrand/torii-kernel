@@ -800,7 +800,7 @@ static int slot_row(uint32_t k)
 static int row_greyed(uint32_t r)
 {
 	if (m.page == PAGE_MENU)
-		return m.greyed[r];
+		return r < ROW_KINDS && m.greyed[r];  // (the menu's rows are each kind once: r < m.rows <= ROW_KINDS)
 	if (m.page == PAGE_SAVE)
 		return 0;
 	if (m.page == PAGE_LOAD)

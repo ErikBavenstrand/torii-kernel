@@ -441,7 +441,7 @@ static int move_slot_files(const char *src_dir, const char *dst_dir, const char 
 				break;
 			const char *rest;
 			u32 n = orphanplan_slot_of(W->fno.fname, &rest);
-			if (!n || (W->fno.fattrib & AM_DIR) || n != strlen(x) || strncasecmp(W->fno.fname, x, n))
+			if (!n || (W->fno.fattrib & AM_DIR) || n != strlen(x) || strncasecmp(W->fno.fname, x, n) != 0)
 				continue;
 			if (so_snprintf(W->e, SO_PATH, "%s/%s", src_dir, W->fno.fname) >= SO_PATH ||
 			    so_snprintf(W->f, SO_PATH, "%s/%s%s", dst_dir, y, rest) >= SO_PATH)
@@ -578,17 +578,20 @@ static int relink_steps(const struct orphanplan_job *job)
 		return r;
 	if (exists(W->a) == 1) {
 		so_snprintf(W->g, SO_PATH, "%s/x", W->b);
-		if ((r = make_parents(W->g)))
+		r = make_parents(W->g);
+		if (r != 0)
 			return r;
 	}
 	for (u32 i = 0; i < job->n; i++) {
-		if ((r = move_slot_files(W->a, W->b, job->x[i], job->y[i])))
+		r = move_slot_files(W->a, W->b, job->x[i], job->y[i]);
+		if (r != 0)
 			return r;
 		if (so_snprintf(W->e, SO_PATH, "%s/%s", W->c, job->x[i]) >= SO_PATH ||
 		    so_snprintf(W->f, SO_PATH, "%s/%s", W->d, job->y[i]) >= SO_PATH)
 			return ORPHAN_PATH;
 		if (exists(W->e) == 1) {
-			if ((r = move_tree(W->e, W->f)))
+			r = move_tree(W->e, W->f);
+			if (r != 0)
 				return r;
 			cutpoint("orphan: history moved");
 		}
@@ -602,7 +605,8 @@ static int relink_steps(const struct orphanplan_job *job)
 		if (t < 0)
 			return ORPHAN_CARD;
 		if (t == 0) {
-			if ((r = move(W->e, W->f)))
+			r = move(W->e, W->f);
+			if (r != 0)
 				return r;
 		} else if (f_unlink_alias(W->e, W->f) != FR_OK && f_unlink(W->e) != FR_OK) {
 			// (A cut rename leaves two names on one chain: the first call drops the old
@@ -627,12 +631,14 @@ static int trash_steps(const struct orphanplan_job *job)
 	    so_snprintf(W->f, SO_PATH, "%s/backups%s", job->to, job->from) >= SO_PATH)
 		return ORPHAN_PATH;
 	if (exists(W->a) == 1) {
-		if ((r = move_tree(W->a, W->e)))
+		r = move_tree(W->a, W->e);
+		if (r != 0)
 			return r;
 		cutpoint("orphan: saves in the trash");
 	}
 	if (exists(W->c) == 1) {
-		if ((r = move_tree(W->c, W->f)))
+		r = move_tree(W->c, W->f);
+		if (r != 0)
 			return r;
 		cutpoint("orphan: history in the trash");
 	}
@@ -762,7 +768,8 @@ int saveorphan_relink(const char *from, const char *to, u32 *renamed)
 	if (!e)
 		return ORPHAN_NO_SOURCE;
 	u32 n, used;
-	if ((r = collect_names(&n, &used)))
+	r = collect_names(&n, &used);
+	if (r != 0)
 		return r;
 	struct taken_ctx ctx = {0, 0};
 	u32 changed = 0;
@@ -772,7 +779,7 @@ int saveorphan_relink(const char *from, const char *to, u32 *renamed)
 			return ctx.error ? ctx.error : ORPHAN_PATH;
 		if (ctx.error)
 			return ctx.error;
-		if (strcmp(picked, W->x[i])) {
+		if (strcmp(picked, W->x[i]) != 0) {
 			u32 len = (u32)strlen(picked);
 			if (used + len + 1 > SO_NAMES_BYTES)
 				return ORPHAN_PATH;
@@ -799,7 +806,8 @@ int saveorphan_relink(const char *from, const char *to, u32 *renamed)
 		tlog("orphan: the plan for %s does not fit its journal", from);
 		return ORPHAN_PATH;
 	}
-	if ((r = journal_write(len)))
+	r = journal_write(len);
+	if (r != 0)
 		return r;
 	W->jbuf[len] = 0;
 	r = orphanplan_read(W->jbuf, len, &W->job) ? relink_steps(&W->job) : ORPHAN_CARD;
@@ -858,7 +866,8 @@ int saveorphan_trash(const char *from)
 	u32 len = orphanplan_write(W->jbuf, SO_JBUF, ORPHANPLAN_TRASH, from, trash, NULL, NULL, 0);
 	if (!len)
 		return ORPHAN_PATH;
-	if ((r = journal_write(len)))
+	r = journal_write(len);
+	if (r != 0)
 		return r;
 	W->jbuf[len] = 0;
 	r = orphanplan_read(W->jbuf, len, &W->job) ? trash_steps(&W->job) : ORPHAN_CARD;
