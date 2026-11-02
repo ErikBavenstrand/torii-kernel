@@ -6,6 +6,21 @@ git log, not here.
 
 ## Unreleased
 
+- **Fixed:** the GB, GBC and NES cheats' review findings. Settings' clean-up
+  took every code of an orphaned GB, GBC or NES cheat file (its game renamed or
+  deleted) for an unreadable GBA one; it now tells a file's console by its
+  codes' shape and leaves such files alone. A NES six-letter Game Genie no
+  longer patches the fixed last bank through a switchable window (mappers 1,
+  2, 71, 94; MMC3's last two). Renaming a GB, GBC or NES game moves its cheat
+  files and deleting it removes them. A launch enforces the poke table's
+  budget after a file edit and says what it left out in a dialog ("N cheats or
+  lines weren't applied"), which also counts a Game Genie line that patched
+  nothing; a GB code on a checksum byte says it stays unpatched, and a byte
+  the loader put past its 8 MB window (the end of an 8 MB ROM) isn't patched.
+  A NES raw write to the ROM or a register can't run (it was unreadable), and
+  the cheat screen's reason names cart RAM, video RAM, the ROM or an unknown
+  GameShark type. (aa3a9854)
+
 - **Added:** typing codes for GB, GBC and NES games. + Add code and Edit code
   are back on their cheat screens, with a keypad of their own: GB codes take
   hex digits and `-` (the `:` key becomes `-`), NES codes the hex digits and
