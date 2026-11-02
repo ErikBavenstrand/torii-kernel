@@ -853,7 +853,7 @@ def section(name, guide):
     return add
 
 
-@section("Heal", "Heals your party, as a Pokémon Center does.")
+@section("Heal party", "Heals your party, as a Pokémon Center does.")
 def heal_section(m, back):
     s = m.s
     s.label("heal")
@@ -1012,7 +1012,7 @@ def warp_section(m, back):
 
 
 @section(
-    "Gifts",
+    "Gift Pokémon",
     "The game's gift Pokémon and eggs, again: the starters, fossils, Castform, Beldum, the Wynaut egg, and the events' Surfing Pichu egg, Jirachi and Celebi. ALTERING CAVE picks which Pokémon live in the cave on Route 103.",
 )
 def gifts_section(m, back):
@@ -1128,7 +1128,7 @@ def evolve_section(m, back):
 
 
 @section(
-    "Legends",
+    "Legendaries again",
     "Brings back a legendary Pokémon you defeated or caught, in its lair (a REGI's opened). "
     "GROUDON and KYOGRE wait in a cave on the route named, while its weather lasts. The roaming "
     "LATIAS or LATIOS roams again.",
@@ -1201,7 +1201,7 @@ def legends_section(m, back):
 
 
 @section(
-    "Tickets",
+    "Event tickets",
     "The event tickets: Eon, Aurora, Mystic and Old Sea Map. The ferry in Lilycove takes you once "
     "you are the Champion; before that, Menu: Warp's ISLANDS does.",
 )
@@ -1231,7 +1231,7 @@ def tickets_section(m, back):
 @section(
     "Unlock",
     "All 8 badges, all 14 Frontier symbols, every town on the FLY map (and the Battle Frontier), "
-    "or a complete National Pokédex.",
+    "or a complete National Pokédex. Saved with your game: there is no undo.",
 )
 def unlock_section(m, back):
     s = m.s
@@ -1368,8 +1368,8 @@ def cheats():
             "Menu",
             "Menu: Open with L+R+B",
             vba(*Mixed(base, None).lines),
-            "Hold L and R, then press B. Lists the Menu sections you picked: "
-            "pick this and any of them. UP/DOWN move, LEFT/RIGHT a page, A chooses, B goes back.",
+            "Hold L and R, then press B while walking. Lists the Menu sections you picked; pick at "
+            "least one. UP/DOWN move, LEFT/RIGHT a page, A picks, B goes back.",
             "hold L+R+B",  # field.c's (ROM patches only): shown, never a gate
         )
     )
@@ -1393,7 +1393,7 @@ def cheats():
     )
     add(
         "Money",
-        "Max coins",
+        "Max Game Corner coins",
         vba(f"[03005D8C]+0494:270F^{KEY}"),
         "Keeps your Game Corner coins at 9,999. Needs the Coin Case.",
     )
@@ -1405,7 +1405,13 @@ def cheats():
     )
     add(
         "Money",
-        "Shopping costs 1",
+        "Max Soot Sack ash",
+        vba(f"[03005D8C]+{var_offset(0x4048):04X}:270F"),  # VAR_ASH_GATHER_COUNT
+        "Keeps your Soot Sack at 9,999 ash, for the Glass Workshop's flutes on Route 113. Needs the Soot Sack.",
+    )
+    add(
+        "Money",
+        "Shop items cost 1",
         vba(*Mixed(shop_costs_1(), None).lines),
         "Every item and decoration in a shop costs 1 apiece, as the list shows. Selling pays as "
         "before.",
@@ -1485,7 +1491,7 @@ def cheats():
     )
     add(  # PokemonUseItemEffects' two EV checks: 100 a stat becomes 255; the 510 total stays
         "Pokémon",
-        "Vitamins up to 255",
+        "Vitamins up to 255 EVs",
         rom_code(
             [
                 (a + d, v)
@@ -1499,18 +1505,27 @@ def cheats():
     )
     add(
         "Pokémon",
-        "Pokérus when caught",
+        "Pokérus on caught Pokémon",
         rom_code(pokerus()),
         "Pokémon you catch have Pokérus: they earn double EVs.",
         "launch",
     )
     add(
         "Pokémon",
-        "Eggs hatch fast",
-        vba(
-            "[03005D8C]+314C:FE"
-        ),  # the Day Care's stepCounter: every step counts as its 255th
-        "Eggs hatch after a few dozen steps.",
+        "Free Day Care",
+        # PrepareDaycareCostStringForSelectedMon: cost = 0, not 100 + 100 a level
+        rom_code([(0x0806FE9E, 0x2400), (0x0806FEA0, 0x46C0), (0x0806FEA2, 0x46C0)]),
+        "Taking a Pokémon back from the Day Care costs nothing.",
+        "launch",
+    )
+    add(
+        "Pokémon",
+        "Day Care makes eggs fast",
+        rom_code(
+            [(0x08070B0C, 0x46C0)]
+        ),  # TryProduceOrHatchEgg: roll every step, not every 256th
+        "The Day Care rolls for an egg on every step instead of every 256th. Parents must still get along.",
+        "launch",
     )
     add(
         "Pokémon",
@@ -1523,12 +1538,11 @@ def cheats():
     )
     add(
         "Pokémon",
-        "Day Care makes eggs fast",
-        rom_code(
-            [(0x08070B0C, 0x46C0)]
-        ),  # TryProduceOrHatchEgg: roll every step, not every 256th
-        "The Day Care rolls for an egg on every step instead of every 256th. Parents must still get along.",
-        "launch",
+        "Eggs hatch fast",
+        vba(
+            "[03005D8C]+314C:FE"
+        ),  # the Day Care's stepCounter: every step counts as its 255th
+        "Eggs in your party hatch after a few dozen steps.",
     )
 
     # Battle (D28-D30)
@@ -1570,7 +1584,7 @@ def cheats():
     )
     add(
         "Battle",
-        "No trainer challenges",
+        "Trainers don't challenge you",
         rom_code([(0x080B3D6C, 0xE038)]),
         "Trainers who see you don't challenge you. Talk to one to battle.",
         "launch",
@@ -1593,8 +1607,7 @@ def cheats():
                     (0x0804A68C, 0x6018),
                 ]
             ),
-            f"Battles give x{mult} EXP, at most 14,335 a Pokémon before the trainer and trade bonuses. Replaces "
-            "the Lucky Egg's bonus.",
+            f"Battles give x{mult} EXP, up to 14,335 a Pokémon. Replaces the Lucky Egg's bonus.",
             "launch",
         )
     add(
@@ -1613,7 +1626,7 @@ def cheats():
     )
     add(
         "Battle",
-        "Always escape",
+        "Always escape wild battles",
         rom_code([(0x0803EE12, 0x2701)]),  # TryRunFromBattle: effect = 1, not its roll
         "Running from a wild battle always works. Trainers and trapping moves or abilities still stop you.",
         "launch",
@@ -1623,6 +1636,22 @@ def cheats():
         "Pokémon always obey",
         rom_code(words([(0x08045CBC, 0x47702000)])),  # IsMonDisobedient returns 0
         "Traded and event Pokémon obey you whatever your badges.",
+        "launch",
+    )
+    add(
+        "Battle",
+        "Gym leader rematches",
+        # trainerRematches[REMATCH_ROXANNE..REMATCH_JUAN]: each leader ready
+        vba(*(f"[03005D8C]+{0x9CA + i:04X}:01" for i in range(65, 73))),
+        "Talk to a gym leader you've beaten for a rematch. It's a double battle, so bring two Pokémon; their team "
+        "gets stronger each time.",
+    )
+    add(
+        "Battle",
+        "Any Pokémon in the Frontier",
+        # AppendIfValid and GetBattleEntryEligibility skip gFrontierBannedSpecies
+        rom_code([(0x081A3F32, 0xE00F), (0x081B8630, 0xE00B)]),
+        "Legendaries and any other Pokémon may enter every Battle Frontier facility.",
         "launch",
     )
 
@@ -1700,14 +1729,6 @@ def cheats():
     )
     add(
         "Overworld",
-        "Free Day Care",
-        # PrepareDaycareCostStringForSelectedMon: cost = 0, not 100 + 100 a level
-        rom_code([(0x0806FE9E, 0x2400), (0x0806FEA0, 0x46C0), (0x0806FEA2, 0x46C0)]),
-        "Taking a Pokémon back from the Day Care costs nothing.",
-        "launch",
-    )
-    add(
-        "Overworld",
         "Walk through walls (hold R)",
         vba(*Mixed(walls(), None).lines),
         "Hold R to walk through walls, people and water. Let go only on normal ground; if stuck, hold R and walk back.",
@@ -1720,31 +1741,16 @@ def cheats():
         "Use Cut, Surf, Fly and the other field moves from the POKéMON menu without their badges.",
         "launch",
     )
-    add(
-        "Overworld",
-        "Gym leader rematches",
-        # trainerRematches[REMATCH_ROXANNE..REMATCH_JUAN]: each leader ready
-        vba(*(f"[03005D8C]+{0x9CA + i:04X}:01" for i in range(65, 73))),
-        "Talk to a gym leader you've beaten for a rematch: a double battle, their team stronger each time.",
-    )
-    add(
-        "Overworld",
-        "Any Pokémon in the Frontier",
-        # AppendIfValid and GetBattleEntryEligibility skip gFrontierBannedSpecies
-        rom_code([(0x081A3F32, 0xE00F), (0x081B8630, 0xE00B)]),
-        "Legendaries and any other Pokémon may enter every Battle Frontier facility.",
-        "launch",
-    )
 
-    # Minigames (D31, D43)
+    # Safari & Contests (D31, D43)
     add(
-        "Minigames",
+        "Safari & Contests",
         "Endless Safari Zone",
         vba("0203A04C:1E", "0203A04E:01F4"),  # gNumSafariBalls, sSafariZoneStepCounter
         "In the Safari Zone you keep 30 balls and 500 steps.",
     )
     add(
-        "Minigames",
+        "Safari & Contests",
         "Safari Pokémon never flee",
         rom_code([(0x0813334E, 0xE011)]),  # Cmd_if_random_safari_flee: never jump
         "Pokémon in the Safari Zone never run away.",
@@ -1753,14 +1759,14 @@ def cheats():
     # the Pokéblock case's last slot (40, 8 bytes each): gold, every flavor
     # 255, feel 1
     add(
-        "Minigames",
+        "Safari & Contests",
         "Max Pokéblock",
         vba("[03005D8C]+0980:FFFFFF0E", "[03005D8C]+0984:0001FFFF"),
         "Your Pokéblock case's last slot holds a gold Pokéblock with every flavor at 255, back after each use. "
         "A feeding or two maxes every condition.",
     )
     add(
-        "Minigames",
+        "Safari & Contests",
         "Quick contests",
         rom_code(
             [(0x080DA572, 0x2801)]
@@ -1769,19 +1775,13 @@ def cheats():
         "launch",
     )
     add(
-        "Minigames",
+        "Safari & Contests",
         "Max contest score",
         # gContestMonRound1Points[3], the player's in a contest on the cart:
         # 255 + (255 + 255 + 255) / 2, every condition and sheen at 255
         vba("02039F06:027D"),
         "Your Pokémon's first-round contest score is the most there is, as if every condition and its sheen "
         "were maxed.",
-    )
-    add(
-        "Minigames",
-        "Full Soot Sack",
-        vba(f"[03005D8C]+{var_offset(0x4048):04X}:270F"),  # VAR_ASH_GATHER_COUNT
-        "Your Soot Sack holds 9,999 ash, for the Glass Workshop on Route 113.",
     )
     return out
 
