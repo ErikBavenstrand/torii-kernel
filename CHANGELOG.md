@@ -10,7 +10,7 @@ git log, not here.
   `constParameterCallback` on job steps and text providers, whose parameter
   types the callback types fix) are marked beside the code with their reason,
   so the baseline is empty and CI fails on any finding. Comments only; the
-  binary is the same.
+  binary is the same. (4a048da6)
 
 ## v0.9.21
 
