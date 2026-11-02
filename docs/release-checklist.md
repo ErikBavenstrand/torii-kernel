@@ -177,6 +177,29 @@ timing or a real game's saves. Do these on the cart with Logging on Debug.
 | The long-path refusal | a ROM in a folder tree whose save path passes 251 bytes: the launch refuses with the path-too-long message, nothing written |
 | Save-type change | change a game's save type from EEPROM 8K to 512 in Game info: the old file is kept as a backup for good, the notice shows once |
 
+### GB, GBC and NES cheats
+
+Never run on a real cart yet (emulator only). Put a game of each console on the
+card, with its cheats as `/torii/cheats/<rom path without extension>.cht`
+(`just cheats` fetches GBA only; copy libretro's files, or type a code: the
+game's popup, Cheats, + Add code). With Logging on Debug, each launch logs
+`launch:` and `cheat:` lines for the codes it applied or left out.
+
+| Check | How |
+|---|---|
+| Game Genie, GB | a GB game and one libretro Game Genie code (`XXX-YYY-ZZZ`, e.g. an infinite lives code): pick it, launch. The effect shows, and the game otherwise plays and saves as before |
+| Game Genie, GBC | the same with a GBC game: the effect shows, the colours are right, no black screen |
+| A banked game | a code with a compare byte on a game with several ROM banks (MBC1/3/5): only the intended bank changes, so other levels and the menu work as usual |
+| Game Genie, NES | a NES game and a six- or eight-letter code (lives, speed): it applies at the start and the game runs at full speed |
+| NES raw poke | a `0754:00`-style code from libretro's NES list: the value holds while you play, and turning the pick off and launching again plays without it |
+| GameShark, GB | a `01VVAAAA` code (infinite lives or money) in a GB game: the value holds for minutes of play; the log lists it as applied |
+| GameShark, GBC | the same in a GBC game, and one `90`-`97` WRAM-bank code if the game's list has one |
+| Speed and sound | a busy scene with no cheats, then with 20 or more RAM pokes picked: no new slowdown, no crackle (each poke costs about 150 cycles of a 280,896 frame in Jagoomba, 60 in PocketNES) |
+| The save stays clean | play a GB game with a battery save with a poke picked, save in game, then power off and launch it with no cheats: its save has none of the cheat's changes |
+| Greyed codes | codes of kinds that don't run here (cart RAM, `8B`, ROM or I/O writes) show greyed with the reason, and the game starts anyway |
+| Typing a code | + Add code in a GB, GBC and NES game: the keypad takes digits and hyphens (GB), or hex and `:` with the GG key's letters (NES); a wrong code is refused with its message |
+| Clean-up leaves them | Settings, Clean up cheats doesn't delete a GB, GBC or NES cheat file |
+
 ### The v0.9 firmware update
 
 The update writes only to an allowlisted LX16 cart on older firmware. On an
