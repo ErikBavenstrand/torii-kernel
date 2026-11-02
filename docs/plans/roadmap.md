@@ -113,7 +113,6 @@ The UX reviews' open proposals (`docs/design/v0.5/ux-review.md`, `settings-ux-re
   - Sonic Advance and Moto Racer replace the IRQ hook, and HP Quidditch blocks the menu. These are compat's three known failures.
 - **Screenshots:** without the game's RAM copy of its registers, a scrolled tile screen sits shifted. The BG matrices, BLDY, MOSAIC and window bounds can't be read back, so fades and Mode 7 roads come out wrong. A shot taken without the cart's clock is named by the filing's time.
 - **Static analysis:** CI gates on `tools/analyze-baseline.txt` (8 findings: cppcheck's `constParameterCallback` on job steps and text providers, whose `struct job *` and `void *ctx` parameters the callback types (`job_step`, the text and count providers) fix; the other 89 were fixed in the code or, for a false alarm, silenced beside the code with its reason). A new finding fails CI.
-- **States and power-off:** a save state lives in unbattered cart SRAM until Back to Torii files it, and is lost on a power-off. Pointing the FPGA's `/RTS` write-back at a per-game file would change that; it is research nobody has planned, and a crosslinked FAT would take the write-back into two files.
 - **Hardware:**
   - The session record in cart RAM page `0xF0` doesn't survive a power cycle.
   - EZ-Flash's loader installs only the first 3 MB of `ezkernelnew.bin` (`tools/omega_image.py` enforces it).
