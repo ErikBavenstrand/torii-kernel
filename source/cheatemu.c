@@ -70,8 +70,9 @@ static int gb_line(const char *s, u32 n, struct emucheat *e)
 	return 0;
 }
 
-// The same for a NES code: Game Genie letters (6 or 8), 1; a raw "AAAA:VV"
-// or "AAAA?CC:VV" RAM write, 2; else 0
+// The same for a NES code: Game Genie letters (6 or 8), or a raw "AAAA:VV"
+// RAM write, 1 and *e filled; else 0 ("AAAA?CC:VV", a write that waits for a
+// byte, isn't in libretro's files and isn't read)
 static int nes_line(const char *s, u32 n, struct emucheat *e)
 {
 	if (n == 6 || n == 8) {
@@ -97,22 +98,73 @@ static int nes_line(const char *s, u32 n, struct emucheat *e)
 		e->value = (u8)value;
 		return 1;
 	}
-	if (n == 7 || n == 10) {
-		u32 colon = n - 3;
-		if (s[colon] != ':')
+	if (n == 7) {  // AAAA:VV, a RAM write
+		if (s[4] != ':')
 			return 0;
-		for (u32 i = 0; i < n; i++)
-			if (i != colon && !(n == 10 && i == 4 && s[i] == '?') && hex_digit(s[i]) < 0)
+		u32 addr = 0, value = 0;
+		for (u32 i = 0; i < 7; i++) {
+			if (i == 4)
+				continue;
+			int h = hex_digit(s[i]);
+			if (h < 0)
 				return 0;
-		return 2;
+			if (i < 4)
+				addr = addr << 4 | (u32)h;
+			else
+				value = value << 4 | (u32)h;
+		}
+		u16 folded;
+		if (!cheatemu_nes_poke_addr(addr, &folded))
+			return 0;  // the ROM's, the PPU's or a register: no RAM write
+		e->kind = CHEATEMU_POKE;
+		e->addr = folded;
+		e->value = (u8)value;
+		e->has_compare = 0;
+		e->compare = 0;
+		return 1;
 	}
 	return 0;
+}
+
+u32 cheatemu_nes_poke_addr(u32 addr, u16 *folded)
+{
+	if (addr < 0x2000) {
+		*folded = (u16)(addr & 0x7FF);
+		return 1;
+	}
+	if (addr >= 0x6000 && addr < 0x8000) {
+		*folded = (u16)addr;
+		return 1;
+	}
+	return 0;
+}
+
+u32 cheatemu_find_table(const u8 *image, u32 n)
+{
+	u32 found = 0xFFFFFFFFu;
+	// The first word of the magic, little-endian as the image's bytes are (the image is 4-byte aligned)
+	const u32 first = (u32)(u8)TORII_CHEATS_MAGIC[0] | (u32)(u8)TORII_CHEATS_MAGIC[1] << 8 |
+			  (u32)(u8)TORII_CHEATS_MAGIC[2] << 16 | (u32)(u8)TORII_CHEATS_MAGIC[3] << 24;
+	for (u32 at = 0; at + sizeof(struct torii_cheats) <= n; at += 4) {
+		// A word at a time (a byte read from the cart's ROM is slow)
+		if (*(const u32 *)(const void *)(image + at) != first)
+			continue;
+		u32 k = 4;
+		while (k < 8 && image[at + k] == (u8)TORII_CHEATS_MAGIC[k])
+			k++;
+		if (k < 8)
+			continue;
+		if (found != 0xFFFFFFFFu)
+			return 0xFFFFFFFFu;
+		found = at;
+	}
+	return found;
 }
 
 u8 cheatemu_decode(u32 console, const char *code, u32 len, struct emucheat *out, u32 max, u32 *n)
 {
 	u32 count = 0;
-	int unsupported = 0;
+	int unsupported = 0, pokes_ok = console == CHEATEMU_NES;
 	*n = 0;
 	if (console != CHEATEMU_GB && console != CHEATEMU_NES)
 		return CHEATEMU_UNREADABLE;
@@ -132,6 +184,10 @@ u8 cheatemu_decode(u32 console, const char *code, u32 len, struct emucheat *out,
 		if (!kind)
 			return CHEATEMU_UNREADABLE;
 		if (kind == 2) {
+			unsupported = 1;
+			continue;
+		}
+		if (e.kind == CHEATEMU_POKE && !pokes_ok) {
 			unsupported = 1;
 			continue;
 		}

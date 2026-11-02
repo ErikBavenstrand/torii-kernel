@@ -1,6 +1,7 @@
 // A game's cheat file on the card, and its cheats at a launch (cheatstore.h).
 #include "cheatstore.h"
 
+#include <stddef.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -14,6 +15,7 @@
 #include "ff.h"
 #include "ingame.h"
 #include "ingame_abi.h"
+#include "emulators.h"
 #include "library.h"
 #include "namesdb.h"
 #include "lang.h"
@@ -2164,7 +2166,26 @@ struct emu_ctx {
 	struct cheatemu_rom rom;
 	struct cheatemu_done done;
 	u32 lines;
+	int rom_ok;  // the image reads as a game its patches can go in
+	u32 table;  // the poke table's offset in the emulator's image, 0xFFFFFFFF: none
+	u32 pokes, left_out;
 };
+
+// A poke into the emulator's table, at the next place (the count is written after them all)
+static void emu_poke(struct emu_ctx *c, const struct emucheat *e)
+{
+	if (c->table == 0xFFFFFFFFu || c->pokes >= TORII_CHEATS_MAX) {
+		c->left_out++;
+		return;
+	}
+	u32 at = c->table + (u32)offsetof(struct torii_cheats, e) + c->pokes * (u32)sizeof(struct torii_cheat);
+	// kind, bank, addr, value, pad: four halfwords
+	*image_at(&c->im, at - c->im.base) = (u16)(1 | e->compare << 8);
+	*image_at(&c->im, at + 2 - c->im.base) = e->addr;
+	*image_at(&c->im, at + 4 - c->im.base) = e->value;
+	*image_at(&c->im, at + 6 - c->im.base) = 0;
+	c->pokes++;
+}
 
 static void emu_one(const struct cheat_patch *pt, u16 number, void *ctx)
 {
@@ -2173,6 +2194,12 @@ static void emu_one(const struct cheat_patch *pt, u16 number, void *ctx)
 	struct cheatemu_done before = c->done;
 	cheatemu_from_patch(pt, &e);
 	c->lines++;
+	if (e.kind == CHEATEMU_POKE) {
+		emu_poke(c, &e);
+		return;
+	}
+	if (!c->rom_ok)
+		return;
 	cheatemu_patch(&c->rom, &e, image_get, image_set, &c->im, EMU_PATCHES_MAX, &c->done);
 	if (c->done.patched == before.patched)
 		tlog("cheats: cheat %u (%s): line %04X patches nothing (%lu with another byte, %lu in the "
@@ -2191,8 +2218,7 @@ void cheatstore_launch_emu(const char *rom_path, u32 console, u32 rom_start, u32
 		tlog_error("cheats: %s: its patches weren't kept before the load: none written", rom_path);
 		return;
 	}
-	struct emu_ctx c = {{rom_start, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, 0};
-	int ok;
+	struct emu_ctx c = {{rom_start, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, 0, 0, 0xFFFFFFFFu, 0, 0};
 	if (console == CHEATEMU_NES) {
 		u8 hdr[16];
 		for (u32 i = 0; i < 16; i += 2) {
@@ -2200,20 +2226,28 @@ void cheatstore_launch_emu(const char *rom_path, u32 console, u32 rom_start, u32
 			hdr[i] = (u8)h;
 			hdr[i + 1] = (u8)(h >> 8);
 		}
-		ok = cheatemu_rom_nes(&c.rom, hdr, size);
+		c.rom_ok = cheatemu_rom_nes(&c.rom, hdr, size);
+		c.table = cheatemu_find_table(pocketnes_gba, pocketnes_gba_size);
 	} else {
-		ok = cheatemu_rom_gb(&c.rom, size);
+		c.rom_ok = cheatemu_rom_gb(&c.rom, size);
+		c.table = cheatemu_find_table(jagoombacolor_gba, jagoombacolor_gba_size);
 	}
-	if (!ok) {
+	if (!c.rom_ok)
 		tlog("cheats: %s: not a ROM its patches can go in (%lu bytes): none written", rom_path,
 		     (unsigned long)size);
-	} else {
-		kept_each(emu_one, &c);
+	kept_each(emu_one, &c);
+	if (c.pokes) {
+		*image_at(&c.im, c.table + (u32)offsetof(struct torii_cheats, count) - c.im.base) = (u16)c.pokes;
+		tlog("cheats: %lu pokes written to the emulator's table", (unsigned long)c.pokes);
+	}
+	if (c.left_out)
+		tlog("cheats: %lu pokes left out (%s)", (unsigned long)c.left_out,
+		     c.table == 0xFFFFFFFFu ? "the emulator has no table" : "its table is full");
+	if (c.rom_ok)
 		tlog("cheats: %lu lines made %lu patches in the game%s%s (%lu cycles)", (unsigned long)c.lines,
 		     (unsigned long)c.done.patched, c.done.limit ? ", some over the limit left out" : "",
 		     c.done.sampled ? ", some in the emulator's checksum left out" : "",
 		     (unsigned long)cycles_since(start));
-	}
 	if (c.im.page)
 		SetPSRampage(0);
 }
@@ -2333,7 +2367,7 @@ static int launch_pass(const char *rom_path, int quick)
 				} else {
 					flags = INGAME_CHEAT_ON |
 						(cs->work.n_patches ? INGAME_WHY_LOCKED : INGAME_WHY_NONE);
-					if (bytes) {
+					if (bytes && cs->work.console == CHEATEMU_GBA) {
 						memcpy((u8 *)gl_cheat_table + gl_cheat_bytes, cs->work.prog, bytes);
 						gl_cheat_bytes += bytes;
 						cost += cs->work.cost;

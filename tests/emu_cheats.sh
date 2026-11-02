@@ -27,7 +27,7 @@ new_cart() {
   rm -rf "$cart" && mkdir -p "$cart"
   case $file in
   *.gb) python3 tests/gb_rom.py "$cart/game" cheat ;;
-  *.nes) python3 tests/nes_rom.py "$cart/game" cheat ;;
+  *.nes) python3 tests/nes_rom.py "$cart/game" "${mode:-cheat}" ;;
   esac
   mkfs.fat -C -F 32 -n EMU "$cart/sd.img" 65536 >/dev/null
   mcopy -i "$cart/sd.img" "$cart/game" "::$file"
@@ -150,9 +150,45 @@ new_cart /Cheat.nes "$(cht Wrong "$(nes "$at" 16 33)")"
 play /Cheat.nes
 expect plain "nes genie with the wrong compare" "cheats: cheat 0 (Wrong): line"
 
-new_cart /Cheat.nes "$(cht Ram 0754:00)"
-play /Cheat.nes
-expect plain "nes raw code"
-grep -qF "cheat 0 (Ram): can't run here, left out" "$cart/kernel.log" || fail "nes raw: not left out with its reason"
+# --- NES raw RAM writes: the game (nes_rom.py poke) clears $0300 each frame and
+# shows red only while the cheat writes $55 there every frame
+mode=poke
+poke() {
+  printf 'cheats = %s\n\n' "$#"
+  local n=0
+  for code in "$@"; do
+    printf 'cheat%s_desc = "Poke %s"\ncheat%s_code = "%s"\ncheat%s_enable = true\n\n' "$n" "$n" "$n" "$code" "$n"
+    n=$((n + 1))
+  done
+}
 
+new_cart /Cheat.nes
+play /Cheat.nes
+expect plain "nes poke game without cheats"
+
+new_cart /Cheat.nes "$(poke 0300:55)"
+play /Cheat.nes
+expect red "nes raw poke, every frame" "cheats: 1 pokes written to the emulator's table"
+
+new_cart /Cheat.nes "$(poke 0300:56)"
+play /Cheat.nes
+expect plain "nes raw poke of another value"
+
+# a mirror of the RAM folds onto it
+new_cart /Cheat.nes "$(poke 0B00:55)"
+play /Cheat.nes
+expect red "nes raw poke at a RAM mirror" "cheats: 1 pokes written to the emulator's table"
+
+# several lines of one cheat and another cheat: all in the table, the last one red
+new_cart /Cheat.nes "$(poke '0311:01+0312:02' 0300:55)"
+play /Cheat.nes
+expect red "nes raw pokes in two cheats" "cheats: 3 pokes written to the emulator's table"
+
+# an address in the ROM, or a register, is no RAM write: the cheat is unreadable and left out
+new_cart /Cheat.nes "$(poke 8000:55)"
+play /Cheat.nes
+expect plain "nes raw poke to the ROM"
+grep -qF "cheat 0 (Poke 0): unreadable, left out" "$cart/kernel.log" || fail "nes raw ROM poke: not left out as unreadable"
+
+mode=cheat
 echo "PASS: Game Genie patches reach GB, GBC and NES games"

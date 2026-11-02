@@ -27,6 +27,7 @@ void test_safefile(void);
 void cut_scenario(void);
 void test_userdata_recent_store(void);
 void test_lang_packs(void);
+void test_emucheats_tables(void);
 void test_userdata_fav_store(void);
 void test_rename_file(void);
 void test_slotstore(void);

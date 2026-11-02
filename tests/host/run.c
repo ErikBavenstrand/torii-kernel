@@ -103,6 +103,7 @@ static const struct {
 	{"cheatemu_gb_patch", test_cheatemu_gb_patch},
 	{"cheatemu_nes_patch", test_cheatemu_nes_patch},
 	{"cheatemu_file", test_cheatemu_file},
+	{"cheatemu_table", test_cheatemu_table},
 	{"cheatkeys_parse", test_cheatkeys_parse},
 	{"cheatkeys_derive", test_cheatkeys_derive},
 	{"cheatkeys_text", test_cheatkeys_text},

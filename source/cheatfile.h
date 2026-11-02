@@ -54,6 +54,13 @@
 #define CHEATFILE_CYCLES_MAX (CHEAT_LOAD_MAX - CHEAT_LOAD(CHEAT_COST_CALL))
 #define CHEATFILE_PROG_MAX (CHEATFILE_BYTES_MAX / 4)  // a cheat's table words
 #define CHEATFILE_OPS_MAX 256      // a cheat's decoded ops
+// A RAM write of a GB, GBC or NES cheat takes this many words of the table
+// budget: 80 bytes, so the picks together hold at most TORII_CHEATS_MAX - 1
+// of them, as many as the emulator's table
+#define CHEATFILE_POKE_WORDS 20
+_Static_assert(CHEATFILE_POKE_WORDS * 4 * (TORII_CHEATS_MAX - 1) <= CHEATFILE_BYTES_MAX &&
+		       CHEATFILE_POKE_WORDS * 4 * TORII_CHEATS_MAX > CHEATFILE_BYTES_MAX,
+	       "the picked pokes fit the emulator's table");
 #define CHEATFILE_EMU_LINES 64     // a GB, GBC or NES cheat's lines (cheatemu.h); more is "too big"
 // A cheat's ROM patches (8 KB of ROM data): they are decoded straight into
 // the patch room (cheatfile_patch_room), not into ops

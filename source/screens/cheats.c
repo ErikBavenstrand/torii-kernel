@@ -1075,7 +1075,8 @@ static void detail_text(u32 at)
 	}
 	cs.key_w = (u8)(w + 8 < CS_KEY_W_MAX ? w + 8 : CS_KEY_W_MAX);
 	detail_pair(&n, STR_CHEATS_LABEL_STATE,
-		    c->picked ? S(STR_CHEATS_DETAIL_PICKED) : S(STR_CHEATS_DETAIL_NOT_PICKED));
+		    c->picked ? S(cs.emu ? STR_CHEATS_DETAIL_PICKED_EMU : STR_CHEATS_DETAIL_PICKED)
+			      : S(STR_CHEATS_DETAIL_NOT_PICKED));
 	if (cs.emu) {
 		// The kind of line is its own format: no row for it
 	} else if (c->detected != CHEAT_FMT_AUTO && c->detected <= CHEAT_FMT_TORII) {
@@ -1086,7 +1087,7 @@ static void detail_text(u32 at)
 		detail_pair(&n, STR_CHEATS_LABEL_FORMAT, S(STR_CHEATS_DETAIL_UNKNOWN));
 	}
 	if (c->status == CHEATFILE_OK && cs.emu) {
-		detail_pair(&n, STR_CHEATS_LABEL_RUNS, S(STR_CHEATS_DETAIL_RUNS));
+		detail_pair(&n, STR_CHEATS_LABEL_RUNS, S(c->bytes ? STR_CHEATS_DETAIL_POKES : STR_CHEATS_DETAIL_RUNS));
 	} else if (c->status == CHEATFILE_OK) {
 		if (c->bytes) {
 			SF(line, sizeof(line), STR_CHEATS_BUDGET, LN(share(c->bytes, c->cost)));

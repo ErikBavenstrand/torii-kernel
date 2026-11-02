@@ -527,6 +527,21 @@ static u8 decode_emu(struct cheatfile_work *w, const char *code, u32 len, struct
 			ps->at[i] = p;
 	}
 	w->n_patches = n;
+	// A poke is a RAM write the emulator runs each frame, from a table of
+	// TORII_CHEATS_MAX: it takes its share of the table budget as a word-sized
+	// stand-in (CHEATFILE_POKE_WORDS words each, so the picks together fit the
+	// emulator's table), which also makes the cheat "always on" in its details
+	u32 pokes = 0;
+	for (u32 i = 0; i < n; i++)
+		if (lines[i].kind == CHEATEMU_POKE) {
+			if ((pokes + 1) * CHEATFILE_POKE_WORDS > CHEATFILE_PROG_MAX)
+				return CHEATFILE_BIG;
+			w->prog[pokes * CHEATFILE_POKE_WORDS] =
+				(u32)lines[i].addr << 16 | (u32)lines[i].compare << 8 | lines[i].value;
+			memset(&w->prog[pokes * CHEATFILE_POKE_WORDS + 1], 0, (CHEATFILE_POKE_WORDS - 1) * sizeof(u32));
+			pokes++;
+		}
+	w->n_prog = pokes * CHEATFILE_POKE_WORDS;
 	return CHEATFILE_OK;
 }
 

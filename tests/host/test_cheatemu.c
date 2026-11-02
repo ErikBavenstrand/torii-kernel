@@ -10,6 +10,7 @@
 //  - GB: mGBA's GBCheatAddGameGenieLine (src/gb/cheats.c, which Torii's
 //    emu/mgba checkout holds), a different arrangement of the same code than
 //    cheatemu's (gambatte's: cartridge.cpp's applyGameGenie).
+#include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -126,10 +127,33 @@ void test_cheatemu_nes_genie(void)
 	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "SXIOPB", 6, &e, 1, &n), CHEATEMU_UNREADABLE);   // B isn't a letter
 	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "", 0, &e, 1, &n), CHEATEMU_UNREADABLE);
 	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "SXIOPO+SXIOPO", 13, &e, 1, &n), CHEATEMU_TOO_BIG);
-	// Raw RAM writes read, but don't run yet: all or nothing
-	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "0754:00+0756:01", 15, two, 4, &n), CHEATEMU_CANT_RUN);
-	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "0754:00+SXIOPO", 14, two, 4, &n), CHEATEMU_CANT_RUN);
-	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "0754?12:00", 10, two, 4, &n), CHEATEMU_CANT_RUN);
+	// Raw RAM writes: pokes at the folded address (0000-1FFF mirrors the 2 KB, 6000-7FFF the PRG-RAM)
+	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "0754:00+0756:01", 15, two, 4, &n), CHEATEMU_OK);
+	CHECK_EQ(n, 2);
+	CHECK_EQ(two[0].kind, CHEATEMU_POKE);
+	CHECK_EQ(two[0].addr, 0x0754);
+	CHECK_EQ(two[0].value, 0x00);
+	CHECK_EQ(two[1].addr, 0x0756);
+	CHECK_EQ(two[1].value, 0x01);
+	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "0B00:55", 7, two, 4, &n), CHEATEMU_OK);
+	CHECK_EQ(two[0].addr, 0x0300);
+	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "1FFF:ab", 7, two, 4, &n), CHEATEMU_OK);
+	CHECK_EQ(two[0].addr, 0x07FF);
+	CHECK_EQ(two[0].value, 0xAB);
+	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "6000:5A", 7, two, 4, &n), CHEATEMU_OK);
+	CHECK_EQ(two[0].addr, 0x6000);
+	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "7FFF:01", 7, two, 4, &n), CHEATEMU_OK);
+	CHECK_EQ(two[0].addr, 0x7FFF);
+	// A poke and a Game Genie in one cheat
+	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "0754:00+SXIOPO", 14, two, 4, &n), CHEATEMU_OK);
+	CHECK_EQ(n, 2);
+	CHECK_EQ(two[1].kind, CHEATEMU_GENIE);
+	// Not RAM: the PPU, the registers, the ROM; and the compare form, which libretro has none of
+	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "2000:00", 7, two, 4, &n), CHEATEMU_UNREADABLE);
+	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "4015:0F", 7, two, 4, &n), CHEATEMU_UNREADABLE);
+	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "5FFF:00", 7, two, 4, &n), CHEATEMU_UNREADABLE);
+	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "8000:00", 7, two, 4, &n), CHEATEMU_UNREADABLE);
+	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "0754?12:00", 10, two, 4, &n), CHEATEMU_UNREADABLE);
 	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "0754:0", 6, two, 4, &n), CHEATEMU_UNREADABLE);
 	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "$0D24206E", 9, two, 4, &n), CHEATEMU_UNREADABLE);
 }
@@ -489,7 +513,12 @@ void test_cheatemu_file(void)
 	load(CHEATEMU_NES, "cheat0_code = \"SXIOPO\"\ncheat1_code = \"0754:00\"\ncheat2_code = "
 			   "\"SZESPUVK\"\ncheat3_code = \"AEVYZLAE+ZEEXIPIE\"\n");
 	CHECK_EQ(cheats[0].status, CHEATFILE_OK);
-	CHECK_EQ(cheats[1].status, CHEATFILE_CANT_RUN);
+	CHECK_EQ(cheats[1].status, CHEATFILE_OK);  // a poke: in the table budget, not the patches'
+	CHECK_EQ(cheats[1].bytes, CHEATFILE_POKE_WORDS * 4);
+	CHECK(cheats[1].patches > 0);
+	CHECK_EQ(cheatfile_activation(&cheats[1]), CHEATKEYS_ALWAYS_ON);
+	CHECK(cheatfile_ungated(&cheats[1]));
+	CHECK_EQ(cheats[0].bytes, 0);
 	CHECK_EQ(cheats[2].status, CHEATFILE_OK);
 	CHECK_EQ(cheats[3].status, CHEATFILE_OK);
 	CHECK(cheats[3].patches >= cheats[0].patches);
@@ -500,5 +529,42 @@ void test_cheatemu_file(void)
 	strcat(text, "\"\n");
 	load(CHEATEMU_NES, text);
 	CHECK_EQ(cheats[0].status, CHEATFILE_BIG);
+	// The picked pokes fit the emulator's table: 63 of one-line cheats, not the 64th
+	static char many[64 * 40];
+	char *p = many;
+	for (u32 i = 0; i < 64; i++)
+		p += sprintf(p, "cheat%u_code = \"%04X:01\"\n", i, (unsigned)(0x300 + i));
+	load(CHEATEMU_NES, many);
+	CHECK_EQ(file.count, 64);
+	u32 picked = 0;
+	for (u32 i = 0; i < 64; i++)
+		picked += (u32)cheatfile_toggle(&file, i);
+	CHECK_EQ(picked, TORII_CHEATS_MAX - 1);
+	CHECK_EQ(cheatfile_why(&file, 63), CHEATFILE_WHY_FULL);
+	// One cheat of 64 poke lines is too big, of 63 fits
+	p = many + sprintf(many, "cheat0_code = \"");
+	for (u32 i = 0; i < 64; i++)
+		p += sprintf(p, i ? "+%04X:01" : "%04X:01", (unsigned)(0x300 + i));
+	strcat(many, "\"\n");
+	load(CHEATEMU_NES, many);
+	CHECK_EQ(cheats[0].status, CHEATFILE_BIG);
 	work.console = CHEATEMU_GBA;
+}
+
+void test_cheatemu_table(void)
+{
+	// A built-in image: aligned magic once, found; twice or none, not
+	static u8 image[512] __attribute__((aligned(4)));
+	CHECK_EQ(cheatemu_find_table(image, sizeof(image)), 0xFFFFFFFFu);
+	memcpy(image + 64, TORII_CHEATS_MAGIC, 8);
+	CHECK_EQ(cheatemu_find_table(image, sizeof(image)), 0xFFFFFFFFu);  // too little room after it for the table
+	static u8 big[4096] __attribute__((aligned(4)));
+	memcpy(big + 64, TORII_CHEATS_MAGIC, 8);
+	CHECK_EQ(cheatemu_find_table(big, sizeof(big)), 64);
+	memcpy(big + 130, TORII_CHEATS_MAGIC, 8);  // not 4-aligned: not a match
+	CHECK_EQ(cheatemu_find_table(big, sizeof(big)), 64);
+	memcpy(big + 2000, TORII_CHEATS_MAGIC, 8);
+	CHECK_EQ(cheatemu_find_table(big, sizeof(big)), 0xFFFFFFFFu);  // two
+	CHECK_EQ(sizeof(struct torii_cheats), 16 + 8 * TORII_CHEATS_MAX);
+	CHECK_EQ(offsetof(struct torii_cheats, e), 16);
 }

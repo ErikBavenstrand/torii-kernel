@@ -105,6 +105,11 @@ cheats-menu/menu 8EF6EB46DCBE3A2E
 cheats-menu/only 29DC28A788A4F426
 cheats-menu/rom B17A29CCE7424E7E
 cheats-menu/wrap 89624DD13B03F272
+cheats-nes/details 3102EBB28214BFDB
+cheats-nes/picked 09F034346D9268CD
+cheats-nes/popup 972ADD4F312DC616
+cheats-nes/screen 130B09783372FD1B
+cheats-nes/unreadable 8CFFA9E915E24DFC
 cheats-raw/edit 116361EFAE1F0765
 cheats-raw/guide 0DAA0D3293F77532
 cheats-raw/list B2E7D3B51B17A63E
@@ -793,6 +798,11 @@ sv-cheats-menu/menu 765002ED53013AD6
 sv-cheats-menu/only EF62EC1FF561A4A5
 sv-cheats-menu/rom D092ADB414FF2173
 sv-cheats-menu/wrap 2529E2C0DC8836C4
+sv-cheats-nes/details 4413ABFFCCE731F7
+sv-cheats-nes/picked 7A312B920235A316
+sv-cheats-nes/popup CDC631AEE87A13AA
+sv-cheats-nes/screen 4E5C9101244DFE7A
+sv-cheats-nes/unreadable F1513EFD0EB664BA
 sv-cheats-raw/edit 46B07B7D590243BD
 sv-cheats-raw/guide 4CD8AA14AADB1891
 sv-cheats-raw/list 67928E213C262332

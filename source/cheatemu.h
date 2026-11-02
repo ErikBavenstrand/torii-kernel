@@ -4,10 +4,11 @@
 // Hardware-free, as tests/host runs it. docs/plans/emulator-cheats.md is the
 // design; docs/research/cheats.md the formats and the corpus's counts.
 //
-// Stage 1 runs Game Genie codes only: a ROM patch, made once at launch,
-// whose compare byte (the 9-digit GB form, the 8-letter NES one) picks the
-// bank it belongs to. A code of another kind (GameShark and raw RAM writes)
-// reads, and is CANT_RUN until the emulators have a table for it.
+// Game Genie codes are ROM patches, made once at launch, whose compare byte
+// (the 9-digit GB form, the 8-letter NES one) picks the bank they belong to.
+// RAM writes (NES raw codes, GB GameShark) are pokes: the kernel writes them
+// into a table inside the emulator's image in PSRAM (struct torii_cheats,
+// cheatemu_find_table), which the emulator applies once a frame.
 #ifndef TORII_CHEATEMU_H
 #define TORII_CHEATEMU_H
 
@@ -25,6 +26,7 @@ enum cheatemu_console {
 // One decoded line of a code
 enum cheatemu_kind {
 	CHEATEMU_GENIE = 1,  // a ROM patch: addr (a CPU address) becomes value, if the byte there is compare
+	CHEATEMU_POKE = 2,   // a RAM write each frame: value to addr (compare: the WRAM bank, GB)
 };
 
 struct emucheat {
@@ -39,13 +41,13 @@ struct emucheat {
 enum {
 	CHEATEMU_OK,
 	CHEATEMU_UNREADABLE,  // no decoder reads one of its lines
-	CHEATEMU_CANT_RUN,    // it reads, but a line is a kind that isn't run yet (a RAM write)
+	CHEATEMU_CANT_RUN,    // it reads, but a line is a kind that isn't run yet (GB GameShark, until stage 3)
 	CHEATEMU_TOO_BIG,     // more lines than max
 };
 
 // Decodes the len bytes of one cheat's code, its lines joined by '+' (or
-// spaces), for console: up to max lines into out, *n of them. Only Game Genie
-// lines give lines; any other kind makes the cheat CANT_RUN (all or nothing).
+// spaces), for console: up to max lines into out, *n of them. A line that
+// reads but doesn't run makes the cheat CANT_RUN (all or nothing).
 u8 cheatemu_decode(u32 console, const char *code, u32 len, struct emucheat *out, u32 max, u32 *n);
 
 // A line as a cheat_patch, which is what a decoded cheat keeps in the cheat
@@ -57,6 +59,37 @@ u8 cheatemu_decode(u32 console, const char *code, u32 len, struct emucheat *out,
 // gives back the same.
 void cheatemu_to_patch(const struct emucheat *e, struct cheat_patch *p);
 void cheatemu_from_patch(const struct cheat_patch *p, struct emucheat *e);
+
+// --- The poke table in the emulator's image ---------------------------------
+
+// What the emulators' torii_cheats holds (emulators/*/src/torii_cheats.c: a
+// const block in .rodata the kernel finds by its magic and fills in PSRAM
+// after the emulator is copied there; the emulator reads it every frame).
+#define TORII_CHEATS_MAGIC "TORIICHT"
+#define TORII_CHEATS_MAX 64
+struct torii_cheat {
+	u8 kind;  // 1: a poke
+	u8 bank;  // GB: the WRAM bank (0: the one D000 maps to)
+	u16 addr;
+	u8 value;
+	u8 pad[3];
+};
+struct torii_cheats {
+	char magic[8];
+	u32 version;  // 1
+	u16 count;    // entries used
+	u16 max;      // TORII_CHEATS_MAX: the emulator never reads past it
+	struct torii_cheat e[TORII_CHEATS_MAX];
+};
+
+// The byte offset of the one torii_cheats in the n bytes of image (4-byte
+// aligned, as the image is), or 0xFFFFFFFF if there is none or more than one
+u32 cheatemu_find_table(const u8 *image, u32 n);
+
+// 1 if a NES address is one a poke may write, and its place in PocketNES's
+// RAM view: 0000-1FFF is the 2 KB of RAM mirrored (folded to 0000-07FF),
+// 6000-7FFF the PRG-RAM; others are the ROM's, the PPU's and the registers
+u32 cheatemu_nes_poke_addr(u32 addr, u16 *folded);
 
 // --- Patching the game's image ---------------------------------------------
 

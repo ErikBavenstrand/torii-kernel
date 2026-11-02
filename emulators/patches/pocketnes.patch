@@ -188,10 +188,22 @@ index 9814b19..3c7ffc3 100644
  	}
  	else
 diff --git a/src/timeout.s b/src/timeout.s
-index 74f8486..e3443bb 100644
+index 74f8486..6d6eac0 100644
 --- a/src/timeout.s
 +++ b/src/timeout.s
-@@ -805,7 +805,7 @@ addcycles:
+@@ -244,6 +244,11 @@ line0x:
+ @	bl_long newframe				@display update (this function withered away to nothing, so it's removed)
+ @	bl updatesound
+ 
++	@Torii: the kernel's picked RAM writes (torii_cheats.c), whatever the cheat finder holds
++	ldr r0,=torii_cheats_run
++	mov lr,pc
++	bx r0
++
+ 	.if CHEATFINDER
+ 	@IMPORT num_cheats
+ 	ldr r1,=num_cheats
+@@ -805,7 +810,7 @@ addcycles:
  
  @MOVE THIS CRAP SOMEWHERE ELSE
  fiveminutes: .word 5*60*60
@@ -200,6 +212,57 @@ index 74f8486..e3443bb 100644
  	.byte 0
  	.byte 0
  	.byte 0
+diff --git a/src/torii_cheats.c b/src/torii_cheats.c
+new file mode 100644
+index 0000000..d8eec02
+--- /dev/null
++++ b/src/torii_cheats.c
+@@ -0,0 +1,45 @@
++#include "includes.h"
++
++// Torii: the RAM writes the kernel's cheat screen picked (source/cheatemu.h,
++// struct torii_cheats). A const block the kernel finds in its copy of this
++// emulator by its magic and fills in PSRAM after copying the emulator there
++// (the emulator runs in place from PSRAM, so it reads the table at once). The
++// kernel's copy keeps count 0. Not PocketNES's own cheat finder list
++// (cheatfinder_cheats), which is saved to the cart and edited in its menu.
++// volatile: the compiler may not fold the count to the 0 it is built with.
++struct torii_cheat {
++	u8 kind;  // 1: a poke
++	u8 bank;
++	u16 addr;  // 0000-07FF RAM, 6000-7FFF PRG-RAM (the kernel folds the mirrors)
++	u8 value;
++	u8 pad[3];
++};
++
++struct torii_cheats {
++	char magic[8];
++	u32 version;
++	u16 count;
++	u16 max;
++	struct torii_cheat e[64];
++};
++
++const volatile struct torii_cheats torii_cheats __attribute__((used, aligned(4))) = {
++	{'T', 'O', 'R', 'I', 'I', 'C', 'H', 'T'}, 1, 0, 64, {{0, 0, 0, 0, {0, 0, 0}}}};
++
++// Once a frame, from timeout.s
++void torii_cheats_run(void)
++{
++	u32 n = torii_cheats.count;
++	if (n > 64)
++		n = 64;
++	for (u32 i = 0; i < n; i++) {
++		u32 addr = torii_cheats.e[i].addr;
++		u8 value = torii_cheats.e[i].value;
++		if (torii_cheats.e[i].kind != 1)
++			continue;
++		if (addr < 0x800)
++			NES_RAM[addr] = value;
++		else if (addr >= 0x6000 && addr < 0x8000)
++			NES_SRAM[addr - 0x6000] = value;
++	}
++}
 diff --git a/src/ui.c b/src/ui.c
 index 09ce396..ef8a286 100644
 --- a/src/ui.c

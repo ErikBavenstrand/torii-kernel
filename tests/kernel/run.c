@@ -96,6 +96,7 @@ static const struct {
 	{"names_partial", test_names_partial},
 	// Language packs on the card, into PSRAM
 	{"lang_packs", test_lang_packs},
+	{"emucheats_tables", test_emucheats_tables},
 };
 
 int torii_unit_tests(void)
