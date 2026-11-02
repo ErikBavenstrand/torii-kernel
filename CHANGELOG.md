@@ -11,7 +11,7 @@ git log, not here.
   says the release is under the GNU GPL 3 or later with a link to the source.
   The binary links minilzo (GPL 2 or later) inside both emulators, so the
   credits had to name it; `THIRD_PARTY_NOTICES.md` and `licenses/` hold the
-  rest, and each release attaches them. Swedish too.
+  rest, and each release attaches them. Swedish too. (f19041f8)
 
 ## v0.9.19
 
