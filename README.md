@@ -338,3 +338,14 @@ outlines of [KyleBing's retro game console icons](https://github.com/KyleBing/re
 licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The menu's
 fonts are [Galmuri](https://github.com/quiple/galmuri), under the SIL Open
 Font License (`assets/fonts/galmuri`).
+
+## Licences
+
+Torii's own code is Apache 2.0 (`LICENSE`), as is EZ-Flash's kernel it builds
+on. The release binary also contains minilzo (GPL 2 or later), libgba (LGPL
+2 or later), FatFs, Jagoomba Color and PocketNES, so it is distributed under
+the GNU GPL 3 or later. [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)
+lists every part with its author and licence, `licenses/` holds the texts
+(each release attaches them as `torii-licenses.zip`), and Info, Credits shows
+the credits on the cart. Torii is not made or endorsed by EZ-Flash. No game,
+BIOS, box art or cheat database is in the repository or a release.

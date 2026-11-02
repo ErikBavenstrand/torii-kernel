@@ -4,6 +4,15 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Changed:** Info's Credits names the kernel's base (EZ-Flash's open source
+  kernel 1.06, Apache 2.0), FatFs, libgba and minilzo with their licences, and
+  says the release is under the GNU GPL 3 or later with a link to the source.
+  The binary links minilzo (GPL 2 or later) inside both emulators, so the
+  credits had to name it; `THIRD_PARTY_NOTICES.md` and `licenses/` hold the
+  rest, and each release attaches them. Swedish too.
+
 ## v0.9.19
 
 - **Added:** kerning. A pair such as T and o sits a pixel closer: the font has,

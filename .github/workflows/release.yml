@@ -62,12 +62,15 @@ jobs:
           name: ezkernelnew
       - name: Write release notes
         run: tools/release_notes.sh > release-notes.md
+      - name: Bundle the licences
+        run: zip -X -r dist/torii-licenses.zip LICENSE THIRD_PARTY_NOTICES.md licenses
       - name: Create the release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           files: |
             dist/ezkernelnew.bin
             dist/torii-lang.zip
+            dist/torii-licenses.zip
             dist/ezkernelnew.sym
             ezkernelnew.elf
           body_path: release-notes.md

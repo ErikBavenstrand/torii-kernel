@@ -46,5 +46,5 @@ There is one place to manage a game's slots (its **Saves** page), one question a
 
 ## Open questions
 
-- Should the launch ask at all? The alternative is that A always plays the active slot and choosing happens only in Saves (faster for one player; worse for a shared cart).
+- Should the launch ask at all? Decided: it asks, as built. The alternative, A always playing the active slot with the choice only in Saves, is faster for one player and worse for a shared cart.
 - Last-saved times need the clock; with it unset the rows show "Saved" or "Never saved".

@@ -415,7 +415,7 @@ const char *const lang_en[STR_COUNT] = {
 	"Still counting them: open this page again in a moment.\n",  // info.about_counting
 	"# Your lists\nFavourites: {1}\nRecent: {2}, of the last {3} played\n",  // info.about_lists
 	"# Torii's folder\n/torii keeps saves, backups and the trash, states and screenshots, cheats, covers, names, the game list, your lists and logs. Keep it when you move to a new card.\n",  // info.about_folders
-	"# Credits\nGB and GBC: Jagoomba Color by EvilJagaGenius, after Dwedit's Goomba Color and FluBBa's Goomba.\nNES: PocketNES by Dwedit, after Loopy and FluBBa.\nCheat decoders: ported from mGBA by Jeffrey Pfau, under the MPL 2.0.\nFonts: Galmuri by Lee Minseo, under the SIL Open Font License 1.1.\nConsole pictures: drawn on KyleBing's retro game console icons, CC BY 4.0.\n",  // info.about_credits
+	"# Credits\nGB and GBC: Jagoomba Color by EvilJagaGenius, after Dwedit's Goomba Color and FluBBa's Goomba.\nNES: PocketNES by Dwedit, after Loopy and FluBBa.\nCheat decoders: ported from mGBA by Jeffrey Pfau, under the MPL 2.0.\nFonts: Galmuri by Lee Minseo, under the SIL Open Font License 1.1.\nConsole pictures: drawn on KyleBing's retro game console icons, CC BY 4.0.\nBase: EZ-Flash's open source kernel 1.06, Apache 2.0. Files: FatFs by ChaN. Libraries: libgba, LGPL 2; minilzo, GPL 2.\nTorii is released under the GNU GPL 3 or later. Source and licences: github.com/ErikBavenstrand/torii-kernel\n",  // info.about_credits
 	"Game names: No-Intro's, from libretro-database, CC BY-SA 4.0.\n",  // info.about_names
 	"{1} ({2})",  // info.about_firmware
 	"Unknown board",  // info.about_unknown

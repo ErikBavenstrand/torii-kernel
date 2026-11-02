@@ -71,7 +71,6 @@ The UX reviews' open proposals (`docs/design/v0.5/ux-review.md`, `settings-ux-re
   - **Not done:** naming a found cheat in game (the overlay has no font or keyboard: rename it on the Cheats page); more than one Undo (the buffer's 288 KB leaves no room for a second copy: `cheat-search.md`); pointer chains (one level only); "on now" through a pointer (set once instead); a memory view around a candidate; VRAM, palette and OAM searches.
   - **Cart check:** a pointer kept in Pokémon Emerald (money through gSaveBlock1Ptr) across a door.
   - **Untested:** a card write that fails while filing (the records wait for the next boot); a 32-bit search with large values and 16 different addresses kept, in the emulator.
-- **States that survive a power-off (1.0?, research):** point the FPGA's `/RTS` write-back of cart SRAM at a per-game file. Watch out: with a crosslinked FAT the write-back would land in both files.
 
 ### Fonts and scripts
 
@@ -84,9 +83,9 @@ The UX reviews' open proposals (`docs/design/v0.5/ux-review.md`, `settings-ux-re
 - **(maybe) Live values in game** (owner, 2026-10-30: less useful than the rest): each cheat in the in-game list shows the value now at the address it writes ("Money 3,421"), with digits the kernel draws for the overlay. Encrypted values (Pokémon's money) would read as nonsense.
 - From the trackers: jagoombacolor#42 accuracy tests, #43 a GBC-compatible ROM run as DMG, #34 the default palette; PocketNES#14 multiboot.
 
-### Tooling, alongside any patch
+### Licences
 
-Static analysis gates CI against `tools/analyze-baseline.txt` (97 findings, style or false alarms: the `strcpy`s copy FatFs names into buffers sized for them, `library.c`'s `memcpy` is terminated by hand, and the v0.9.6 triage covers the rest).
+- **Ask Jaga (jagoombacolor) and Dwedit (Goomba Color, PocketNES) to put a licence in their repositories**, or to say in writing that Torii may build and release their code with our patches. Neither repository has one, and the release's binary includes both (`THIRD_PARTY_NOTICES.md`, "Open points"). Nothing else in the licence audit is open: the notices, the texts in `licenses/` and the cart's Credits page are done in v0.9.20.
 
 ### Research (doesn't block 1.0 unless a finding does)
 
@@ -99,8 +98,6 @@ Static analysis gates CI against `tools/analyze-baseline.txt` (97 findings, styl
   - The open register questions: the `0x09E00000` status values, `0x096C0000` auto-save, Mode B's slot, the frames at minor `0x17`, what `0x09700000` changes in the ROM map, and how the unlock sequence is checked.
   - A blue EZODE-B's raw version word and NOR IDs, if an owner of one can read them.
 - **Unverified:** "chip select high" as mid-read assumes the RTC port reads back its output pins. That holds in mGBA but hasn't been checked on the cart.
-- **Licences and terms:** No-Intro's terms for a derived name table (built on the user's machine, never bundled); libretro-thumbnails has no licence grant (fetched locally, never committed); the boxes' trade dress; OpenVGDB, GameTDB, DeadSkullzJr's database and GameHacking.org terms; libtonc's licence; FluBBa's and Dwedit's redistribution terms (only if more consoles come).
-- **Saves:** should a launch ask for a slot at all (`docs/design/v0.5/saves.md`)?
 
 ### Known limits (accepted, no work planned)
 
@@ -113,6 +110,9 @@ Static analysis gates CI against `tools/analyze-baseline.txt` (97 findings, styl
   - The exact-ROM hook patches cover only the EU builds of GTA Advance, Super Monkey Ball Jr., LEGO Star Wars II and Tomb Raider: Legend; their other regions get no in-game menu (`docs/research/hook-coverage.md`).
   - Sonic Advance and Moto Racer replace the IRQ hook, and HP Quidditch blocks the menu. These are compat's three known failures.
 - **Screenshots:** without the game's RAM copy of its registers, a scrolled tile screen sits shifted. The BG matrices, BLDY, MOSAIC and window bounds can't be read back, so fades and Mode 7 roads come out wrong. A shot taken without the cart's clock is named by the filing's time.
+- **Static analysis:** CI gates on `tools/analyze-baseline.txt` (97 findings, triaged in v0.9.6: style, or false alarms; the `strcpy`s copy FatFs names into buffers sized for them, and `library.c`'s `memcpy` is terminated by hand). A new finding fails CI.
+- **Saves:** a launch with several slots asks which to play, as designed (`docs/design/v0.5/saves.md`).
+- **States and power-off:** a save state lives in unbattered cart SRAM until Back to Torii files it, and is lost on a power-off. Pointing the FPGA's `/RTS` write-back at a per-game file would change that; it is research nobody has planned, and a crosslinked FAT would take the write-back into two files.
 - **Hardware:**
   - The session record in cart RAM page `0xF0` doesn't survive a power cycle.
   - EZ-Flash's loader installs only the first 3 MB of `ezkernelnew.bin` (`tools/omega_image.py` enforces it).
