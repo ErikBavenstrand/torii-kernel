@@ -257,14 +257,14 @@ Every cheat we have (GameHacking, plus libretro's three of its own), grouped. "P
 
 ## The golden set
 
-`cheats/gba/Pokemon - Emerald Version (USA, Europe).cht`, built by `tools/golden/emerald.py` from pret's pokeemerald (its addresses and symbol file for this ROM; item and species tables in `tools/golden/emerald.json`). 484 cheats in 8 folders (`cheatN_folder`), each with a guide and a buttons line; the 386 species, 20 levels, 25 natures and 5 EXP rates are choice groups.
+`cheats/gba/Pokemon - Emerald Version (USA, Europe).cht`, built by `tools/golden/emerald.py` from pret's pokeemerald (its addresses and symbol file for this ROM; item and species tables in `tools/golden/emerald.json`). 489 cheats in 8 folders (`cheatN_folder`), each with a guide and a buttons line; the 386 species, 20 levels, 25 natures and 5 EXP rates are choice groups.
 
 | Folder | Cheats |
 | --- | --- |
 | Menu | Open with L+R+B (B, as A would first talk to what is in front), the base, and one cheat for each section, which lists only the sections picked: Heal, PC, Shop (a Poké Mart for each of Medicine, Balls, Training, TMs & HMs, Held items, Mail, Berries and Valuables: every item but the key items, and every decoration, at game prices; sell there too), Warp (16 towns, the 34 routes, 27 dungeons, 8 gyms and the League, 15 landmarks, 5 islands), Gifts (Hoenn and Johto starters, Beldum, Castform with its Mystic Water, Lileep, Anorith, the Wynaut egg, and the events' Surfing Pichu egg, WISHMKR Jirachi and Ageto Celebi; Altering Cave's Pokémon picked from its 9 sets), Trade evolution (the game's own trade evolutions and evolution scene, `tools/golden/evolve.c`), Legends (respawn 11, Groudon and Kyogre through their abnormal weather, and the roaming Lati), Tickets (the four event tickets with their ferry flags), Unlock (badges, Frontier symbols, Pokédex) |
 | Money | Max money, Max coins (Torii's keyed lines), Max Battle Points, Shopping costs 1 |
-| Pokémon | Shiny, Perfect IVs, Max friendship, Max EVs, Vitamins up to 255, Nature (25), Gender (2), Pokérus when caught, Eggs hatch fast, Everstone always passes nature, Day Care eggs fast |
-| Battle | One-hit KO, Infinite HP, Infinite PP, No trainer challenges, EXP x2/x3/x5/x10/x255, EXP shared with the party, Every ball catches, Pokémon always obey |
+| Pokémon | Shiny, Perfect IVs, Max friendship, Max EVs, Vitamins up to 255, Nature (25), Gender (2), Ability (2), Forget HMs, Pokérus when caught, Eggs hatch fast, Everstone always passes nature, Day Care makes eggs fast |
+| Battle | One-hit KO, Infinite HP, Infinite PP, No trainer challenges, EXP x2/x3/x5/x10/x255, EXP shared with the party, Every ball catches, Always escape, Pokémon always obey |
 | Wild | Species (386), Level 5-100 (20), No wild encounters, Encounter every step |
 | Overworld | Instant text, Run and bike anywhere, Mirage Island always there, Fly to any town, Free Day Care, Walk through walls (hold R), Field moves without badges, Gym leader rematches, Any Pokémon in the Frontier |
 | Minigames | Endless Safari Zone, Safari Pokémon never flee, Max Pokéblock, Quick contests, Max contest score, Full Soot Sack |
@@ -298,6 +298,7 @@ On the emulated cart with the real ROM (CRC32 `1F1C08FB`) and a 100% save (Proje
 | Shop, Shopping costs 1 | the Medicine and Balls marts; TM01 for "₽1", money 329,622 to 329,621, TM01 4 to 5 |
 | Tickets | "Obtained the EON TICKET!"; the ferry flag set; a second pick says you have it |
 | Menu | Heal, PC, Warp (Oldale, Sky Pillar, Southern Island's dock), Legends (Regirock's defeated and hidden flags cleared, Regice's not), Gifts ("Jack received TREECKO!"), Unlock (badges, symbols; the Pokédex's bits restored from zero) |
+| Ability, Always escape (2026-11-02) | a wild Ralts with one personality (bit 0 clear): ability 0 with First, 1 with Second; a Lv 100 Ninjask: "Got away safely!" with Always escape, "Can't escape!" without. Forget HMs: by disassembly only (`IsHMMove2` and `IsMoveHm` return 0; their only callers are battle and evolution learning and the summary screen's swap) |
 | Quick contests, Max contest score | a Normal Cool contest (2026-11-02): judging ends after the first appeal, the player's round-1 points held at 637 (the others 49-61), first place and the ribbon |
 
 | No trainer challenges | Route 102's Rick, his defeat flag cleared: he challenges in the control; with it the player walks past |

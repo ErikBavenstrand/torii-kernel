@@ -1464,6 +1464,25 @@ def cheats():
             f"Every new Pokémon that can be either is {name.lower()}. Works with Shiny and Nature.",
             "launch",
         )
+    for n, name in enumerate(("First", "Second")):
+        add(
+            "Pokémon",
+            f"Ability: {name}",
+            # CreateBoxMon's ability number: n, not the personality's bit 0
+            # (which is the gender byte's too, so Gender keeps working)
+            rom_code([(0x08067E64, 0x2000 | n)]),
+            f"Every new Pokémon whose species has two abilities gets its {name.lower()}, foes' too.",
+            "launch",
+        )
+    add(
+        "Pokémon",
+        "Forget HMs",
+        # IsHMMove2 (learning in battle and on evolving) and IsMoveHm (the
+        # summary screen's move swap) return 0
+        rom_code(words([(0x0806E804, 0x47702000), (0x081B6D14, 0x47702000)])),
+        "A Pokémon can drop an HM move for a new one like any other move, without the Move Deleter.",
+        "launch",
+    )
     add(  # PokemonUseItemEffects' two EV checks: 100 a stat becomes 255; the 510 total stays
         "Pokémon",
         "Vitamins up to 255",
@@ -1590,6 +1609,13 @@ def cheats():
         "Every ball catches",
         rom_code([(0x08056566, 0x46C0)]),
         "Every ball you throw at a wild Pokémon catches it.",
+        "launch",
+    )
+    add(
+        "Battle",
+        "Always escape",
+        rom_code([(0x0803EE12, 0x2701)]),  # TryRunFromBattle: effect = 1, not its roll
+        "Running from a wild battle always works. Trainers and trapping moves or abilities still stop you.",
         "launch",
     )
     add(
