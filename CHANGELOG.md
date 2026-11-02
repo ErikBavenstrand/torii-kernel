@@ -4,6 +4,22 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Fixed:** In-game menu Off reaches a game on the NOR. Its hook has the
+  menu keys burned in, so it still opened the menu after Off was picked,
+  until the game was written again; the menu's code now checks the setting
+  and gives the game back at once (d31012e0).
+- **Fixed:** a 32 MB game whose cheats found no padding to go in was scanned
+  again at every launch, as its `.pat` said cheats off while Settings said
+  on. The file now keeps what they needed, and a launch with the same need
+  or more leaves them out without a scan (a47fed81).
+- **Changed:** a game list's Play shows the way it starts a GBA game
+  (clean or addons) and no longer steps: Game info's Boot mode is the one
+  place that sets it. The SD card page's Play keeps its « » (its file info has
+  no Boot mode) and now names default's way as the lists do (4ed92753,
+  57444e6a).
+
 ## v0.9.16
 
 - **Added:** Torii code, a superset of VBA's address:value lines (VBA

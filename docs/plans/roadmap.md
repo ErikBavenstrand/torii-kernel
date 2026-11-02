@@ -42,6 +42,7 @@ Each release's details are in `CHANGELOG.md`; the planning, ticket reports and r
 - **v0.9.7–v0.9.10 Screenshots and the cheat search:** screenshots in a game's popup and `.bmp` files on the SD card page, moved with a renamed game; the in-game cheat search (same, changed, up, down, equals, Up/Down by, More/Less than, From A to B, signed, BCD, a one-level pointer scan, Undo), its finds filed as cheats on Back to Torii; R toggles a favourite; Play « default » names its way on the games pages.
 - **v0.9.11–v0.9.15 The cheat screen:** cheat folders (`cheatN_folder`) and choice groups; ROM patches free in game, 2,048 a launch; one flat list with scroll bars; any cheat's code editable on the cart; launches decode only the picks; the game popup trimmed (Hide box art, Load state and starting straight into a state removed); the in-game menu no longer lets a bright game show through.
 - **v0.9.16 Torii code and golden cheats (2026-11-02):** Torii code, a superset of VBA's lines with tests, blocks, buttons and bit operations (`docs/torii-code.md`); the menu reads the cart at WS0 3/1; a launch keeps ROM patches as runs in 48 KB of cart SRAM (about 23,000 patches, 4,096 a cheat). Pokémon Emerald's golden set (`tools/golden/emerald.py`, curation in `docs/research/cheats-emerald-curation.md`): 489 cheats, all Torii code, in Menu, Money, Pokémon, Battle, Wild, Overworld and Safari & Contests; an L+R+B menu (Heal party, PC, Shop, Warp, Gift Pokémon, Trade evolution, Legendaries again, Event tickets, Unlock); every folder reviewed against pokeemerald and on the emulated cart, with the bugs found fixed.
+- **v0.9.17 Fixes (2026-11-02):** In-game menu Off reaches NOR games (the overlay gives the game back); a 32 MB launch that left its cheats out keeps its `.pat` and isn't scanned again; Boot mode is set in Game info only (a game list's Play names the way, no stepper) and the SD page's Play names default's way; `tests/saves.sh rom-read-error`; the flaky `cheats.sh` step fixed (a SIGPIPE); Emerald's Free Day Care, Any Pokémon in the Frontier (Mew) and Forget HMs' summary-screen swap run on the emulated cart.
 
 ## Open work, before 1.0
 
@@ -54,9 +55,7 @@ Each release's details are in `CHANGELOG.md`; the planning, ticket reports and r
 Code fixes that the emulator can test, plus the leftovers from v0.9.
 
 - **Bugs to confirm and fix:**
-  - `Read_SD_sectors` now returns 1 when the card never answers, but the "card read failed" paths are still untested (`docs/design/engine.md`): test them with an emulated read error.
-  - A NOR game keeps the In-game menu setting it was written with, so it still opens the menu after Off until it is rewritten (`docs/design/v0.8/ingame-menu.md`).
-  - A 32 MB launch whose extras were dropped to fit rescans the ROM on every launch: the `.pat` cache only has room for the picks.
+  - A ROM read that fails part-way in (`rom_read_failed`, not at its first block) is still untested: `tests/saves.sh rom-read-error` fails the first one. The other "card read failed" paths are on the real card only.
 - **Languages:**
   - Test a text pointer that another screen keeps across a pack switch. Only Settings' own redraw is covered today.
   - The owner's corrections to the Swedish terms. The texts shortened for width to check are `rename.key_space` "Blank", `gsaves.keys` "Backup", `games.fact_size`/`fact_played` "Strl"/"Sist", `ingame.unsaved_both` and `gsaves.act_copy` "Kopiera".
@@ -65,8 +64,7 @@ Code fixes that the emulator can test, plus the leftovers from v0.9.
 
 The UX reviews' open proposals (`docs/design/v0.5/ux-review.md`, `settings-ux-review.md`) and the owner's asks.
 
-- The SD page's popup offers Play's « » stepper under the games pages' rules, and names default's way as they do (the games pages do since v0.9.7, d00ed28e; the SD page doesn't).
-- **One place for how a game boots** (owner, 2026-10-27): the popup's Play « addons » and Game info's Boot mode set the same thing. Keep only one, and point the cheat screen's "needs Boot with addon" note to it.
+- **The SD page's Play « »:** the game lists dropped it in v0.9.17 (Game info's Boot mode is the one place), but the SD card page keeps it, as its file info has no Boot mode. Give it a Boot mode there, or keep both.
 
 ### In game
 
@@ -99,7 +97,7 @@ The UX reviews' open proposals (`docs/design/v0.5/ux-review.md`, `settings-ux-re
 
 Pokémon Emerald's set is done (v0.9.16). Left:
 
-- **Two Emerald fixes not run in the emulator, only read in the disassembly:** Free Day Care (the Day Care lady prices every Pokémon at 0) and Any Pokémon in the Frontier letting Mew in. Also Forget HMs (an HM move swapped out in the summary screen and on a level-up in battle). Run each on the emulated cart.
+- **Forget HMs, the level-up path:** the summary screen's swap runs on the emulated cart (v0.9.17); an HM move swapped out on a level-up in battle (`IsHMMove2`, also evolution learning) is read in the disassembly only. Run it with a level-up in battle.
 - **Navel Rock's ladder tiles (owner, 2026-11-01):** after a warp, some tiles looked wrong on the real cart; the emulator's renders match the reference pixel for pixel. Waiting for a photo from the cart.
 - **Declined (owner, 2026-11-02), not to be built unless asked:** Fishing always bites, Feebas everywhere on Route 119, fast walking, trainers' Pokémon with perfect IVs; earlier declines are D52–D59 in the curation doc.
 
@@ -109,7 +107,7 @@ Pokémon Emerald's set is done (v0.9.16). Left:
 - **compat selection:** choose compat runs by the functions each game runs, as `test` already does, in place of the hand-kept `NO_COMPAT` (`docs/research/dev-loop-speed.md`).
 - **Logs:** frame-timing summaries carry the log write's time, not the scroll's. They're DEBUG only, their table holds 8 names, and on a nearly full buffer they can push out older lines (`source/engine/cycles.c`, `tlog_flush`).
 - **Emulator:** the kernel install fills the last sector's tail with 0xFF where the real loader writes stale bytes, and `OMEGA_FPGA_VERSION` isn't validated.
-- **Flaky `tests/cheats.sh`** (2026-11-01, twice in `just check`, passed on rerun): in its 500-cheat step, the second visit from the game popup never reaches the cheat screen before frame 8000, and the script exits without its FAIL line in the log. Find what varies between runs (the clock isn't pinned) and why `fail` isn't printed.
+- **Flaky `tests/cheats.sh`** (2026-11-01, twice in `just check`, passed on rerun): the silent exit was `tac | sed q` under `pipefail`, a SIGPIPE when `tac` outlived `sed` (fixed in v0.9.17, 754a719e). If it ever fails again with a FAIL line, the second visit not reaching the cheat screen is a separate bug.
 - **Font tests:** `tools/font_preview.py` needs the network for its candidates, and `tests/font_test.py` compiles with the host `cc`, not devkitARM.
 
 ### Cart checks (the owner, before every tag)
