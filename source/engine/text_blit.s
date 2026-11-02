@@ -10,6 +10,11 @@
 @ and written once per row, with 32-bit accesses only (VRAM ignores byte
 @ writes), and blank rows are skipped.
 @
+@ A glyph index below 256 is in the font's table; from 256 on it is a script
+@ glyph, in the table the run names (text.h), whose bitmap offsets count
+@ 4 byte units and whose tops are moved by the run's dy. A run with no script
+@ draws nothing for one.
+@
 @ Each glyph takes one of three loops: inside one tile column; 8 px or
 @ narrower across two; wider (both bytes of its rows), across two or three.
 @ A shift by a register holding 32 gives 0 in ARM code, so the wide loop
@@ -27,6 +32,9 @@
 	.equ	RUN_X, 20
 	.equ	RUN_Y, 24
 	.equ	RUN_INK, 28
+	.equ	RUN_SCRIPT_GLYPHS, 32
+	.equ	RUN_SCRIPT_BITS, 36
+	.equ	RUN_SCRIPT_DY, 40
 @ struct torii_font
 	.equ	FONT_GLYPHS, 0
 	.equ	FONT_BITS, 4
@@ -44,7 +52,10 @@
 	.equ	SP_RIGHT, 16		@ wide glyphs: px + width
 	.equ	SP_X, 20		@ wide glyphs: r11 and r12, kept here
 	.equ	SP_G, 24
-	.equ	SP_SIZE, 28
+	.equ	SP_SCRIPT, 28		@ the script's glyph table
+	.equ	SP_SBITS, 32		@ its bitmaps
+	.equ	SP_DY, 36		@ rows added to a script glyph's top
+	.equ	SP_SIZE, 44		@ keeps the stack 8 byte aligned
 
 @ Registers in the loops:
 @   r0  row bits, then the expanded row    r7  ink
@@ -79,9 +90,15 @@
 	ldr	r3, [r1, #FONT_BITS]
 	str	r2, [sp, #SP_TABLE]
 	str	r3, [sp, #SP_BITS]
+	ldr	r2, [r0, #RUN_SCRIPT_GLYPHS]
+	ldr	r3, [r0, #RUN_SCRIPT_BITS]
+	ldr	r1, [r0, #RUN_SCRIPT_DY]
+	str	r2, [sp, #SP_SCRIPT]
+	str	r3, [sp, #SP_SBITS]
+	str	r1, [sp, #SP_DY]
 	ldr	r12, [r0, #RUN_GLYPHS]
 	ldr	r1, [r0, #RUN_COUNT]
-	add	r1, r12, r1
+	add	r1, r12, r1, lsl #1	@ 2 bytes an index
 	str	r1, [sp, #SP_END]
 	ldr	r1, [r0, #RUN_TILES]
 	ldr	r2, [r0, #RUN_Y]
@@ -97,7 +114,9 @@
 	ldr	r0, [sp, #SP_END]
 	cmp	r12, r0
 	bhs	.L\name\()_done
-	ldrb	r0, [r12], #1
+	ldrh	r0, [r12], #2
+	cmp	r0, #256
+	bhs	.L\name\()_script
 	ldr	r1, [sp, #SP_TABLE]
 	add	r0, r0, r0, lsl #1
 	add	r1, r1, r0, lsl #1	@ the glyph: table + 6 * index
@@ -112,6 +131,7 @@
 	ldrb	r2, [r1, #GLYPH_WIDTH]
 	ldr	lr, [sp, #SP_BITS]
 	add	r3, lr, r3
+.L\name\()_placed:			@ r0 top, r2 width, r3 bitmap
 	ldr	r4, [sp, #SP_BASE]
 	add	r4, r4, r0, lsl #2
 	mov	r0, r9, lsr #3
@@ -213,6 +233,29 @@
 	subs	r5, r5, #1
 	bne	.L\name\()_two
 	b	.L\name\()_glyph
+
+	@ A script glyph: the same, from the script's table
+.L\name\()_script:
+	ldr	r1, [sp, #SP_SCRIPT]
+	cmp	r1, #0
+	beq	.L\name\()_glyph	@ no script: nothing is drawn
+	sub	r0, r0, #256
+	add	r0, r0, r0, lsl #1
+	add	r1, r1, r0, lsl #1
+	ldrb	r5, [r1, #GLYPH_ROWS]
+	ldrb	r2, [r1, #GLYPH_ADVANCE]
+	mov	r9, r11
+	add	r11, r11, r2
+	cmp	r5, #0
+	beq	.L\name\()_glyph
+	ldrh	r3, [r1, #GLYPH_OFFSET]
+	ldr	lr, [sp, #SP_SBITS]
+	add	r3, lr, r3, lsl #2
+	ldrb	r0, [r1, #GLYPH_TOP]
+	ldr	lr, [sp, #SP_DY]
+	add	r0, r0, lr
+	ldrb	r2, [r1, #GLYPH_WIDTH]
+	b	.L\name\()_placed
 
 .L\name\()_done:
 	add	sp, sp, #SP_SIZE

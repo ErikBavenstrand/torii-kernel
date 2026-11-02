@@ -53,6 +53,7 @@ static const struct {
 	{"text_clear", test_text_clear},
 	{"text_cycles", test_text_cycles},
 	{"fmt_cycles", test_fmt_cycles},
+	{"cycles_summary_room", test_cycles_summary_room},
 	{"diag_line_cut", test_diag_line_cut},
 	{"ui_pool_and_arenas", test_ui_pool_and_arenas},
 	{"theme_switch_loads_banks", test_theme_switch_loads_banks},

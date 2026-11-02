@@ -48,7 +48,7 @@ static void set_pixel(u32 *tiles, u32 x, u32 y, u32 index)
 }
 
 // The reference: every inked bit of every row, one pixel at a time
-static void ref_draw(u32 *tiles, const struct torii_font *font, const u8 *glyphs, u32 count, u32 x, u32 y, u32 ink)
+static void ref_draw(u32 *tiles, const struct torii_font *font, const u16 *glyphs, u32 count, u32 x, u32 y, u32 ink)
 {
 	for (u32 i = 0; i < count; i++) {
 		const struct torii_glyph *g = &font->glyphs[glyphs[i]];
@@ -69,17 +69,25 @@ typedef void blit_fn(const struct text_run *run);
 // Every glyph of the font, in runs that fit the window, at pen offset x0
 static int blit_matches(blit_fn *blit, const struct torii_font *font, u32 x0, u32 ink)
 {
-	u8 glyphs[TORII_FONT_GLYPHS];
+	u16 glyphs[TORII_FONT_GLYPHS + TORII_FONT_KERN_MAX];
+	u32 all = TORII_FONT_GLYPHS + font->kern_count;  // the kerned variants too
 	u32 next = 0;
-	while (next < TORII_FONT_GLYPHS) {
+	while (next < all) {
 		u32 count = 0, pen = x0;
-		while (next < TORII_FONT_GLYPHS && pen + font->glyphs[next].advance + 16 < COLUMNS * 8) {
+		while (next < all && pen + font->glyphs[next].advance + 16 < COLUMNS * 8) {
 			pen += font->glyphs[next].advance;
 			glyphs[count++] = next++;
 		}
 		fill(tiles_a, x0 * 77 + next);
 		fill(tiles_b, x0 * 77 + next);
-		struct text_run run = {tiles_a, CW, font, glyphs, count, x0, ROWS * 8 - font->line_height, ink};
+		struct text_run run = {.tiles = tiles_a,
+				       .column_words = CW,
+				       .font = font,
+				       .glyphs = glyphs,
+				       .count = count,
+				       .x = x0,
+				       .y = ROWS * 8 - font->line_height,
+				       .ink = ink};
 		blit(&run);
 		ref_draw(tiles_b, font, glyphs, count, x0, run.y, ink);
 		if (memcmp(tiles_a, tiles_b, WORDS * 4) != 0)
@@ -113,8 +121,15 @@ void test_text_blit(void)
 
 	// 'A' at x 6, ink 3, on blank tiles (font_body.c pictures it)
 	memset(tiles_a, 0, WORDS * 4);
-	u8 a = 'A' - TORII_FONT_FIRST;
-	struct text_run run = {tiles_a, CW, &font_body, &a, 1, 6, 0, 3};
+	u16 a = 'A' - TORII_FONT_FIRST;
+	struct text_run run = {.tiles = tiles_a,
+			       .column_words = CW,
+			       .font = &font_body,
+			       .glyphs = &a,
+			       .count = 1,
+			       .x = 6,
+			       .y = 0,
+			       .ink = 3};
 	text_blit(&run);
 	CHECK_EQ(tiles_a[1], 0);           // row 1: above the glyph's top (2)
 	CHECK_EQ(tiles_a[CW + 2], 0x3);    // row 2, "..#..": pixel 8
@@ -125,6 +140,43 @@ void test_text_blit(void)
 	CHECK_EQ(tiles_a[CW + 10], 0x300);
 	CHECK_EQ(tiles_a[11], 0);          // below the glyph
 	CHECK_EQ(tiles_a[2 * CW + 7], 0);  // the next column untouched
+
+	// A script glyph (index 256 on) from the run's own table, its bitmap offset in
+	// 4 byte units and its top moved by script_dy; one the run has no table for
+	// draws nothing and takes no room
+	static const struct torii_glyph sglyphs[2] = {{0, 7, 2, 2, 5}, {1, 5, 0, 1, 3}};
+	static const u8 sbits[8] ALIGN(4) = {0x1F, 0x11, 0, 0, 0x07, 0, 0, 0};
+	u16 run3[3] = {'A' - TORII_FONT_FIRST, TORII_FONT_SCRIPT, TORII_FONT_SCRIPT + 1};
+	memset(tiles_a, 0, WORDS * 4);
+	struct text_run sr = {.tiles = tiles_a,
+			      .column_words = CW,
+			      .font = &font_body,
+			      .glyphs = run3,
+			      .count = 3,
+			      .x = 0,
+			      .y = 0,
+			      .ink = 5,
+			      .script_glyphs = sglyphs,
+			      .script_bits = sbits,
+			      .script_dy = 1};
+	text_blit(&sr);
+	u32 ax = font_body.glyphs['A' - TORII_FONT_FIRST].advance;
+	for (u32 x = 0; x < 5; x++) {
+		CHECK_EQ(pixel(tiles_a, ax + x, 3), 5);  // top 2 + dy 1, "#####"
+		CHECK_EQ(pixel(tiles_a, ax + x, 4), (x == 0 || x == 4) ? 5 : 0);  // "#...#"
+	}
+	CHECK_EQ(pixel(tiles_a, ax + 5, 3), 0);
+	for (u32 x = 0; x < 3; x++)
+		CHECK_EQ(pixel(tiles_a, ax + 7 + x, 1), 5);  // the second: top 0 + dy 1, "###"
+	memset(tiles_b, 0, WORDS * 4);
+	struct text_run none = sr;
+	none.tiles = tiles_b;
+	none.script_glyphs = NULL;
+	none.glyphs = run3 + 1;
+	none.count = 2;
+	text_blit(&none);
+	for (u32 i = 0; i < WORDS; i++)
+		CHECK_EQ(tiles_b[i], 0);
 }
 
 void test_text_draw(void)
@@ -247,9 +299,23 @@ void test_text_cycles(void)
 	text_layout(&font_body, row38, sizeof(row38) - 1, 240, &line);
 	CHECK_EQ(line.count, 38);
 	CHECK(!line.truncated);
-	struct text_run run = {vram, 16, &font_body, line.glyphs, line.count, 1, 2, 1};
+	struct text_run run = {.tiles = vram,
+			       .column_words = 16,
+			       .font = &font_body,
+			       .glyphs = line.glyphs,
+			       .count = line.count,
+			       .x = 1,
+			       .y = 2,
+			       .ink = 1};
 	u32 row = cycles(text_blit, &run);
-	struct text_run one = {vram, 16, &font_body, line.glyphs + 1, 1, 3, 2, 1};  // 'u' at x 3
+	struct text_run one = {.tiles = vram,
+			       .column_words = 16,
+			       .font = &font_body,
+			       .glyphs = line.glyphs + 1,
+			       .count = 1,
+			       .x = 3,
+			       .y = 2,
+			       .ink = 1};  // 'u' at x 3
 	u32 glyph = cycles(text_blit, &one);
 	cycles_report("text-glyph", glyph);
 	cycles_report("text-row38", row);
@@ -258,7 +324,14 @@ void test_text_cycles(void)
 	// A heading's worth: 20 glyphs of the 16 px font, most over 8 px wide
 	static const char heading[] = "SETTINGS AND OPTIONS";
 	text_layout(&font_heading, heading, sizeof(heading) - 1, 240, &line);
-	struct text_run head = {vram, 16, &font_heading, line.glyphs, line.count, 1, 0, 1};
+	struct text_run head = {.tiles = vram,
+				.column_words = 16,
+				.font = &font_heading,
+				.glyphs = line.glyphs,
+				.count = line.count,
+				.x = 1,
+				.y = 0,
+				.ink = 1};
 	u32 wide = cycles(text_blit, &head);
 	cycles_report("text-heading20", wide);
 	tlog("text-heading20: %lu cycles a glyph", (unsigned long)(wide / line.count));
@@ -297,11 +370,25 @@ void test_text_cycles(void)
 	REG_IME = ime;
 	text_layout(&font_body, name25, sizeof(name25) - 1, 224, &line);
 	CHECK_EQ(line.count, 25);
-	struct text_run run25 = {canvas.tiles, 168, &font_body, line.glyphs, line.count, 6, y14 + 1, 6};
+	struct text_run run25 = {.tiles = canvas.tiles,
+				 .column_words = 168,
+				 .font = &font_body,
+				 .glyphs = line.glyphs,
+				 .count = line.count,
+				 .x = 6,
+				 .y = y14 + 1,
+				 .ink = 6};
 	u32 row25 = cycles(text_blit, &run25);
 	text_layout(&font_body, name40, sizeof(name40) - 1, 224, &line);
 	CHECK_EQ(line.count, 40);
-	struct text_run run40 = {canvas.tiles, 168, &font_body, line.glyphs, line.count, 6, y14 + 1, 6};
+	struct text_run run40 = {.tiles = canvas.tiles,
+				 .column_words = 168,
+				 .font = &font_body,
+				 .glyphs = line.glyphs,
+				 .count = line.count,
+				 .x = 6,
+				 .y = y14 + 1,
+				 .ink = 6};
 	u32 row40 = cycles(text_blit, &run40);
 	REG_IME = 0;
 	REG_WAITCNT_CART = WAITCNT_MENU;

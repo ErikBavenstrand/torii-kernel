@@ -124,7 +124,12 @@ static const u16 mark_bits[] ALIGN(4) = {
 };
 static const struct torii_glyph mark_glyphs[] = {
 	{0, 8, 0, 7, 7}, {14, 8, 0, 7, 7}, {28, 13, 0, 9, 12}, {46, 11, 0, 7, 9}};
-static const struct torii_font marks = {mark_glyphs, (const uint8_t *)mark_bits, 9, 0, 2, 12};
+static const struct torii_font marks = {.glyphs = mark_glyphs,
+					.bits = (const uint8_t *)mark_bits,
+					.line_height = 9,
+					.baseline = 0,
+					.row_bytes = 2,
+					.max_width = 12};
 
 // --- State ---------------------------------------------------------------------
 
@@ -281,17 +286,23 @@ static void paint_field(void *ctx, u8 nd, const struct text_window *win, u32 set
 static u32 wrap_lines(const struct torii_font *font, const char *s, u32 len, u32 width, u16 *starts)
 {
 	u32 n = 1, pos = 0, x = 0, space = 0;  // space: where a break after the line's last space goes, 0 none
+	u32 prev = TORII_FONT_REPLACEMENT;     // the glyph before, for kerning; none at a line's start
 	starts[0] = 0;
 	while (pos < len && n < LINES_MAX) {
 		if (s[pos] == '\n') {
 			starts[n++] = (u16)++pos;
 			x = 0;
 			space = 0;
+			prev = TORII_FONT_REPLACEMENT;
 			continue;
 		}
 		u32 at = pos;
-		int g = text_next_glyph(s, len, &pos);
-		u32 adv = g >= 0 ? font->glyphs[g].advance : 0;
+		int g = text_next_glyph(font, s, len, &pos);
+		u32 adv = g >= 0 ? torii_font_glyph(font, (u32)g)->advance : 0;
+		if (g >= 0 && torii_kern(font, prev, (u32)g))
+			adv--;
+		if (g >= 0)
+			prev = (u32)g;
 		if (x + adv > width && at > starts[n - 1]) {
 			u32 brk = space > starts[n - 1] ? space : at;
 			starts[n++] = (u16)brk;

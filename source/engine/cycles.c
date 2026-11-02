@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "cycles.h"
+#include "../logbuf.h"
 #include "../tlog.h"
 
 void cycles_report(const char *name, u32 cycles)
@@ -22,6 +23,11 @@ static struct {
 void cycles_frame(const char *name, u32 cycles)
 {
 	tlog_console("frame-cycles: %s %lu", name, (unsigned long)cycles);
+	cycles_note(name, cycles);
+}
+
+void cycles_note(const char *name, u32 cycles)
+{
 	for (u32 i = 0; i < SUMMARY_NAMES; i++) {
 		if (summary[i].name && strcmp(summary[i].name, name) != 0)
 			continue;
@@ -41,6 +47,13 @@ void cycles_frame(const char *name, u32 cycles)
 
 void cycles_summary(void)
 {
+	// The lines go into the ring: with no room left for all of them they
+	// would push older lines out, so they wait for the next flush
+	u32 lines = 0;
+	for (u32 i = 0; i <= SUMMARY_NAMES && summary[i].name; i++)
+		lines += summary[i].worst > ENGINE_FRAME_CYCLES;
+	if (lines && tlog_pending() + lines * LOG_LINE_MAX > LOG_RING_SIZE)
+		return;
 	for (u32 i = 0; i <= SUMMARY_NAMES && summary[i].name; i++)
 		if (summary[i].worst > ENGINE_FRAME_CYCLES)
 			tlog_debug("frame-cycles summary: %s: %lu frames, worst %lu, mean %lu", summary[i].name,

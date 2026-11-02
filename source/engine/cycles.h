@@ -64,10 +64,14 @@ void cycles_report(const char *name, u32 cycles);
 // and would flood the card's log. The frame also counts towards NAME's
 // summary.
 void cycles_frame(const char *name, u32 cycles);
+// The summary's count alone, with no console line (cycles_frame less the line)
+void cycles_note(const char *name, u32 cycles);
 // Logs, at DEBUG, each name's measured frames since the last summary
 // ("frame-cycles summary: NAME: N frames, worst W, mean M"), for the names
 // with a frame over ENGINE_FRAME_CYCLES only (the rest filled the card's
-// log with nothing to act on), and starts again. tlog_flush calls it.
+// log with nothing to act on), and starts again. tlog_flush calls it. With
+// too little room in the log's ring for the lines, it writes none and keeps
+// the figures for the next flush, so they never push older lines out.
 void cycles_summary(void);
 
 #endif

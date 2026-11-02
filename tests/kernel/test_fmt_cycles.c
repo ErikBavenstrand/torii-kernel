@@ -4,6 +4,7 @@
 #include <gba_base.h>
 
 #include "../../source/engine/cycles.h"
+#include "../../source/logbuf.h"
 #include "../../source/tlog.h"
 #include "tests.h"
 #include "torii_test.h"
@@ -28,4 +29,23 @@ void test_fmt_cycles(void)
 		snprintf(out, 64, "%s %s %lu%s.gba", "Golden", "Sun", (unsigned long)i, i & 1 ? " (USA)" : "");
 	tlog("fmt: %lu cycles a row name",
 	     (unsigned long)(cycles_since(start) / 100));  // newlib took 54,000, this about 25,000
+}
+
+// The frame-cycles summary never pushes older lines out of a nearly full ring
+void test_cycles_summary_room(void)
+{
+	static const char pad[] =
+		"0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789"
+		"0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789";
+	cycles_summary();  // what earlier tests left
+	cycles_note("summary-room", ENGINE_FRAME_CYCLES + 5000);
+	u32 before = tlog_pending();
+	cycles_summary();
+	CHECK(tlog_pending() == before || tlog_wants(TLOG_DEBUG));
+	while (tlog_pending() + LOG_LINE_MAX <= LOG_RING_SIZE)
+		tlog_force(TLOG_INFO, "%s", pad);
+	cycles_note("summary-room", ENGINE_FRAME_CYCLES + 5000);
+	before = tlog_pending();
+	cycles_summary();
+	CHECK_EQ(tlog_pending(), before);
 }

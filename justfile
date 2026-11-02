@@ -389,6 +389,11 @@ lang:
 assets:
     uv run -q tools/asset.py ui
 
+# Rewrite the script font the tests use (assets/fonts/test, for the pseudo-locale en-XA;
+# committed, tests/font_test.py checks it is current)
+script-test-font:
+    uv run -q tools/script_test_font.py
+
 # Redraw the font candidates' preview sheets in docs/research/fonts, e.g. `just font-preview galmuri`
 font-preview *keys:
     uv run -q tools/font_preview.py {{keys}}

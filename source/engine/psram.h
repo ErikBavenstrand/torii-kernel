@@ -29,7 +29,8 @@
 //	7.5 MB    box art's lookups (boxart.c): the set of art files on the card
 //	          and the paths of the covers wanted, PSRAM_ART_BYTES
 //	7.625 MB  the language pack in use (lang_load.c), PSRAM_LANG_BASE, 64 KB;
-//	          the rest to 8 MB (320 KB) held for 1.0's script fonts
+//	          then its script fonts (engine/script.h), PSRAM_LANG_FONT_BASE,
+//	          the rest to 8 MB (320 KB)
 //
 // Page 1, while the menu runs, holds a larger cheat file's windows
 // (cheatstore.h, CHEATSTORE_SLOT_PAGE), selected only within the calls that
@@ -91,8 +92,8 @@
 #define PSRAM_NAMES_DB_BYTES 0x001C0000u
 #define PSRAM_NAMES_CACHE_BASE (PSRAM_NAMES_DB_BASE + PSRAM_NAMES_DB_BYTES)
 #define PSRAM_NAMES_CACHE_BYTES 0x000C0000u
-// The language pack in use (lang_load.c), up to LANG_PACK_MAX, then 1.0's
-// script fonts to the window's end
+// The language pack in use (lang_load.c), up to LANG_PACK_MAX, then its script
+// fonts (engine/script.h), up to SCRIPT_MAX
 #define PSRAM_LANG_BASE (PSRAM_WINDOW + 0x007A0000u)
 #define PSRAM_LANG_BYTES 0x00010000u
 #define PSRAM_LANG_FONT_BASE (PSRAM_LANG_BASE + PSRAM_LANG_BYTES)

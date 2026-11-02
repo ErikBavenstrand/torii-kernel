@@ -10,7 +10,7 @@ python3 tools/hostcc.py dist/host/tests \
   source/safefile_scan.c source/userdata.c source/screens/registry.c source/screens/carousel_ring.c source/screens/settings_layout.c \
   source/engine/motion.c source/engine/ease_lut.c source/engine/input.c \
   source/engine/pool.c source/engine/res.c source/engine/budget.c \
-  source/engine/text_layout.c source/engine/font_body.c source/engine/font_heading.c \
+  source/engine/text_layout.c source/engine/script.c source/engine/font_body.c source/engine/font_heading.c \
   source/engine/asset.c source/engine/covercache.c source/engine/affine.c \
   source/ui/ui_core.c source/ui/ui_ring.c source/ui/rowcache.c source/ui/ui_theme.c source/ui/palette.c source/ui/keyq.c \
   source/ui/ui_reading.c source/ui/letter.c source/gamelist.c \

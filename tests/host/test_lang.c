@@ -2,6 +2,7 @@
 // strings, the pack checks, the dates and numbers, and the language list.
 #include <string.h>
 
+#include "../../source/engine/script.h"
 #include "../../source/lang.h"
 #include "../kernel/lang_test_pack.h"
 #include "../kernel/torii_test.h"
@@ -163,6 +164,44 @@ void test_lang_pack(void)
 	size = lang_test_pack(pack, sizeof(pack_words), "sv", "Svenska", strings, 1);
 	lang_test_put32(pack + 12, LANG_PACK_MAX + 2);
 	CHECK_EQ(lang_pack_check_header(pack), LANG_PACK_BAD);
+}
+
+// A pack with a script font after its strings: the strings are checked alone,
+// the font's place must fit the header's size
+void test_lang_pack_font(void)
+{
+	static const struct lang_test_string strings[] = {{STR_ITEM_RECENT, "Senaste"}};
+	u32 size = lang_test_pack(pack, sizeof(pack_words), "sv", "Svenska", strings, 1);
+	u32 strings_end = (size + 3) & ~3u, font = 96;
+	lang_test_put32(pack + 12, strings_end + font);
+	lang_test_put32(pack + 52, strings_end);
+	lang_test_put32(pack + 56, font);
+	lang_test_pack_seal(pack, strings_end);
+	CHECK_EQ(lang_pack_strings_bytes(pack), strings_end);
+	CHECK_EQ(lang_pack_check_header(pack), LANG_PACK_OK);
+	CHECK_EQ(lang_pack_check(pack, strings_end), LANG_PACK_OK);
+	CHECK_EQ(lang_pack_check(pack, strings_end + font), LANG_PACK_SHORT);  // the strings alone are what is checked
+	u32 at, bytes;
+	lang_pack_font(pack, &at, &bytes);
+	CHECK(at == strings_end && bytes == font);
+	// A font that doesn't end where the pack does, one not on a word, one bigger than its room, one without bytes
+	lang_test_put32(pack + 12, strings_end + font + 4);
+	CHECK_EQ(lang_pack_strings_bytes(pack), 0);
+	CHECK_EQ(lang_pack_check_header(pack), LANG_PACK_BAD);
+	lang_test_put32(pack + 12, strings_end + font);
+	lang_test_put32(pack + 52, strings_end + 2);
+	lang_test_put32(pack + 56, font - 2);
+	CHECK_EQ(lang_pack_check_header(pack), LANG_PACK_BAD);
+	lang_test_put32(pack + 52, strings_end);
+	lang_test_put32(pack + 56, font);
+	lang_test_put32(pack + 12, strings_end + SCRIPT_MAX + 4);
+	lang_test_put32(pack + 56, SCRIPT_MAX + 4);
+	CHECK_EQ(lang_pack_check_header(pack), LANG_PACK_BAD);
+	lang_test_put32(pack + 12, strings_end);
+	lang_test_put32(pack + 56, 0);  // a font offset with no font
+	CHECK_EQ(lang_pack_check_header(pack), LANG_PACK_BAD);
+	lang_test_put32(pack + 52, 0);
+	CHECK_EQ(lang_pack_check_header(pack), LANG_PACK_OK);
 }
 
 void test_lang_launch(void)

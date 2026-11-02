@@ -2,6 +2,7 @@
 #include <string.h>
 
 #include "lang.h"
+#include "engine/script.h"
 #include "crc32.h"
 
 // The strings in use: a pack's offsets and pool, for ids below count; the
@@ -41,15 +42,39 @@ const char *const lang_pack_check_names[LANG_PACK_CHECKS] = {
 	"ok", "too short", "not a pack", "for another Torii (stale)", "damaged (CRC)", "an offset past its strings",
 };
 
+// The pack's strings end where its script font begins, or at its end: size
+// is the whole file's bytes. 0 if the font's place makes no sense.
+static u32 strings_end(const u8 *pack)
+{
+	u32 size = rd32(pack + 12), font = rd32(pack + 52), font_bytes = rd32(pack + 56);
+	if (!font_bytes)
+		return font ? 0 : size;
+	if (font & 3 || font > size || font_bytes != size - font || font_bytes > SCRIPT_MAX)
+		return 0;
+	return font;
+}
+
+u32 lang_pack_strings_bytes(const u8 *pack)
+{
+	return strings_end(pack);
+}
+
+void lang_pack_font(const u8 *pack, u32 *offset, u32 *bytes)
+{
+	*offset = rd32(pack + 52);
+	*bytes = rd32(pack + 56);
+}
+
 static u32 check(const u8 *pack, u32 bytes, int header_only)
 {
 	if (bytes < LANG_HEADER)
 		return LANG_PACK_SHORT;
 	if (memcmp(pack, "TLNG", 4) != 0)
 		return LANG_PACK_MAGIC;
-	u32 count = rd16(pack + 6), size = rd32(pack + 12), pool = rd32(pack + 60);
+	u32 count = rd16(pack + 6), pool = rd32(pack + 60);
 	if (rd16(pack + 4) != LANG_FORMAT || count != STR_COUNT || rd32(pack + 8) != LANG_KEY_HASH)
 		return LANG_PACK_STALE;
+	u32 size = strings_end(pack);
 	if (size > LANG_PACK_MAX || pool != LANG_HEADER + 2 * count || size <= pool)
 		return LANG_PACK_BAD;
 	if (bytes == LANG_HEADER && header_only)

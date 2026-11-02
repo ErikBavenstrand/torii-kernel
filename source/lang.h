@@ -121,9 +121,15 @@ enum lang_pack_check {
 	LANG_PACK_BAD,  // an offset past its strings, or strings with no end
 	LANG_PACK_CHECKS
 };
-// Whether bytes at pack (a whole pack file) are a pack this kernel takes:
-// LANG_PACK_OK, or why not
+// Whether bytes at pack (the pack's strings: a whole pack file, less its
+// script font if it has one) are a pack this kernel takes: LANG_PACK_OK, or
+// why not
 u32 lang_pack_check(const u8 *pack, u32 bytes);
+// How many bytes the pack's strings take (what lang_pack_check wants), from
+// its header; 0 if the header places its script font nonsensically
+u32 lang_pack_strings_bytes(const u8 *pack);
+// Where the pack's script font is in the file and its bytes (0: none), from the header
+void lang_pack_font(const u8 *pack, u32 *offset, u32 *bytes);
 // The same for its first LANG_HEADER bytes alone (a listing): its size,
 // CRC and offsets wait for lang_pack_check
 u32 lang_pack_check_header(const u8 *pack);
@@ -179,7 +185,9 @@ int lang_switch(u32 i);
 // The index of the language in use
 u32 lang_current(void);
 // Before a launch fills PSRAM: the launch's strings to RAM
-// (lang_keep_launch), in the row cache's room until the menu runs again
+// (lang_keep_launch), in the row cache's room until the menu runs again, and
+// the pack's script font dropped (script_drop): what the launch draws shows
+// the replacement box for those characters
 void lang_before_launch(void);
 // The menu's loop: loads the pack again after a launch that came back
 void lang_poll(void);

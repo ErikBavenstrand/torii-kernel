@@ -8,6 +8,13 @@
 #define CHARSET_REPLACEMENT 0xFFFDu
 
 // Reads the UTF-8 character at s[*pos], one of len bytes, moves *pos past
+// it, and returns its code point as it is: CHARSET_REPLACEMENT for a broken
+// sequence, CHARSET_NONE for a stray continuation byte and for a soft hyphen.
+u32 charset_next(const char *s, u32 len, u32 *pos);
+// The code point to draw for c (U+0100 and up; Latin-1 stays as it is) when
+// no script font has it: charset_next_latin1's rules below
+u32 charset_fold_latin1(u32 c);
+// Reads the UTF-8 character at s[*pos], one of len bytes, moves *pos past
 // it, and returns the code point to draw: U+0000-U+00FF as it is. Latin
 // Extended-A letters lose their accents, dashes and curly quotes become
 // ASCII, and anything else, or a broken sequence, is CHARSET_REPLACEMENT.

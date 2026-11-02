@@ -34,6 +34,18 @@ The .ini format (UTF-8):
 language calls itself, shown in Settings), and in en.ini launch, the
 sections a game's launch reads after the game fills PSRAM (lang.h:
 lang_before_launch). Those sections come first in en.ini.
+A language that needs characters beyond Latin-1 also names a script font:
+  font = assets/fonts/NAME.bdf         a BDF (path from the repository's root),
+                                       for the body font's lines (12 px)
+  font_heading = assets/fonts/NAME.bdf the heading font's (16 px); without it
+                                       headings draw the body font's glyphs
+  font_ranges = 3040-30FF, 4E00-9FFF   the code points to take (hex, from 0100),
+                                       default every one the BDF has
+The glyphs are placed on the menu fonts' lines (tools/font.py: baseline,
+squeeze and clip) and go into the pack as a blob (source/engine/script.h) after
+its strings. Texts may then use those characters; the kernel loads the blob into
+PSRAM with the pack, so a launch, which fills PSRAM, draws the replacement box
+for them again.
 
 A pack (.lng), little-endian:
   0   "TLNG"
@@ -41,16 +53,18 @@ A pack (.lng), little-endian:
   8   u32 CRC32 of English's keys in order, each with its placeholders: a
       pack built against other keys, or keys that fill in other values, is
       stale, and the kernel takes none of it (Rockbox's version check)
-  12  u32 the pack's bytes
-  16  u32 CRC32 of the bytes from 20 on
+  12  u32 the pack's bytes (the strings, then the script font if any)
+  16  u32 CRC32 of the strings' bytes, from 20 on
   20  char code[8], char name[24], NUL-padded
-  52  u32 font offset, u32 font bytes: 0 until 1.0's script fonts
+  52  u32 font offset (in the file, a multiple of 4: where the strings end),
+      u32 font bytes; both 0 for a pack with no script font
   60  u32 the string pool's offset (80 + 2 x count)
   64  char release[16]: the Torii it was built with (TORII_VERSION), NUL-padded
   80  u16 offsets[count]: each string's place in the pool, 0 for one the
       pack doesn't have (the pool starts with a NUL)
   then the pool: the strings, each ended by a NUL
-A pack is at most 64 KB (PACK_MAX): the room it has in PSRAM. Every
+A pack's strings are at most 64 KB (PACK_MAX): the room they have in PSRAM; its
+script font at most 320 KB (font.py's SCRIPT_MAX), with its own CRC32. Every
 placeholder and every .one/.other pair must match English's, checked here.
 """
 
@@ -208,13 +222,64 @@ def latin1(s: str) -> bool:
     return all(ord(c) <= 0xFF for c in s)
 
 
+def font_tool():
+    """tools/font.py, which builds the script fonts."""
+    here = str(Path(__file__).resolve().parent)
+    if here not in sys.path:
+        sys.path.insert(0, here)
+    import font
+
+    return font
+
+
+def script_raw(path: Path):
+    """A script font's BDF glyphs (cached by file)."""
+    key = str(path)
+    if key not in SCRIPT_RAW:
+        font = font_tool()
+        try:
+            SCRIPT_RAW[key] = font.read_bdf(path.read_bytes().decode("latin-1"))[0]
+        except (OSError, ValueError) as e:
+            raise LangError(f"{path}: {e}") from e
+    return SCRIPT_RAW[key]
+
+
+SCRIPT_RAW: dict[str, dict] = {}
+
+
+def script_ranges(lang: Lang):
+    text = lang.meta.get("font_ranges")
+    if text is None:
+        return None
+    try:
+        return font_tool().parse_ranges(text)
+    except ValueError as e:
+        raise LangError(f"{lang.path}: font_ranges: {e}") from e
+
+
+def script_codepoints(lang: Lang) -> set[int]:
+    """The code points past Latin-1 the pack's script font draws (none without one)."""
+    if "font" not in lang.meta:
+        return set()
+    raw = script_raw(ROOT / lang.meta["font"])
+    ranges = script_ranges(lang)
+    return {
+        cp
+        for cp in raw
+        if 0x100 <= cp <= 0xFFFF
+        and (ranges is None or any(a <= cp <= b for a, b in ranges))
+    }
+
+
 def check_text(lang: Lang) -> None:
+    drawn = script_codepoints(lang)
     for key in lang.keys:
         t = lang.text[key]
-        if not latin1(t):
-            bad = next(c for c in t if ord(c) > 0xFF)
+        if not all(ord(c) <= 0xFF or ord(c) in drawn for c in t):
+            bad = next(c for c in t if ord(c) > 0xFF and ord(c) not in drawn)
             raise LangError(
-                f"{lang.where(key)}: {bad!r} isn't Latin-1, which the fonts draw"
+                f"{lang.where(key)}: {bad!r} isn't Latin-1, which the fonts draw, "
+                "nor in the pack's script font"
             )
         names = {m.group(1) for m in PLACEHOLDER_RE.finditer(t)}
         named = {n for n in names if not n.isdigit()}
@@ -409,6 +474,30 @@ def pool_of(lang: Lang, en: Lang, keys: list[str]) -> tuple[list[int], bytes]:
     return offsets, bytes(pool)
 
 
+def font_blob(lang: Lang) -> bytes:
+    """The pack's script font (source/engine/script.h), or nothing."""
+    if "font" not in lang.meta:
+        return b""
+    font = font_tool()
+    ranges = script_ranges(lang)
+    records = []
+    for name, key in (("body", "font"), ("heading", "font_heading")):
+        if key not in lang.meta:
+            continue
+        height, baseline = font.builtin_baseline(ROOT, name)
+        try:
+            glyphs = font.script_glyphs(
+                script_raw(ROOT / lang.meta[key]), ranges, height, baseline
+            )
+            records.append(font.script_record(glyphs))
+        except ValueError as e:
+            raise LangError(f"{lang.path}: {key}: {e}") from e
+    try:
+        return font.script_blob(records)
+    except ValueError as e:
+        raise LangError(f"{lang.path}: {e}") from e
+
+
 def pack(lang: Lang, en: Lang) -> bytes:
     offsets, pool = pool_of(lang, en, en.keys)
     count = len(en.keys)
@@ -416,18 +505,23 @@ def pack(lang: Lang, en: Lang) -> bytes:
     body = bytearray()
     body += lang.meta["code"].encode().ljust(CODE_BYTES, b"\0")
     body += lang.meta["name"].encode().ljust(NAME_BYTES, b"\0")
-    body += le32(0) + le32(0)  # the font: none until 1.0
+    blob = font_blob(lang)
+    font_at = len(body)  # patched below: where the font's offset and bytes go
+    body += le32(0) + le32(0)
     body += le32(pool_at)
     body += release().encode().ljust(RELEASE_BYTES, b"\0")
     body += b"".join(le16(o) for o in offsets)
     body += pool
-    if len(body) % 2:
+    while len(body) % (4 if blob else 2):
         body += b"\0"
-    size = 20 + len(body)
-    if size > PACK_MAX:
+    strings = 20 + len(body)
+    if strings > PACK_MAX:
         raise LangError(
-            f"{lang.path}: the pack is {size} bytes, over {PACK_MAX} (its room in PSRAM)"
+            f"{lang.path}: the pack's strings are {strings} bytes, over {PACK_MAX} (their room in PSRAM)"
         )
+    if blob:
+        body[font_at : font_at + 8] = le32(strings) + le32(len(blob))
+    size = strings + len(blob)
     end = launch_end(en)
     _, launch_pool = pool_of(lang, en, en.keys[:end])
     launch = 2 * end + len(launch_pool)
@@ -436,7 +530,7 @@ def pack(lang: Lang, en: Lang) -> bytes:
             f"{lang.path}: the launch's strings take {launch} bytes, over {LAUNCH_MAX}"
         )
     head = MAGIC + le16(FORMAT) + le16(count) + le32(key_hash(en)) + le32(size)
-    return head + le32(zlib.crc32(bytes(body)) & 0xFFFFFFFF) + bytes(body)
+    return head + le32(zlib.crc32(bytes(body)) & 0xFFFFFFFF) + bytes(body) + blob
 
 
 # The pseudo-locale: every letter that has one in Latin-1 gets an accent,
@@ -451,6 +545,10 @@ def pseudo(en: Lang) -> str:
         "[meta]",
         f"code = {PSEUDO_CODE}",
         "name = Éñglísh (pséúdó)",
+        # Numbered boxes for Greek, Cyrillic and kana (tools/script_test_font.py)
+        "font = assets/fonts/test/script-test-body.bdf",
+        "font_heading = assets/fonts/test/script-test-heading.bdf",
+        "font_ranges = 0141, 0391-03C9, 0410-044F, 3041-3096",
     ]
     section = None
     for key in en.keys:

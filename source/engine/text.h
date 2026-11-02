@@ -16,6 +16,7 @@
 #include <gba_base.h>
 
 #include "font.h"
+#include "script.h"
 
 struct text_window {
 	u32 *tiles;  // first tile, word aligned (VRAM or RAM)
@@ -27,19 +28,22 @@ struct text_window {
 // no narrower advance); text_layout stops there.
 #define TEXT_MAX_GLYPHS 128
 
-// The glyph a UTF-8 string draws next: reads the character at s[*pos] and
-// moves *pos past it (charset_next_latin1). Returns its index in
-// font->glyphs, or -1 to draw nothing (a stray continuation byte).
-int text_next_glyph(const char *s, u32 len, u32 *pos);
+// The glyph a UTF-8 string draws next in font: reads the character at s[*pos]
+// and moves *pos past it. Returns its index in font->glyphs, or a script
+// glyph's (from TORII_FONT_SCRIPT, when the pack in use has the character:
+// script.h), or -1 to draw nothing (a stray continuation byte). Anything else
+// past Latin-1 draws as charset_next_latin1 folds it, or as the replacement box.
+int text_next_glyph(const struct torii_font *font, const char *s, u32 len, u32 *pos);
 
 // Pen advance of a UTF-8 string, in pixels: the sum of its glyphs'
-// advances, which includes the gap after the last one (1 px in the menu
-// fonts).
+// advances (less a pixel for each kerned pair, torii_kern), which includes
+// the gap after the last one (1 px in the menu fonts).
 u32 text_width(const struct torii_font *font, const char *s, u32 len);
 
-// What text_draw draws: glyph indices into font->glyphs and where it ends.
+// What text_draw draws: glyph indices (font->glyphs' or script glyphs', kerned
+// variants included) and where it ends.
 struct text_line {
-	u8 glyphs[TEXT_MAX_GLYPHS];
+	u16 glyphs[TEXT_MAX_GLYPHS];
 	u32 count;
 	u32 advance;    // pen advance of the glyphs (trailing spaces may take it past the clip)
 	u32 extent;     // pixels from the pen to the right of the last inked pixel
@@ -110,12 +114,27 @@ struct text_run {
 	u32 *tiles;          // the window's first tile
 	u32 column_words;    // words in a tile column: window height * 8
 	const struct torii_font *font;  // glyphs wider than 8 px have 2 byte rows
-	const u8 *glyphs;    // indices into font->glyphs
+	const u16 *glyphs;   // indices into font->glyphs, or script glyphs (from TORII_FONT_SCRIPT)
 	u32 count;
 	u32 x;               // pen position of the first glyph
 	u32 y;               // line top
 	u32 ink;             // palette index, 0-15
+	const struct torii_glyph *script_glyphs;  // the script's table: NULL draws no script glyph
+	const u8 *script_bits;
+	s32 script_dy;       // added to a script glyph's top
 };
+
+// Points run's script fields at run->font's script glyphs, if the pack in use
+// has any (a run with none draws no script glyph)
+static inline void text_run_script(struct text_run *run)
+{
+	const struct torii_script *sc = script_of(run->font);
+	if (sc) {
+		run->script_glyphs = sc->glyphs;
+		run->script_bits = sc->bits;
+		run->script_dy = sc->dy;
+	}
+}
 
 // Draws a run into 4bpp column-major tiles. ARM code in IWRAM.
 IWRAM_CODE void text_blit(const struct text_run *run);

@@ -44,6 +44,7 @@ Each release's details are in `CHANGELOG.md`; the planning, ticket reports and r
 - **v0.9.16 Torii code and golden cheats (2026-11-02):** Torii code, a superset of VBA's lines with tests, blocks, buttons and bit operations (`docs/torii-code.md`); the menu reads the cart at WS0 3/1; a launch keeps ROM patches as runs in 48 KB of cart SRAM (about 23,000 patches, 4,096 a cheat). Pokémon Emerald's golden set (`tools/golden/emerald.py`, curation in `docs/research/cheats-emerald-curation.md`): 489 cheats, all Torii code, in Menu, Money, Pokémon, Battle, Wild, Overworld and Safari & Contests; an L+R+B menu (Heal party, PC, Shop, Warp, Gift Pokémon, Trade evolution, Legendaries again, Event tickets, Unlock); every folder reviewed against pokeemerald and on the emulated cart, with the bugs found fixed.
 - **v0.9.17 Fixes (2026-11-02):** In-game menu Off reaches NOR games (the overlay gives the game back); a 32 MB launch that left its cheats out keeps its `.pat` and isn't scanned again; Boot mode is set in Game info only (a game list's Play names the way, no stepper) and the SD page's Play names default's way; `tests/saves.sh rom-read-error`; the flaky `cheats.sh` step fixed (a SIGPIPE); Emerald's Free Day Care, Any Pokémon in the Frontier (Mew) and Forget HMs' summary-screen swap run on the emulated cart.
 - **v0.9.18 Fonts, tests and tooling (2026-11-02):** Ç ç ¡ ¿ µ keep their tail at 12 px, and font bitmaps take 1 byte a row for glyphs up to 8 px (6.8 KB to 3.7 KB of ROM); `tests/saves.sh rom-read-error` also fails a read at a ROM's third block; the `lang-live` golden (a pack switched in Settings reaches home and its pages, frame for frame as booting in Swedish); Swedish "Mellanr.", "Kopiera ny plats" and "1 snabbspar."; CI's static analysis gates on its baseline; `just check` plays only the games that ran a changed function (the `NO_COMPAT` list is gone); the debug frame summary counts a ninth name under "other"; `OMEGA_FPGA_VERSION` is validated; `font_preview.py --offline`; Forget HMs' level-up path run in battle on the emulated cart (a Mew at Lv 19 with Cut learned Mega Punch over Cut with the cheat, and "HM moves can't be forgotten now." without it).
+- **v0.9.19 Kerning and script fonts (2026-11-02):** kerning (13 left glyphs, 224 and 174 pairs in the body and heading fonts, picked by their ink: a variant of the left glyph a pixel narrower, one rule in `text_layout`, `text_width`, the labels, rename's wrapping, the copy's percentage and the in-game menu's lines); a language pack's script font (`font` in `[meta]`, `source/engine/script.h`; glyph indices are 16-bit; the pseudo-locale en-XA has numbered boxes for Greek, Cyrillic and kana, golden `lang-script`); frame figures leave out the log flush and the timing summary no longer pushes older lines out; the Swedish terms reviewed; `tests/cheats.sh` passed 5 runs in a row after the SIGPIPE fix.
 
 ## Open work, before 1.0
 
@@ -55,7 +56,6 @@ Each release's details are in `CHANGELOG.md`; the planning, ticket reports and r
 
 Code fixes that the emulator can test, plus the leftovers from v0.9.
 
-- **Languages:** the owner's review of the Swedish terms. v0.9.18 chose "Mellanr.", "Kopiera ny plats" and "1 snabbspar."; "Backup" and "Strl"/"Sist" stay (the box art list's facts have room for no more).
 
 ### Menus
 
@@ -67,7 +67,6 @@ The UX reviews' open proposals (`docs/design/v0.5/ux-review.md`, `settings-ux-re
 
 - **Menu speed:** the target is the menu visible within 2 frames; it measures 4 frames to the panel and 5 to the rows (`ingame-menu.md`).
 - **Hook coverage:** the exact-ROM hook patches cover only the EU builds of GTA Advance, Super Monkey Ball Jr., LEGO Star Wars II and Tomb Raider: Legend. Add the other regions (`docs/research/hook-coverage.md`).
-- **Sleep:** Pokémon Emerald's sleep stayed black on the real cart, and START+SELECT didn't wake it. It could be the real BIOS or the cart during Stop (`omega-de-hardware.md`); find out on the cart first.
 - **Sound after LOAD (1.0?):** games on Nintendo's MP2000 engine keep the PCM buffer's position in RAM, which could re-sync DMA1 at LOAD.
 - **Cheat search (shipped in v0.9.7–v0.9.10; [design](../design/v0.9/cheat-search.md)):** what is left of it. Reviewed 2026-10-31 (a code reviewer and an adversarial tester in the emulator); the review's fixes shipped. Open:
   - **Contestable decisions:** it borrows the save-state buffer (no other cart SRAM has 288 KB), so a state not yet on the card blocks it and saving a state ends it; a game whose stack top is the BIOS's default (`0x03007F00`) gets its stack 32 bytes lower for the live block, others none (Street Fighter Alpha 3, top `0x03007EC0`, crashed with it: "on now" sets the value once there); the Cheat search row is on the Cheats page when the game has a cheat list (the menu has room for nine rows); the menu's lines past the seventh draw a frame later, with the footer.
@@ -78,8 +77,7 @@ The UX reviews' open proposals (`docs/design/v0.5/ux-review.md`, `settings-ux-re
 
 ### Fonts and scripts
 
-- **(1.0?) Scripts beyond Latin-1:** a font file named in the pack's font field, loaded into the 320 KB held in PSRAM, plus a `charset` path past Latin-1. Glyphs outside Latin-1 draw a replacement box today.
-- **Kerning:** needs one rule in every place that sums advances (`text_layout.c`'s four loops, `text_width`, `paint.h`, `progress.c`, `rename.c`, `keypad.c`, the overlay's `ingame.c`), with the blitter drawing what they measured. The plan: kerned variants of the left glyph (advance one less, in the 31 free glyph slots) picked by one shared pair table, so the blitter needs no change.
+- **A real script font (1.0?):** the mechanism ships in v0.9.19 (a pack's `font` in `[meta]`, loaded into the 320 KB in PSRAM, tested with the numbered boxes of en-XA), but no pack has a font yet: it needs a full BDF with an open licence (Galmuri's Hangul and kana, say; the repository holds its Latin-1 subset only) and a translation to go with it. The in-game menu (`ingame.c`) and a launch's dialogs draw those characters as the replacement box, since a launch fills PSRAM.
 
 ### Emulators and cheats
 
@@ -88,41 +86,9 @@ The UX reviews' open proposals (`docs/design/v0.5/ux-review.md`, `settings-ux-re
 - **(maybe) Live values in game** (owner, 2026-10-30: less useful than the rest): each cheat in the in-game list shows the value now at the address it writes ("Money 3,421"), with digits the kernel draws for the overlay. Encrypted values (Pokémon's money) would read as nonsense.
 - From the trackers: jagoombacolor#42 accuracy tests, #43 a GBC-compatible ROM run as DMG, #34 the default palette; PocketNES#14 multiboot.
 
-### Golden cheats
-
-Pokémon Emerald's set is done (v0.9.16), with Forget HMs' level-up path run in v0.9.18. Left:
-
-- **Declined (owner, 2026-11-02), not to be built unless asked:** Fishing always bites, Feebas everywhere on Route 119, fast walking, trainers' Pokémon with perfect IVs; earlier declines are D52–D59 in the curation doc.
-
 ### Tooling, alongside any patch
 
-Static analysis gates CI against `tools/analyze-baseline.txt` (98 findings, style or false alarms: the `strcpy`s copy FatFs names into buffers sized for them, `library.c`'s `memcpy` is terminated by hand, and the v0.9.6 triage covers the rest).
-
-
-- **Logs:** frame-timing summaries carry the log write's time, not the scroll's, and on a nearly full buffer they can push out older lines (`source/engine/cycles.c`, `tlog_flush`). They're DEBUG only.
-- **Flaky `tests/cheats.sh`** (2026-11-01, twice in `just check`, passed on rerun): the silent exit was `tac | sed q` under `pipefail`, a SIGPIPE when `tac` outlived `sed` (fixed in v0.9.17, 754a719e). If it ever fails again with a FAIL line, the second visit not reaching the cheat screen is a separate bug.
-### Cart checks (the owner, before every tag)
-
-The steps are in `docs/release-checklist.md`.
-
-- **Cheat search (shipped in v0.9.7, never run on the cart):** a search in a game with a flash save and one with an EEPROM save (Pokémon Emerald's lives or money); "on now" holding a value; the found cheat filed on Back to Torii; a screenshot after a search in the same menu (the overlay's on-demand code); that games with the default stack top still boot and save with it 32 bytes lower.
-- **New in v0.9.17 and v0.9.18:** In-game menu Off on a NOR game; a 32 MB game's second launch (no scan); the SD popup's Play naming; Ç ç ¡ ¿ µ on a menu with long names, and text everywhere after the 1 byte rows.
-- **New in v0.9.16:** a cheat in Torii code with a test and a block, and one with buttons; Emerald's golden file with the menu, a warp, the shop and a ROM-patch cheat (Shop items cost 1) picked with many others, to check the 48 KB of patch runs in cart SRAM; the menu at WS0 3/1.
-- **New in v0.9:** Swedish from `torii-lang.zip`; the firmware screens on an up-to-date cart (none should show); About's raw version word. Record the raw word, so the allowlist can be narrowed.
-- **v0.8 still to check:**
-  - In-game menu Off, and custom menu keys.
-  - The in-game probe's verdict (`tests/roms/ingame`, Clean boot at Flash 128K, then A).
-  - A screenshot named by the clock as it was taken, with the game's clock left right afterwards (Pokémon Emerald).
-  - A 32 MB game's menu and cheats.
-- **Untried since v0.2.2:** DEBUG, NES, the EEPROM probe's verdict, and the clock against real time. The clock read an hour fast on 2026-10-27, most likely still on summer time, since the cart has no DST.
-- **Unmeasured:**
-  - The ROM copy rate (`PROGRESS_COPY_RATE`).
-  - The walk of a full card, and the single-sector SD command cost.
-  - SD folder open time, and the 251k-cycle frame on a folder of 1,024+ subfolders.
-  - Covers from an art folder of thousands of files.
-  - Identify, and crc.txt's write steps.
-  - About's first free-space read on exFAT.
-  - `CHIP_ERASE_FRAMES` from a timed Format all.
+Static analysis gates CI against `tools/analyze-baseline.txt` (97 findings, style or false alarms: the `strcpy`s copy FatFs names into buffers sized for them, `library.c`'s `memcpy` is terminated by hand, and the v0.9.6 triage covers the rest).
 
 ### Research (doesn't block 1.0 unless a finding does)
 

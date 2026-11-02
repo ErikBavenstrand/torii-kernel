@@ -1,0 +1,23 @@
+# A pack's script font (v0.9.19): the pseudo-locale en-XA brings numbered boxes
+# for Greek, Cyrillic and kana (tools/script_test_font.py), set in Settings
+# (slot 0, its id 0x53C4). Hello.gba's name has Greek and Cyrillic letters,
+# kana, a Latin Extended-A letter the font has (Ł: its own glyph, not the
+# menu font's L) and one it lacks (ó: folded), and a character no font has
+# (Ω, a box): the GBA page draws the body font's glyphs and Game info's title
+# the heading font's. Wider kana glyphs have two byte rows.
+#! settings 0=21444
+#! settings 28=1
+#! sd-file /torii/lang/en-XA.lng 0 dist/lang/en-XA.lng
+#! sd-name /Hello.gba tests/roms/hello/hello.gba "AA ΑΒΓ Дом ひらがな Łódź Ω (Japan)"
+-p 30:nav_test_action:2113929225
+-w "nav: test hook 9 "
+-w "nav: home ready"
+-k @8:RIGHT -k @12:- -k @20:A -k @24:-
+-w "nav: page gba ready"
+-s @30:gba.png
+-k @32:DOWN -k @36:-
+-k @60:START -k @64:-
+-w "screen ready: game-popup"
+-k @12:UP -k @16:- -k @24:UP -k @28:- -k @40:A -k @44:-
+-w "screen ready: game-info"
+-s @20:info.png

@@ -76,7 +76,8 @@ static void percent_glyph_load(struct percent_glyph *g, const struct torii_font 
 	memset(g, 0, sizeof(*g));
 	if (index < 0)
 		return;
-	const struct torii_glyph *src = &f->glyphs[index];
+	// The interrupt can't read PSRAM either: a script glyph shows the box
+	const struct torii_glyph *src = &f->glyphs[index >= (int)TORII_FONT_SCRIPT ? TORII_FONT_REPLACEMENT : index];
 	g->advance = src->advance;
 	g->width = (u8)(src->width < 16 ? src->width : 16);
 	g->top = src->top;
@@ -91,11 +92,15 @@ static void percent_glyph_load(struct percent_glyph *g, const struct torii_font 
 // The glyphs of s[0, len) into out, at most PERCENT_AFFIX; how many
 static u32 percent_affix(struct percent_glyph *out, const struct torii_font *f, const char *s, u32 len)
 {
-	u32 n = 0, pos = 0;
+	u32 n = 0, pos = 0, prev = TORII_FONT_REPLACEMENT;
 	while (pos < len && n < PERCENT_AFFIX) {
-		int g = text_next_glyph(s, len, &pos);
-		if (g >= 0)
-			percent_glyph_load(&out[n++], f, g);
+		int g = text_next_glyph(f, s, len, &pos);
+		if (g < 0)
+			continue;
+		if (n && torii_kern(f, prev, (u32)g))
+			out[n - 1].advance--;  // the same pair text_layout kerns, a pixel closer
+		percent_glyph_load(&out[n++], f, g);
+		prev = (u32)g;
 	}
 	return n;
 }
@@ -114,7 +119,7 @@ static int percent_hook(void)
 	for (u32 d = 0; d < 10; d++) {
 		char c = (char)('0' + d);
 		u32 pos = 0;
-		percent_glyph_load(&hook.digit[d], f, text_next_glyph(&c, 1, &pos));
+		percent_glyph_load(&hook.digit[d], f, text_next_glyph(f, &c, 1, &pos));
 	}
 	hook.scale = ((100u << 16) + hook.bar.width - 1) / hook.bar.width;
 	return 1;

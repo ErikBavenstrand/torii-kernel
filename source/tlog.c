@@ -711,7 +711,7 @@ void tlog_sd_ready(void (*between)(void))
 			between();
 }
 
-void tlog_flush(void)
+static void flush_now(void)
 {
 	char path[32];
 	u32 n;
@@ -790,6 +790,23 @@ void tlog_flush(void)
 	}
 	no_room = 0;
 	force_pending = 0;
+}
+
+// Cycles tlog_flush has spent since the last tlog_flush_cycles_take
+static u32 flush_cycles EWRAM_BSS;
+
+void tlog_flush(void)
+{
+	u32 start = cycles_now();
+	flush_now();
+	flush_cycles += cycles_since(start);
+}
+
+u32 tlog_flush_cycles_take(void)
+{
+	u32 n = flush_cycles;
+	flush_cycles = 0;
+	return n;
 }
 
 void tlog_force(u32 level, const char *format, ...)

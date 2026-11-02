@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import zlib
 from pathlib import Path
 
 from PIL import Image
@@ -386,6 +387,206 @@ class Vendored(unittest.TestCase):
                 check=False,
             )
             self.assertEqual(run.returncode, 0, run.stderr)
+
+
+def tiny_fonts():
+    """The two menu fonts as `just font` makes them."""
+    out = {}
+    for name, (path, height) in font.BUILTIN.items():
+        args = [str(ROOT / path), "--name", name, "--line-height", str(height)]
+        out[name] = font.load(font.parse_args([*args, "--squeeze", "--clip"]))
+    return out
+
+
+class Kerning(unittest.TestCase):
+    """A pair that sits a pixel closer (torii_kern in source/engine/font.h)."""
+
+    def test_pairs_keep_their_ink_apart(self):
+        for name, f in tiny_fonts().items():
+            pairs = f.kern
+            self.assertTrue(pairs, name)
+            self.assertLessEqual(len(pairs), font.KERN_MAX, name)
+            for left, rights in pairs.items():
+                self.assertIn(chr(left + font.FIRST), font.KERN_LEFTS)
+                for right in rights:
+                    # a pixel closer, no ink within one pixel of the other's: the
+                    # 2 px that ordinary neighbours keep
+                    self.assertGreaterEqual(
+                        font.ink_distance(f.glyphs[left], f.glyphs[right], 1), 2, name
+                    )
+
+    def test_expected_pairs(self):
+        for f in tiny_fonts().values():
+            t = font.index(ord("T"))
+            self.assertIn(font.index(ord("o")), f.kern[t])
+            self.assertIn(font.index(ord(".")), f.kern[t])
+            self.assertNotIn(font.index(ord("H")), f.kern[t])
+            self.assertNotIn(font.index(ord(" ")), f.kern[t])  # no spaces
+            # Only letters, the full stop and the comma follow, and only the listed letters kern
+            for rights in f.kern.values():
+                for right in rights:
+                    cp = right + font.FIRST
+                    self.assertTrue(chr(cp).isalpha() or chr(cp) in ".,")
+
+    def test_variants_in_the_table(self):
+        for name, f in tiny_fonts().items():
+            packed = font.pack(f)
+            self.assertEqual(len(packed.kerned), len(f.kern))
+            for slot, left in enumerate(packed.kerned):
+                base = packed.entries[left]
+                variant = packed.entries[font.REPLACEMENT + 1 + slot]
+                # the same bitmap, an advance one less
+                self.assertEqual(variant, (base[0], base[1] - 1, *base[2:]), name)
+            self.assertLessEqual(len(packed.entries), 256)
+
+    def test_c_has_the_tables(self):
+        f = tiny_fonts()["body"]
+        source = font.emit(f)
+        self.assertIn("kern_of", source)
+        self.assertIn(f"font_body_glyphs[TORII_FONT_GLYPHS + {len(f.kern)}]", source)
+        self.assertEqual(source.count("/* kerned "), len(f.kern))
+        # A font with no pair has no tables
+        none = tiny_fonts()["body"]
+        none.kern = {}
+        source = font.emit(none)
+        self.assertNotIn("kern_of", source)
+        self.assertIn("\tNULL,", source)
+
+
+def script_glyph(advance, pixels):
+    return font.Glyph(advance, set(pixels))
+
+
+class ScriptFont(unittest.TestCase):
+    """The blob a pack carries (source/engine/script.h)."""
+
+    def blob(self):
+        glyphs = {
+            0x141: script_glyph(6, {(0, 2), (1, 2), (2, 2)}),
+            0x391: script_glyph(7, {(0, 3), (4, 4)}),
+            0x392: script_glyph(7, {(0, 3), (4, 4)}),  # the same shape as 0x391
+            0x414: script_glyph(11, {(0, 1), (9, 2)}),  # 10 px wide: 2 byte rows
+            0x415: script_glyph(5, set()),  # blank
+        }
+        return font.script_blob([font.script_record(glyphs)]), glyphs
+
+    def test_header(self):
+        blob, _ = self.blob()
+        u16 = lambda at: int.from_bytes(blob[at : at + 2], "little")
+        u32 = lambda at: int.from_bytes(blob[at : at + 4], "little")
+        self.assertEqual(blob[:4], b"TSCF")
+        self.assertEqual((u16(4), u16(6)), (1, 1))
+        self.assertEqual(u32(8), zlib.crc32(blob[12:]))
+        self.assertEqual(u32(12), len(blob))
+        self.assertEqual((u32(16), u32(20)), (24, 0))
+        self.assertEqual(len(blob) % 4, 0)
+
+    def test_record(self):
+        blob, _ = self.blob()
+        rec = int.from_bytes(blob[16:20], "little")
+        u16 = lambda at: int.from_bytes(blob[rec + at : rec + at + 2], "little")
+        u32 = lambda at: int.from_bytes(blob[rec + at : rec + at + 4], "little")
+        ranges, count, table, bits = u16(0), u16(2), u32(4), u32(8)
+        # 0x141, 0x391-0x392, 0x414-0x415
+        self.assertEqual((ranges, count), (3, 5))
+        self.assertEqual(
+            [(u16(12 + 6 * i), u16(14 + 6 * i), u16(16 + 6 * i)) for i in range(3)],
+            [(0x141, 0x141, 0), (0x391, 0x392, 1), (0x414, 0x415, 3)],
+        )
+        self.assertEqual((table % 4, bits % 4), (0, 0))
+        entry = lambda i: tuple(blob[rec + table + 6 * i + 2 : rec + table + 6 * i + 6])
+        offset = lambda i: u16(table + 6 * i)
+        self.assertEqual(entry(0), (6, 2, 1, 3))  # advance, top, rows, width
+        self.assertEqual(entry(1), (7, 3, 2, 5))
+        self.assertEqual(entry(3), (11, 1, 2, 10))
+        self.assertEqual(entry(4)[2], 0)  # blank: no rows
+        self.assertEqual(offset(1), offset(2))  # one shape, stored once
+        # 1 byte rows for the narrow, 2 for the 10 px glyph; offsets count 4 byte units
+        data = blob[rec + bits :]
+        self.assertEqual(
+            data[offset(1) * 4 : offset(1) * 4 + 2], bytes([0b00001, 0b10000])
+        )
+        self.assertEqual(
+            data[offset(3) * 4 : offset(3) * 4 + 4],
+            bytes([0b1, 0b0, 0b0, 0b10]),  # rows 0b0000000001, 0b1000000000
+        )
+
+    def test_two_fonts(self):
+        glyphs = {0x391: script_glyph(7, {(0, 3)})}
+        rec = font.script_record(glyphs)
+        blob = font.script_blob([rec, rec])
+        u32 = lambda at: int.from_bytes(blob[at : at + 4], "little")
+        self.assertEqual(int.from_bytes(blob[6:8], "little"), 2)
+        self.assertEqual(u32(20) - u32(16), len(rec) + (-len(rec) % 4))
+        with self.assertRaises(ValueError):
+            font.script_blob([])
+        with self.assertRaises(ValueError):
+            font.script_blob([rec] * 3)
+        with self.assertRaises(ValueError):
+            font.script_record({})
+
+    def test_too_big(self):
+        # 20,000 distinct 12 x 12 glyphs are over 320 KB
+        glyphs = {
+            0x4E00 + i: script_glyph(
+                13,
+                {(11, 11), (0, 0)}
+                | {(bit // 12 + 1, bit % 12) for bit in range(15) if i >> bit & 1},
+            )
+            for i in range(0x6000)
+        }
+        with self.assertRaisesRegex(ValueError, "256 KB"):
+            font.script_blob([font.script_record(glyphs)])
+        # and more glyphs than the PSRAM holds tables for, all of one shape
+        blanks = {cp: script_glyph(5, set()) for cp in range(0x100, 0xFFFF)}
+        with self.assertRaisesRegex(ValueError, "over"):
+            font.script_blob([font.script_record(blanks)])
+
+    def test_glyphs_from_a_bdf(self):
+        raw, _ = font.read_bdf(
+            (ROOT / "assets/fonts/test/script-test-body.bdf").read_text()
+        )
+        height, baseline = font.builtin_baseline(ROOT, "body")
+        self.assertEqual(height, 12)
+        glyphs = font.script_glyphs(raw, [(0x391, 0x393)], height, baseline)
+        self.assertEqual(sorted(glyphs), [0x391, 0x392, 0x393])
+        g = glyphs[0x391]
+        self.assertEqual(g.advance, 7)
+        rows = sorted({y for _, y in g.pixels})
+        self.assertEqual((rows[0], rows[-1]), (baseline - 8, baseline - 1))
+        # No range: every code point past Latin-1 the font has, none below
+        every = font.script_glyphs(raw, None, height, baseline)
+        self.assertEqual(min(every), 0x141)
+        self.assertEqual(len(every), len(raw))
+
+    def test_ranges(self):
+        self.assertEqual(
+            font.parse_ranges("0370-03FF, 0400-04FF,3042"),
+            [(0x370, 0x3FF), (0x400, 0x4FF), (0x3042, 0x3042)],
+        )
+        for bad in ("00FF", "0300-0200", "0200-10000", "xyz"):
+            with self.assertRaises(ValueError):
+                font.parse_ranges(bad)
+
+    def test_builtin_metrics_match_the_committed_fonts(self):
+        for name in ("body", "heading"):
+            source = (ROOT / "source/engine" / f"font_{name}.c").read_text()
+            tail = source.split(f"const struct torii_font font_{name} = {{")[1]
+            numbers = [t.strip(",") for t in tail.split()[2:6]]
+            height, baseline = font.builtin_baseline(ROOT, name)
+            self.assertEqual((int(numbers[0]), int(numbers[1])), (height, baseline))
+
+    def test_test_font_is_current(self):
+        sys.path.insert(0, str(ROOT / "tools"))
+        import script_test_font
+
+        for name, height, narrow, wide in script_test_font.FONTS:
+            path = ROOT / "assets/fonts/test" / name
+            self.assertEqual(
+                path.read_text(),
+                script_test_font.make(height, narrow, wide),
+                f"{name}: run `just script-test-font`",
+            )
 
 
 class Png(unittest.TestCase):

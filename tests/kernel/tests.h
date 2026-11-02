@@ -46,6 +46,7 @@ void test_text_draw(void);
 void test_text_clear(void);
 void test_text_cycles(void);
 void test_fmt_cycles(void);
+void test_cycles_summary_room(void);
 void test_diag_line_cut(void);
 void test_engine_res_alloc(void);
 void test_engine_budget(void);

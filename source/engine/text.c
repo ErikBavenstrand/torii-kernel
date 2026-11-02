@@ -16,6 +16,9 @@ _Static_assert(offsetof(struct text_run, count) == 16, "RUN_COUNT");
 _Static_assert(offsetof(struct text_run, x) == 20, "RUN_X");
 _Static_assert(offsetof(struct text_run, y) == 24, "RUN_Y");
 _Static_assert(offsetof(struct text_run, ink) == 28, "RUN_INK");
+_Static_assert(offsetof(struct text_run, script_glyphs) == 32, "RUN_SCRIPT_GLYPHS");
+_Static_assert(offsetof(struct text_run, script_bits) == 36, "RUN_SCRIPT_BITS");
+_Static_assert(offsetof(struct text_run, script_dy) == 40, "RUN_SCRIPT_DY");
 _Static_assert(offsetof(struct torii_font, glyphs) == 0, "FONT_GLYPHS");
 _Static_assert(offsetof(struct torii_font, bits) == 4, "FONT_BITS");
 _Static_assert(sizeof(struct torii_glyph) == 6, "the glyph table's stride");
@@ -51,6 +54,7 @@ u32 text_draw_line(const struct text_window *win, const struct torii_font *font,
 		.y = y,
 		.ink = ink & 15,
 	};
+	text_run_script(&run);
 	text_blit(&run);
 	return x + line->advance;
 }

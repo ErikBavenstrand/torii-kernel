@@ -17,7 +17,7 @@ static u32 fit(const struct torii_font *font, const char *s, u32 len, u32 width,
 	int spaced = 0;
 	while (pos < len) {
 		u32 at = pos;
-		text_next_glyph(s, len, &pos);
+		text_next_glyph(font, s, len, &pos);
 		if (text_width(font, s, pos) > width)
 			break;
 		last_fit = pos;
@@ -34,7 +34,7 @@ static u32 fit(const struct torii_font *font, const char *s, u32 len, u32 width,
 		return last_space;
 	}
 	if (!last_fit)
-		text_next_glyph(s, len, &last_fit);  // one character, wider than the row
+		text_next_glyph(font, s, len, &last_fit);  // one character, wider than the row
 	*next = last_fit;
 	return last_fit;
 }

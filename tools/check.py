@@ -115,7 +115,12 @@ RULES = [
         "host tests",
     ),
     (
-        ["tools/font.py", "tests/font_test.py", "assets/fonts/*"],
+        [
+            "tools/font.py",
+            "tools/script_test_font.py",
+            "tests/font_test.py",
+            "assets/fonts/*",
+        ],
         {LINT, TEST_HOST},
         "font converter, tested by test-host",
     ),

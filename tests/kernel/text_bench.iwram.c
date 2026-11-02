@@ -33,7 +33,7 @@ IWRAM_CODE void bench_blit_c(const struct text_run *run)
 	const u32 ink = run->ink;
 	const u32 cw = run->column_words;
 	u32 *const base = run->tiles + run->y;
-	const u8 *g = run->glyphs, *const end = g + run->count;
+	const u16 *g = run->glyphs, *const end = g + run->count;
 	u32 x = run->x;
 
 	for (; g < end; g++) {

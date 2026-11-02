@@ -245,8 +245,22 @@ static void time_text(u32 *vram)
 	struct text_line line;
 	text_clear(&win, 0, 0, 240, 16, 0);
 	text_layout(&font_body, row38, sizeof(row38) - 1, 240, &line);
-	struct text_run row = {vram, 16, &font_body, line.glyphs, line.count, 1, 2, 1};
-	struct text_run one = {vram, 16, &font_body, line.glyphs + 1, 1, 3, 2, 1};  // 'u' at x 3
+	struct text_run row = {.tiles = vram,
+			       .column_words = 16,
+			       .font = &font_body,
+			       .glyphs = line.glyphs,
+			       .count = line.count,
+			       .x = 1,
+			       .y = 2,
+			       .ink = 1};
+	struct text_run one = {.tiles = vram,
+			       .column_words = 16,
+			       .font = &font_body,
+			       .glyphs = line.glyphs + 1,
+			       .count = 1,
+			       .x = 3,
+			       .y = 2,
+			       .ink = 1};  // 'u' at x 3
 	u32 glyph = blit_cycles(&one);
 	u32 row_cycles = blit_cycles(&row);
 	figure("diag-glyph", "glyph", glyph);

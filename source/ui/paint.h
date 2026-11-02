@@ -76,7 +76,7 @@ static inline void paint_card_fill(const struct text_window *win, u32 x, u32 y, 
 
 // Text as the blitter takes it: glyph indices and their pen advance
 struct paint_label {
-	u8 glyphs[PAINT_LABEL_MAX];
+	u16 glyphs[PAINT_LABEL_MAX];
 	u8 count;
 	u8 advance;  // px
 };
@@ -84,9 +84,9 @@ struct paint_label {
 // One glyph of font
 static inline void paint_label_glyph(const struct torii_font *font, u32 g, struct paint_label *l)
 {
-	l->glyphs[0] = (u8)g;
+	l->glyphs[0] = (u16)g;
 	l->count = 1;
-	l->advance = font->glyphs[g].advance;
+	l->advance = torii_font_glyph(font, g)->advance;
 }
 
 // A Latin-1 character's glyph (the menu's fonts start at U+0020)
@@ -95,17 +95,23 @@ static inline void paint_label_char(const struct torii_font *font, u32 c, struct
 	paint_label_glyph(font, c - TORII_FONT_FIRST, l);
 }
 
-// A short UTF-8 label's glyphs (cut at PAINT_LABEL_MAX)
+// A short UTF-8 label's glyphs (cut at PAINT_LABEL_MAX), kerned as text_layout does
 static inline void paint_label_text(const struct torii_font *font, const char *s, struct paint_label *l)
 {
-	u32 len = (u32)strlen(s), pos = 0, adv = 0;
+	u32 len = (u32)strlen(s), pos = 0, adv = 0, prev = TORII_FONT_REPLACEMENT;
 	l->count = 0;
 	while (pos < len && l->count < PAINT_LABEL_MAX) {
-		int g = text_next_glyph(s, len, &pos);
+		int g = text_next_glyph(font, s, len, &pos);
 		if (g < 0)
 			continue;
-		l->glyphs[l->count++] = (u8)g;
-		adv += font->glyphs[g].advance;
+		u32 kern = torii_kern(font, prev, (u32)g);
+		if (kern) {
+			l->glyphs[l->count - 1] = (u16)kern;
+			adv--;
+		}
+		l->glyphs[l->count++] = (u16)g;
+		adv += torii_font_glyph(font, (u32)g)->advance;
+		prev = (u32)g;
 	}
 	l->advance = (u8)(adv < 255 ? adv : 255);
 }
@@ -115,9 +121,18 @@ static inline void paint_label_text(const struct torii_font *font, const char *s
 static inline void paint_blit(const struct text_window *win, const struct torii_font *font, u32 x, u32 y, u32 ink,
 			      const struct paint_label *l)
 {
-	struct text_run run = {win->tiles, win->height * 8u, font, l->glyphs, l->count, x, y, ink & 15};
-	if (l->count)
+	struct text_run run = {.tiles = win->tiles,
+			       .column_words = win->height * 8u,
+			       .font = font,
+			       .glyphs = l->glyphs,
+			       .count = l->count,
+			       .x = x,
+			       .y = y,
+			       .ink = ink & 15};
+	if (l->count) {
+		text_run_script(&run);
 		text_blit(&run);
+	}
 }
 
 // A label centred in [x, x + w), its line's top at y

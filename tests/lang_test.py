@@ -201,7 +201,7 @@ class Pack(unittest.TestCase):
         self.assertEqual(u32(16), zlib.crc32(data[20:]))
         self.assertEqual(data[20:28].rstrip(b"\0"), b"sv")
         self.assertEqual(data[28:52].rstrip(b"\0"), b"Svenska")
-        self.assertEqual((u32(52), u32(56)), (0, 0))  # no font until 1.0
+        self.assertEqual((u32(52), u32(56)), (0, 0))  # no script font
         self.assertEqual(data[64:80].rstrip(b"\0").decode(), lang.release())
         pool = u32(60)
         self.assertEqual(pool, lang.HEADER + 2 * len(en.keys))
@@ -215,6 +215,50 @@ class Pack(unittest.TestCase):
         self.assertEqual(text("ingame.resume"), "Fortsätt".encode())
         self.assertIsNone(text("item.both"))
         self.assertEqual(len(data) % 2, 0)
+
+    def test_script_font(self):
+        """A pack with a font: its strings first, then the blob, which the
+        header places and checks with a CRC of its own."""
+        en = english()
+        body = "font = assets/fonts/test/script-test-body.bdf\n"
+        heading = "font_heading = assets/fonts/test/script-test-heading.bdf\n"
+        text = "[item]\nrecent = \u0391\u0392\u0393 \u3042\n"
+        data = lang.pack(
+            translation(body + heading + "font_ranges = 0391-03C9, 3041-3096\n" + text),
+            en,
+        )
+        u32 = lambda at: int.from_bytes(data[at : at + 4], "little")
+        at, size = u32(52), u32(56)
+        self.assertGreater(size, 0)
+        self.assertEqual(at % 4, 0)
+        self.assertEqual(u32(12), len(data))
+        self.assertEqual(at + size, len(data))
+        # The strings' CRC covers the strings only, and their pool ends before the font
+        self.assertEqual(u32(16), zlib.crc32(data[20:at]))
+        blob = data[at:]
+        self.assertEqual(blob[:4], b"TSCF")
+        self.assertEqual(int.from_bytes(blob[8:12], "little"), zlib.crc32(blob[12:]))
+        self.assertEqual(int.from_bytes(blob[12:16], "little"), len(blob))
+        self.assertEqual(int.from_bytes(blob[6:8], "little"), 2)  # body and heading
+        # Its text carries the characters the font draws, in UTF-8
+        self.assertIn("\u0391\u0392\u0393 \u3042".encode(), data[:at])
+        # A character the font's ranges leave out, or no font has, is refused
+        with self.assertRaisesRegex(lang.LangError, "script font"):
+            translation(body + "font_ranges = 0391-03C9\n" + text)
+        with self.assertRaisesRegex(lang.LangError, "isn't Latin-1"):
+            translation(text)
+        with self.assertRaisesRegex(lang.LangError, "font_ranges"):
+            lang.pack(translation(body + "font_ranges = 00A0-00FF\n"), en)
+        # One with no heading font borrows the body font's: one record
+        data = lang.pack(translation(body + "[item]\nrecent = x\n"), en)
+        blob = data[int.from_bytes(data[52:56], "little") :]
+        self.assertEqual(int.from_bytes(blob[6:8], "little"), 1)
+        self.assertEqual(int.from_bytes(blob[20:24], "little"), 0)
+
+    def test_pseudo_locale_has_the_test_font(self):
+        en = lang.load_english()
+        data = lang.pack(parse(lang.pseudo(en), lang.PSEUDO_CODE), en)
+        self.assertGreater(int.from_bytes(data[56:60], "little"), 0)
 
     def test_too_big(self):
         en = english()

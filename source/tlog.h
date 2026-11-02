@@ -60,6 +60,9 @@ void tlog_sd_ready(void (*between)(void));
 // summary (cycles_summary). Call it only where the kernel's ROM is mapped and
 // no other code is in the middle of a FatFs call.
 void tlog_flush(void);
+// The cycles tlog_flush has taken since the last call, then 0: the frame
+// figures leave them out, as a flush is the log's cost and not the screen's.
+u32 tlog_flush_cycles_take(void);
 // tlog_flush for a screen of an engine session (SETTINGS turning LOGGING
 // on): if the log isn't open on the card yet, a job opens it a sector at a
 // time over the next frames (about 130 steps to make a new 64 KB file), so

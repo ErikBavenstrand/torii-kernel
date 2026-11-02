@@ -1,0 +1,26 @@
+# A pack's script font after a launch that comes back (v0.9.19): the launch
+# drops it (the game fills PSRAM, lang_before_launch), the failed launch (as
+# nor-launch-fail.opts) returns to the menu, and lang_poll loads the pack and
+# its font again, so the GBA page draws Hello's Greek and Cyrillic letters in
+# en-XA's numbered boxes, not the replacement box.
+#! settings 0=21444
+#! sd-file /torii/lang/en-XA.lng 0 dist/lang/en-XA.lng
+#! sd-file /torii/saves/Hello.gba/game.ini 14 tests/shots/flash128-game.ini
+#! sd-file /torii/saves/torii 16 tests/roms/hello/hello.gba
+#! sd-name /Hello.gba tests/roms/hello/hello.gba "AA ΑΒΓ Дом (Japan)"
+#! expect-error error 2:
+#! expect-error save: can't make
+-w "nav: home ready"
+-P "@8:nav_test_path:/Hello.gba" -p @8:nav_test_action:0x7E000003
+-w "nor: list saved"
+-w "nav: home ready"
+-p @8:nav_test_action:0x7E000006
+-w "screen ready: dialog"
+-k @8:B -k @12:-
+-w "lang: back from a launch"
+-w "lang: en-XA, "
+-w "lang: en-XA's script font"
+-w "nav: home ready"
+-k @8:RIGHT -k @12:- -k @20:A -k @24:-
+-w "nav: page gba ready"
+-s @30:gba.png

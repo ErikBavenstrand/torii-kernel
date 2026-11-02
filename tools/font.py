@@ -45,6 +45,15 @@ which declares the menu's fonts):
   (`width`), else 2 bytes starting at an even offset, little-endian, and bit 0
   is the leftmost pixel, at the pen position, so glyphs are at most 16 px wide.
   The font's `row_bytes` is the widest glyph's (1 or 2).
+  Kerning: after the glyphs, one entry for each left glyph that kerns (A F L
+  P T V W Y f r v w y, as far as the pairs below leave any): the same bitmap
+  with an advance one less, at glyphs[TORII_FONT_GLYPHS + slot]. kern_of[g] is
+  the slot's glyph index (or 0), kern_left[slot] the glyph it copies and
+  kern_right[slot] a bitmap over the glyphs it kerns before (letters, ".",
+  and ","): the pairs whose ink is at least 3 px apart at any two pixels, in
+  the largest of their x and y differences, so a pixel closer leaves the
+  2 px ordinary neighbours have. A layout that sees
+  such a pair draws the left glyph's variant (torii_kern in font.h).
 Why that layout: a GBA 4bpp tile row is one little-endian word whose low
 nibble is the leftmost pixel. With bit 0 leftmost, a row expands to that word
 by table lookup (bit i to nibble i) with no bit reversal, and drawing at pixel
@@ -63,7 +72,9 @@ shape in 2 byte rows.
 
 import argparse
 import hashlib
+import struct
 import sys
+import zlib
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -91,6 +102,9 @@ class Font:
     missing: list[int]  # code points drawn with the replacement glyph
     squeezed: list[int]  # code points with blank rows closed by --squeeze
     clipped: list[int]  # code points with ink rows dropped by --clip
+    kern: dict[int, list[int]] = field(
+        default_factory=dict
+    )  # left index -> right indices
 
     @property
     def max_width(self) -> int:
@@ -305,7 +319,220 @@ def build(raw: Raw, args, source: str) -> Font:
         missing,
         sorted(squeezed),
         sorted(clipped),
+        kerning(table),
     )
+
+
+# The glyphs that kern before a following glyph, and the ones they kern with:
+# letters and the full stop and comma (a T before an o, an r before a full stop)
+KERN_LEFTS = "AFLPTVWYfrvwy"
+KERN_MAX = 256 - (REPLACEMENT + 1)  # glyph slots the table has free
+
+
+def kern_rights(cp: int) -> bool:
+    return (
+        chr(cp).isalpha()
+        and (cp < 0x80 or (0xC0 <= cp <= 0xFF and cp not in (0xD7, 0xF7)))
+    ) or chr(cp) in ".,"
+
+
+def ink_distance(left: Glyph, right: Glyph, kern: int) -> int:
+    """The smallest distance between a pixel of left and one of right, right's
+    pen kern pixels before left's advance, as the largest of the two
+    differences (so a pixel diagonally next to another counts 1)."""
+    return min(
+        (
+            max(abs(x - (x2 + left.advance - kern)), abs(y - y2))
+            for x, y in left.pixels
+            for x2, y2 in right.pixels
+        ),
+        default=99,
+    )
+
+
+def kerning(glyphs: list[Glyph]) -> dict[int, list[int]]:
+    """Pairs that sit a pixel closer: the ones whose ink stays two pixels
+    apart at least, the spacing of ordinary neighbours, after it (so at least
+    three before). Left glyph index -> right glyph indices, lefts with none left out."""
+    out: dict[int, list[int]] = {}
+    for lc in KERN_LEFTS:
+        left = glyphs[index(ord(lc))]
+        rights = [
+            index(rc)
+            for rc in range(FIRST, LAST + 1)
+            if kern_rights(rc)
+            and glyphs[index(rc)].pixels
+            and ink_distance(left, glyphs[index(rc)], 0) >= 3
+        ]
+        if rights:
+            out[index(ord(lc))] = rights
+    if len(out) > KERN_MAX:
+        raise ValueError(f"{len(out)} glyphs kern, the table has room for {KERN_MAX}")
+    return out
+
+
+# The menu fonts as `just font` makes them (the justfile's options): a script
+# font is placed on the same lines
+BUILTIN = {
+    "body": ("assets/fonts/galmuri/Galmuri9.bdf", 12),
+    "heading": ("assets/fonts/galmuri/Galmuri11-Bold.bdf", 16),
+}
+
+
+def builtin_baseline(root: Path, name: str) -> tuple[int, int]:
+    """(line height, baseline) of a menu font."""
+    path, height = BUILTIN[name]
+    args = argparse.Namespace(
+        src=root / path,
+        line_height=height,
+        baseline=None,
+        proportional=False,
+        spacing=1,
+        space=None,
+        squeeze=True,
+        clip=True,
+        png_cell=None,
+        png_first=FIRST,
+        png_baseline=None,
+        png_advance=None,
+        name=name,
+    )
+    font = load(args)
+    return font.line_height, font.baseline
+
+
+# --- Script fonts: the glyphs a language pack brings (source/engine/script.h) ---
+
+SCRIPT_MAX = 0x50000  # bytes of blob the kernel has room for in PSRAM
+SCRIPT_FIRST = 0x100  # code points below are the menu font's own
+
+
+def parse_ranges(text: str) -> list[tuple[int, int]]:
+    """'0370-03FF, 0400-04FF, 3042' (hex code points) -> [(first, last)]."""
+    out = []
+    for part in text.replace(" ", "").split(","):
+        if not part:
+            continue
+        a, _, b = part.partition("-")
+        first, last = int(a, 16), int(b or a, 16)
+        if not SCRIPT_FIRST <= first <= last <= 0xFFFF:
+            raise ValueError(
+                f"range {part}: code points run from {SCRIPT_FIRST:04X} to FFFF"
+            )
+        out.append((first, last))
+    return out
+
+
+def script_glyphs(
+    raw: Raw,
+    ranges: list[tuple[int, int]] | None,
+    line_height: int,
+    baseline: int,
+    proportional: bool = False,
+    spacing: int = 1,
+    space: int = 3,
+) -> dict[int, Glyph]:
+    """The glyphs of a font for its code points in ranges (all above U+00FF if
+    None), placed on a line like the menu font's: line_height rows, baseline rows
+    above the baseline, blank rows inside an accent closed and ink still outside
+    the line dropped (the menu fonts' --squeeze and --clip)."""
+    wanted = sorted(
+        cp
+        for cp in raw
+        if SCRIPT_FIRST <= cp <= 0xFFFF
+        and (ranges is None or any(a <= cp <= b for a, b in ranges))
+    )
+    out: dict[int, Glyph] = {}
+    for cp in wanted:
+        advance, pixels = raw[cp]
+        if proportional:
+            if pixels:
+                left = min(x for x, _ in pixels)
+                right = max(x for x, _ in pixels)
+                pixels = {(x - left, y) for x, y in pixels}
+                advance = right - left + 1 + spacing
+            else:
+                advance = space
+        left = min((x for x, _ in pixels if x < 0), default=0)
+        placed = {(x - left, baseline - 1 - y) for x, y in pixels}
+        placed = squeeze(placed, line_height)
+        inside = {(x, y) for x, y in placed if 0 <= y < line_height}
+        advance -= left
+        if not 0 <= advance <= 255:
+            raise ValueError(f"U+{cp:04X}: advance {advance} is outside 0-255")
+        if inside and max(x for x, _ in inside) >= 16:
+            raise ValueError(f"U+{cp:04X}: wider than 16 px")
+        out[cp] = Glyph(advance, inside)
+    return out
+
+
+def script_record(glyphs: dict[int, Glyph]) -> bytes:
+    """One font's record of the script blob (script.h): ranges of consecutive
+    code points, the glyph table and the bitmaps, offsets from the record's start."""
+    if not glyphs:
+        raise ValueError("a script font with no glyphs")
+    cps = sorted(glyphs)
+    ranges: list[tuple[int, int, int]] = []
+    for i, cp in enumerate(cps):
+        if ranges and cp == ranges[-1][1] + 1:
+            ranges[-1] = (ranges[-1][0], cp, ranges[-1][2])
+        else:
+            ranges.append((cp, cp, i))
+    bits = bytearray()
+    shapes: dict[tuple, int] = {}  # a shape already stored -> its offset
+    table = bytearray()
+    for cp in cps:
+        g = glyphs[cp]
+        top, rows = rows_of(g)
+        width = max((x for x, _ in g.pixels), default=-1) + 1
+        key = (width, tuple(rows))
+        if rows and key not in shapes:
+            rb = 2 if width > 8 else 1
+            while len(bits) % 4:
+                bits.append(0)  # offsets count 4 byte units
+            shapes[key] = len(bits)
+            for row in rows:
+                bits.extend(row >> (8 * b) & 0xFF for b in range(rb))
+        offset = shapes[key] // 4 if rows else 0
+        if offset > 0xFFFF:
+            raise ValueError("more than 256 KB of bitmaps in one script font")
+        table += struct.pack("<HBBBB", offset, g.advance, top, len(rows), width)
+    while len(bits) % 4:
+        bits.append(0)
+    head = 12 + 6 * len(ranges)
+    table_at = head + (-head % 4)
+    bits_at = table_at + len(table) + (-len(table) % 4)
+    rec = bytearray(struct.pack("<HHII", len(ranges), len(cps), table_at, bits_at))
+    for first, last, base in ranges:
+        rec += struct.pack("<HHH", first, last, base)
+    rec += bytes(table_at - len(rec))
+    rec += table
+    rec += bytes(bits_at - len(rec))
+    rec += bits
+    return bytes(rec)
+
+
+def script_blob(records: list[bytes]) -> bytes:
+    """The blob: the body font's record, then the heading font's if given."""
+    if not 1 <= len(records) <= 2:
+        raise ValueError("a script blob has one or two fonts")
+    at = 24
+    offsets = []
+    body = bytearray()
+    for rec in records:
+        offsets.append(at + len(body))
+        body += rec + bytes(-len(rec) % 4)
+    total = 24 + len(body)
+    if total > SCRIPT_MAX:
+        raise ValueError(f"the script fonts take {total} bytes, over {SCRIPT_MAX}")
+    offsets += [0] * (2 - len(offsets))
+    blob = bytearray(
+        struct.pack("<4sHHIII", b"TSCF", 1, len(records), 0, total, offsets[0])
+        + struct.pack("<I", offsets[1])
+    )
+    blob += body
+    struct.pack_into("<I", blob, 8, zlib.crc32(bytes(blob[12:])) & 0xFFFFFFFF)
+    return bytes(blob)
 
 
 def squeeze(pixels: set[tuple[int, int]], height: int) -> set[tuple[int, int]]:
@@ -377,6 +604,7 @@ class Packed:
     bits: bytes
     entries: list[tuple[int, int, int, int, int]]  # offset, advance, top, rows, width
     art: list[str]  # a comment picturing each distinct bitmap
+    kerned: list[int]  # the glyph each variant after the entries copies
 
 
 def pack(font: Font) -> Packed:
@@ -404,7 +632,12 @@ def pack(font: Font) -> Packed:
         raise ValueError(
             f"{font.name}: {len(bits)} bytes of bitmaps, offsets are 16-bit"
         )
-    return Packed(bytes(bits), entries, art)
+    # A kerned variant: its glyph with an advance one less, the same bitmap
+    kerned = sorted(font.kern)
+    for left in kerned:
+        o, a, t, r, w = entries[left]
+        entries.append((o, a - 1, t, r, w))
+    return Packed(bytes(bits), entries, art, kerned)
 
 
 def emit(font: Font) -> str:
@@ -417,24 +650,69 @@ def emit(font: Font) -> str:
     ]
     entries = [
         f"\t{{{o}, {a}, {t}, {r}, {w}}}, /* {label(i + FIRST)} */"
-        for i, (o, a, t, r, w) in enumerate(packed.entries)
+        for i, (o, a, t, r, w) in enumerate(packed.entries[: REPLACEMENT + 1])
+    ] + [
+        f"\t{{{o}, {a}, {t}, {r}, {w}}}, /* kerned {label(left + FIRST)} */"
+        for (o, a, t, r, w), left in zip(
+            packed.entries[REPLACEMENT + 1 :], packed.kerned, strict=True
+        )
     ]
+    kern_of = [0] * (REPLACEMENT + 1)
+    for slot, left in enumerate(packed.kerned):
+        kern_of[left] = REPLACEMENT + 1 + slot
+    right_bytes = (REPLACEMENT + 7) // 8
+    kern_right = []
+    for left in packed.kerned:
+        row = bytearray(right_bytes)
+        for right in font.kern[left]:
+            row[right // 8] |= 1 << (right % 8)
+        kern_right.append(
+            "\t{"
+            + ", ".join(f"0x{b:02X}" for b in row)
+            + f"}}, /* kerns after {label(left + FIRST)} */"
+        )
+    kern_text = ""
+    if packed.kerned:
+        kern_text = (
+            f"\n/* Kerning (torii_kern): {sum(len(r) for r in font.kern.values())} pairs "
+            f"of {len(packed.kerned)} left glyphs. */\n"
+            f"static const uint8_t font_{name}_kern_of[TORII_FONT_GLYPHS] = {{\n"
+            + "\n".join(
+                "\t" + ", ".join(str(v) for v in kern_of[start : start + 16]) + ","
+                for start in range(0, len(kern_of), 16)
+            )
+            + "\n};\n"
+            f"static const uint8_t font_{name}_kern_left[] = {{"
+            + ", ".join(str(left) for left in packed.kerned)
+            + "};\n"
+            f"static const uint8_t font_{name}_kern_right[][TORII_FONT_RIGHT_BYTES] = {{\n"
+            + "\n".join(kern_right)
+            + "\n};\n"
+        )
     source = (
         f"/* Made by tools/font.py from {font.source}. Do not edit.\n"
         f" * {len(packed.bits)} bytes of bitmaps in 1 byte rows (2 for glyphs over 8 px). */\n"
-        '#include "font.h"\n\n'
+        '#include <stddef.h>\n\n#include "font.h"\n\n'
         f"static const uint8_t font_{name}_bits[] __attribute__((aligned(4))) = {{\n"
         + "\n".join(data)
         + "\n};\n\n/* The bitmaps, '#' inked:\n"
         + "\n".join(f" * {line}" for line in packed.art)
         + "\n */\n\n"
-        f"static const struct torii_glyph font_{name}_glyphs[TORII_FONT_GLYPHS] = {{\n"
+        f"static const struct torii_glyph font_{name}_glyphs[TORII_FONT_GLYPHS + {len(packed.kerned)}] = {{\n"
         + "\n".join(entries)
-        + "\n};\n\n"
+        + "\n};\n"
+        + kern_text
+        + "\n"
         f"const struct torii_font font_{name} = {{\n"
         f"\tfont_{name}_glyphs,\n\tfont_{name}_bits,\n"
         f"\t{font.line_height},\n\t{font.baseline},\n\t{font.row_bytes},\n\t{font.max_width},\n"
-        "};\n"
+        f"\t{len(packed.kerned)},\n"
+        + (
+            f"\tfont_{name}_kern_of,\n\tfont_{name}_kern_left,\n\tfont_{name}_kern_right,\n"
+            if packed.kerned
+            else "\tNULL,\n\tNULL,\n\tNULL,\n"
+        )
+        + "};\n"
     )
     return source
 

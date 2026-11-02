@@ -69,7 +69,7 @@ static u8 punctuation_of(u32 c)
 	}
 }
 
-u32 charset_next_latin1(const char *s, u32 len, u32 *pos)
+u32 charset_next(const char *s, u32 len, u32 *pos)
 {
 	const u8 *p = (const u8 *)s;
 	u8 lead = p[*pos];
@@ -100,12 +100,23 @@ u32 charset_next_latin1(const char *s, u32 len, u32 *pos)
 	}
 	if (c == 0xAD)
 		return CHARSET_NONE;  // a soft hyphen: where a word may break, never drawn
+	return c;
+}
+
+u32 charset_fold_latin1(u32 c)
+{
 	if (c < 0x100)
 		return c;
 	if (c < 0x180)
 		return (u8)latin_a_ascii[c - 0x100];
 	u8 q = punctuation_of(c);
 	return q ? q : CHARSET_REPLACEMENT;
+}
+
+u32 charset_next_latin1(const char *s, u32 len, u32 *pos)
+{
+	u32 c = charset_next(s, len, pos);
+	return c == CHARSET_NONE ? c : charset_fold_latin1(c);
 }
 
 u32 charset_cut(const char *s, u32 max)

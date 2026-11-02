@@ -52,6 +52,7 @@ u32 frame_begin(void)
 {
 	VBlankIntrWait();
 	start_cycles = cycles_now();
+	tlog_flush_cycles_take();  // a flush between frames isn't this one's
 	if (gfx_pending())
 		gfx_commit();
 	commit_line = (u8) * (vu16 *)0x04000006;
@@ -73,12 +74,16 @@ void frame_end(void)
 	last_cycles = cycles_since(start_cycles);
 	woken = 0;
 	if (measure_count) {
+		// The figures leave out a log flush inside the frame: its write is
+		// the card's time, not the screen's
+		u32 flush = tlog_flush_cycles_take();
+		u32 shown = last_cycles > flush ? last_cycles - flush : 0;
 		for (u32 i = 0; i < measure_count; i++)
-			cycles_frame(measure_names[i], last_cycles);
-		if (last_cycles > worst_cycles) {
+			cycles_frame(measure_names[i], shown);
+		if (shown > worst_cycles) {
 			// Where the time went: the commit, then each stretch between marks
 			worst_name = measure_names[0];
-			worst_cycles = last_cycles;
+			worst_cycles = shown;
 			worst_line = commit_line;
 			for (u32 i = 0; i < FRAME_SPLITS; i++)
 				worst_split[i] =

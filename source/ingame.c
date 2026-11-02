@@ -53,10 +53,14 @@ static u32 sram_put(u32 at, const u8 *src, u32 n)
 	return bad;
 }
 
+static u32 glyph_index(u32 cp)
+{
+	return cp >= TORII_FONT_FIRST && cp <= TORII_FONT_LAST ? cp - TORII_FONT_FIRST : TORII_FONT_REPLACEMENT;
+}
+
 static const struct torii_glyph *glyph(u32 cp)
 {
-	u32 i = cp >= TORII_FONT_FIRST && cp <= TORII_FONT_LAST ? cp - TORII_FONT_FIRST : TORII_FONT_REPLACEMENT;
-	return &font_body.glyphs[i];
+	return &font_body.glyphs[glyph_index(cp)];
 }
 
 // len bytes of UTF-8 at s in the body font into the INGAME_TEXT_ROWS rows of
@@ -67,13 +71,16 @@ static u32 bits_draw(vu8 *out, u32 row_bytes, const char *s, u32 len, u32 max_w,
 {
 	for (u32 i = 0; i < INGAME_TEXT_ROWS * row_bytes; i++)
 		out[i] = 0;
-	u32 pos = 0, w = 0, keep = 0, cut = 0;
+	u32 pos = 0, w = 0, keep = 0, cut = 0, prev = TORII_FONT_REPLACEMENT;
 	u32 dots = 3 * glyph('.')->advance;
 	while (pos < len) {
 		u32 cp = charset_next_latin1(s, len, &pos);
 		if (cp == CHARSET_NONE)
 			continue;
 		w += glyph(cp)->advance;
+		if (torii_kern(&font_body, prev, glyph_index(cp)))
+			w--;  // a kerned pair, as text_layout has it
+		prev = glyph_index(cp);
 		if (w > max_w) {
 			cut = 1;
 			break;
@@ -82,11 +89,15 @@ static u32 bits_draw(vu8 *out, u32 row_bytes, const char *s, u32 len, u32 max_w,
 			keep = pos;
 	}
 	u32 end = cut ? keep : len, x = 0;
+	prev = TORII_FONT_REPLACEMENT;
 	for (pos = 0; pos < end + (cut ? 3 : 0);) {
 		u32 cp = pos < end ? charset_next_latin1(s, len, &pos) : (pos++, '.');
 		if (cp == CHARSET_NONE)
 			continue;
 		const struct torii_glyph *g = glyph(cp);
+		if (torii_kern(&font_body, prev, glyph_index(cp)))
+			x--;
+		prev = glyph_index(cp);
 		const u8 *bits = font_body.bits + g->offset;
 		for (u32 r = 0; r < g->rows && g->top + r < INGAME_TEXT_ROWS; r++) {
 			u32 row = 0;
