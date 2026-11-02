@@ -26,8 +26,8 @@ new_cart() {
   local file=$1 cht=${2:-}
   rm -rf "$cart" && mkdir -p "$cart"
   case $file in
-    *.gb) python3 tests/gb_rom.py "$cart/game" cheat ;;
-    *.nes) python3 tests/nes_rom.py "$cart/game" cheat ;;
+  *.gb) python3 tests/gb_rom.py "$cart/game" cheat ;;
+  *.nes) python3 tests/nes_rom.py "$cart/game" cheat ;;
   esac
   mkfs.fat -C -F 32 -n EMU "$cart/sd.img" 65536 >/dev/null
   mcopy -i "$cart/sd.img" "$cart/game" "::$file"
