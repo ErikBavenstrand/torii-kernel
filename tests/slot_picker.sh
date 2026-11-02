@@ -6,6 +6,8 @@
 #   select-go   and A there starts the slot
 #   choose      two slots: it asks on every launch, A on the other one starts
 #               with its file and the record follows
+#   ask-off     Settings' Ask for a slot off (slot 38): two slots, the active
+#               one starts at once; SELECT with A still asks
 # Making, copying and renaming slots are the Saves page's (tests/game_saves.sh).
 # Runs inside the torii-emu container after `just build` and `just
 # emu-headless`, and building tests/roms/hello.
@@ -96,3 +98,22 @@ logged "save: $S/q.sav exists"
 [ "$(slot_of)" = q ] || fail "choose: the record says $(slot_of)"
 [ "$(sum Main)" = "$before" ] || fail "choose: Main.sav changed"
 echo "PASS: slot picker: two slots show it on every launch, A starts the chosen one"
+
+# ask-off: two slots, the setting off: the active slot starts without asking
+card ask-off Main q
+python3 tests/setnor.py set "$cart/kernel-nor.bin" 38=0
+# shellcheck disable=SC2046,SC2086
+boot $(nav_game gba 0) $go -u "launch: loading" -f 2000
+not_logged "screen ready: slot-picker"
+logged "launch: loading Hello.gba"
+logged "save: $S/Main.sav exists"
+[ "$(slot_of)" = Main ] || fail "ask-off: the record says $(slot_of)"
+echo "PASS: slot picker: with Ask for a slot off, two slots start the active one at once"
+
+# ask-off, SELECT: it asks anyway
+card ask-off-select Main q
+python3 tests/setnor.py set "$cart/kernel-nor.bin" 38=0
+# shellcheck disable=SC2046,SC2086
+boot $(nav_game gba 0) $select -w "screen ready: slot-picker" -k @30:B -k @34:- -w "launch: no slot chosen" -f 1500
+logged "launch: no slot chosen, nothing started"
+echo "PASS: slot picker: SELECT with A asks even with Ask for a slot off"
