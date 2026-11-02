@@ -1,4 +1,4 @@
-cheats = 5
+cheats = 6
 
 cheat0_desc = "Infinite lives"
 cheat0_code = "1F0-01B-609"
@@ -19,3 +19,7 @@ cheat3_enable = false
 cheat4_desc = "Walk through walls"
 cheat4_code = "01??DCC4"
 cheat4_enable = false
+
+cheat5_desc = "Skip the logo"
+cheat5_code = "001-00F"
+cheat5_enable = false

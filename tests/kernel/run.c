@@ -83,9 +83,11 @@ static const struct {
 	{"userdata_fav_store", test_userdata_fav_store},
 	// An SD file renamed: its save and its lists follow it
 	{"rename_file", test_rename_file},
+	{"rename_cheats_emu", test_rename_cheats_emu},
 	// A game's cheat file on the card, and its picks at a launch
 	{"cheatstore", test_cheatstore},
 	{"cheatstore_clean", test_cheatstore_clean},
+	{"cheatstore_clean_emu", test_cheatstore_clean_emu},
 	{"cheatlist", test_cheatlist},
 	{"slotstore", test_slotstore},
 	{"saveorphan", test_saveorphan},

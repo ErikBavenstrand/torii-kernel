@@ -50,6 +50,31 @@ enum {
 // reads but doesn't run makes the cheat CANT_RUN (all or nothing).
 u8 cheatemu_decode(u32 console, const char *code, u32 len, struct emucheat *out, u32 max, u32 *n);
 
+// The console whose codes the len bytes of one cheat's code are shaped as
+// (CHEATEMU_GB, CHEATEMU_NES), or CHEATEMU_GBA for none of them: every line must be a
+// GB Game Genie (XXX-YYY[-ZZZ]), an 8-digit GameShark line or an Xploder's
+// "$" and 8 digits (digits may be '?', a wildcard to fill in), or a NES genie word
+// (6 or 8 letters of its alphabet) or "AAAA:VV", and one must be a Game Genie or "AAAA:VV"
+// or have a '?' or '$' (an 8-digit line alone could be anything). The cheat file
+// clean-up uses it to tell a GB, GBC or NES game's file (its name has no extension) from a
+// GBA game's: whether the game is still on the card says nothing.
+u32 cheatemu_shape(const char *code, u32 len);
+
+// Why a cheat that decodes CANT_RUN doesn't run: the first of its lines that doesn't, as one of these
+enum {
+	CHEATEMU_WHY_OTHER,  // no reason to tell apart (a write that waits for a byte)
+	CHEATEMU_WHY_SRAM,  // a GameShark write to the cart's RAM (A000-BFFF): a save keeps it
+	CHEATEMU_WHY_VRAM,  // to video RAM (8000-9FFF)
+	CHEATEMU_WHY_ROM,  // to the ROM (GB 0000-7FFF), OAM or I/O, or a NES ROM, PPU or register address
+	CHEATEMU_WHY_TYPE,  // a GameShark type other than 01 and 90-97
+};
+u32 cheatemu_why_cant(u32 console, const char *code, u32 len);
+
+// 1 if a GB Game Genie line of the code is for a byte the emulator's checksum samples (bank 0, the
+// first 16 KB at every 128 bytes, four each): the kernel leaves it unpatched. 0 for a NES code, whose
+// PRG offset depends on the mapper's banks.
+u32 cheatemu_sampled_lines(u32 console, const char *code, u32 len);
+
 // A line as a cheat_patch, which is what a decoded cheat keeps in the cheat
 // file's patch room (cheatfile.h) and a launch keeps in cart SRAM: its offset
 // is the kind above bit 16 and the address, the value is value | compare << 8,
@@ -67,6 +92,7 @@ void cheatemu_from_patch(const struct cheat_patch *p, struct emucheat *e);
 // after the emulator is copied there; the emulator reads it every frame).
 #define TORII_CHEATS_MAGIC "TORIICHT"
 #define TORII_CHEATS_MAX 64
+#define CHEATEMU_LINES_SCAN 64  // lines cheatemu_sampled_lines looks at
 struct torii_cheat {
 	u8 kind;  // 1: a poke
 	u8 bank;  // GB: the WRAM bank (0: the one D000 maps to)
@@ -101,6 +127,11 @@ struct cheatemu_rom {
 	u8 banks;  // NES: PRG's 16 KB banks
 	u32 size;  // the image's bytes
 	u32 prg_at;  // NES: where PRG starts (16, or 528 with a trainer)
+	// Where the image starts in PSRAM (after the emulator): the kernel loads it in 8 MB
+	// pages, each block at base + its offset in the page, so a block that would end past
+	// the page's 8 MB (the last 80 KB or so of a ROM of 8 MB) went out of the window: a byte
+	// there isn't known to be in the game's copy, and isn't patched
+	u32 base;
 };
 
 // Reads what a patch needs of the game: GB, from its size; NES, from the
@@ -117,6 +148,7 @@ struct cheatemu_done {
 	u32 other;  // places the code's address is, but the compare byte isn't there
 	u32 sampled;  // places left alone: the emulator keys its states and palette on them
 	u32 limit;  // places left because the launch's patches (max) were all used
+	u32 unmapped;  // places left: the loader wrote them past its page's window (cheatemu_rom's base)
 	u8 unknown;  // a NES mapper whose banks aren't known, and no compare to tell them
 };
 
@@ -124,9 +156,10 @@ struct cheatemu_done {
 // set): at most max, added to done. A GB address below 4000 is bank 0's; from
 // 4000, every other bank's that holds the compare byte (any, without one),
 // as a Game Genie on the bus patches whichever bank is mapped. A NES address
-// is a place in a PRG bank by the mapper's bank size (4 and 118/119: 8 KB; 1,
-// 2, 71 and 94: 16 KB with the last fixed at C000; 7, 11, 34, 66 and 79: 32
-// KB; 0 and 3: fixed), the same way. A byte the emulators' ROM checksum
+// is a place in a PRG bank by the mapper's bank size (4 and 118/119: 8 KB, E000
+// the last bank, C000 the one before, 8000 the others; 1, 2, 71 and 94: 16 KB, C000
+// the last bank, 8000 the others; 7, 11, 34, 66 and 79: 32 KB; 0 and 3: fixed), the
+// same way: a code is never made for a fixed bank's byte through a switchable window. A byte the emulators' ROM checksum
 // samples is never patched: the first 16 KB of GB, of NES PRG, at every 128
 // bytes, four bytes each (cheatemu_sampled).
 void cheatemu_patch(const struct cheatemu_rom *rom, const struct emucheat *e, cheatemu_get get, cheatemu_set set,

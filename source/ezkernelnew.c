@@ -1916,9 +1916,14 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 		}
 		// Torii: the picked cheats' Game Genie patches, in the game's copy
 		// (cheatstore_launch kept them before the load)
-		cheatstore_launch_emu(launch_save.rom, (is_EMU == 3) ? CHEATEMU_NES : CHEATEMU_GB, emu_rom_start,
-				      emu_rom_size);
+		u32 left_out = cheatstore_launch_emu(launch_save.rom, (is_EMU == 3) ? CHEATEMU_NES : CHEATEMU_GB,
+						     emu_rom_start, emu_rom_size);
 		progress_done(NULL);
+		if (left_out) {  // picks that didn't all apply: said, with a key to go on
+			char msg[160];
+			SF(msg, sizeof(msg), STR_N(STR_LAUNCH_EMU_LEFT_OUT, left_out), LN(left_out));
+			dialog_message(NULL, msg, DIALOG_INFO);
+		}
 		Launch_now(0x200, key_L, (is_EMU == 3) ? "plugin PocketNES" : "plugin Jagoomba Color");
 		while (1)
 			;

@@ -343,8 +343,11 @@ void cheatstore_launch(const char *rom_path, u32 psram_bytes);
 // The second pass of a GB, GBC or NES game's launch (the first, cheatstore_launch
 // with no psram_bytes, kept the picked cheats' Game Genie lines): the game's
 // file of size bytes is in PSRAM from rom_start, after the emulator; the
-// lines' patches are made in it (cheatemu.h). Nothing without kept lines.
-void cheatstore_launch_emu(const char *rom_path, u32 console, u32 rom_start, u32 size);
+// lines' patches are made in it (cheatemu.h). Nothing without kept lines. How many
+// cheats, pokes and lines were left out in all, here or in the first pass (a cheat
+// that no longer reads or has no room beside the picks, a poke past the table, a
+// Game Genie line that patched nothing): the caller says so.
+u32 cheatstore_launch_emu(const char *rom_path, u32 console, u32 rom_start, u32 size);
 // A larger file's picks in the window decoded now, as decoded: what each
 // takes of the budget, for the index (an older kernel's counted patches,
 // not cheatfile_patch_units). The cheat list's build calls it.

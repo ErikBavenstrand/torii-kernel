@@ -148,12 +148,21 @@ void test_cheatemu_nes_genie(void)
 	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "0754:00+SXIOPO", 14, two, 4, &n), CHEATEMU_OK);
 	CHECK_EQ(n, 2);
 	CHECK_EQ(two[1].kind, CHEATEMU_GENIE);
-	// Not RAM: the PPU, the registers, the ROM; and the compare form, which libretro has none of
-	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "2000:00", 7, two, 4, &n), CHEATEMU_UNREADABLE);
-	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "4015:0F", 7, two, 4, &n), CHEATEMU_UNREADABLE);
-	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "5FFF:00", 7, two, 4, &n), CHEATEMU_UNREADABLE);
-	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "8000:00", 7, two, 4, &n), CHEATEMU_UNREADABLE);
-	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "0754?12:00", 10, two, 4, &n), CHEATEMU_UNREADABLE);
+	// Not RAM (the PPU, the registers, the ROM, 4000-5FFF) or the compare form, which libretro has none of:
+	// readable codes that don't run
+	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "2000:00", 7, two, 4, &n), CHEATEMU_CANT_RUN);
+	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "4015:0F", 7, two, 4, &n), CHEATEMU_CANT_RUN);
+	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "5FFF:00", 7, two, 4, &n), CHEATEMU_CANT_RUN);
+	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "8000:00", 7, two, 4, &n), CHEATEMU_CANT_RUN);
+	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "FFFF:00", 7, two, 4, &n), CHEATEMU_CANT_RUN);
+	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "0754?12:00", 10, two, 4, &n), CHEATEMU_CANT_RUN);
+	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "0754:00+8000:01", 15, two, 4, &n),
+		 CHEATEMU_CANT_RUN);  // all or nothing
+	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "SXIOPO+8000:01", 14, two, 4, &n), CHEATEMU_CANT_RUN);
+	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "0754?1Z:00", 10, two, 4, &n), CHEATEMU_UNREADABLE);
+	// One cheat may hold a Game Genie and a poke: both run (nothing refuses a mix)
+	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "SXIOPO+0754:00+SZESPUVK+0756:01", 31, two, 4, &n), CHEATEMU_OK);
+	CHECK_EQ(n, 4);
 	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "0754:0", 6, two, 4, &n), CHEATEMU_UNREADABLE);
 	CHECK_EQ(cheatemu_decode(CHEATEMU_NES, "$0D24206E", 9, two, 4, &n), CHEATEMU_UNREADABLE);
 }
@@ -445,14 +454,24 @@ void test_cheatemu_nes_patch(void)
 	cheatemu_patch(&rom, &e, get, set, &im, 10, &d);
 	CHECK_EQ(d.patched, 1);
 	CHECK_EQ(im.bytes[16 + 5 * 0x4000 + 0x1000], 0x55);
-	CHECK_EQ(d.other, 7);
+	CHECK_EQ(d.other, 6);  // the last bank is C000's, not 8000's: it isn't looked at
 	memset(&d, 0, sizeof(d));
 	e = genie(0xD000, 0x66, 0, 0);
 	cheatemu_patch(&rom, &e, get, set, &im, 10, &d);
 	CHECK_EQ(d.patched, 1);
 	CHECK_EQ(im.bytes[16 + 7 * 0x4000 + 0x1000], 0x66);
 	free(im.bytes);
-	// MMC3 (4), 16 banks of 16 KB = 32 of 8 KB: E000 the last 8 KB, others any
+	// The same 6-letter code for 91D9 (SXIOPO): the 7 switchable banks at 11D9, never the fixed last bank's
+	im = nes_image(8, 2, 0, &rom);
+	memset(&d, 0, sizeof(d));
+	e = genie(0x91D9, 0xAD, 0, 0);
+	cheatemu_patch(&rom, &e, get, set, &im, 100, &d);
+	CHECK_EQ(d.patched, 7);
+	for (u32 b = 0; b < 8; b++)
+		CHECK_EQ(im.bytes[16 + b * 0x4000 + 0x11D9], b < 7 ? 0xAD : 8);
+	CHECK_EQ(im.bytes[16 + 7 * 0x4000 + 0x11D9], 8);
+	free(im.bytes);
+	// MMC3 (4), 16 banks of 16 KB = 32 of 8 KB: E000 the last 8 KB, C000 the one before, 8000 the others
 	im = nes_image(16, 4, 0, &rom);
 	memset(&d, 0, sizeof(d));
 	e = genie(0xE005, 0x77, 0, 0);
@@ -462,7 +481,21 @@ void test_cheatemu_nes_patch(void)
 	memset(&d, 0, sizeof(d));
 	e = genie(0xA005, 0x78, 0, 0);
 	cheatemu_patch(&rom, &e, get, set, &im, 100, &d);
-	CHECK_EQ(d.patched, 32);
+	CHECK_EQ(d.patched, 30);  // not the last two banks: the fixed ones are C000's and E000's
+	CHECK_EQ(im.bytes[16 + 30 * 0x2000 + 0x0005], 0x10);  // untouched
+	CHECK_EQ(im.bytes[16 + 31 * 0x2000 + 0x0005], 0x77);  // E005's patch above, not A005's
+	memset(&d, 0, sizeof(d));
+	e = genie(0xC005, 0x79, 0, 0);  // the second to last 8 KB bank
+	cheatemu_patch(&rom, &e, get, set, &im, 100, &d);
+	CHECK_EQ(d.patched, 1);
+	CHECK_EQ(im.bytes[16 + 30 * 0x2000 + 0x0005], 0x79);
+	free(im.bytes);
+	// An MMC3 game of 2 banks of 8 KB: 8000 is bank 0
+	im = nes_image(1, 4, 0, &rom);
+	memset(&d, 0, sizeof(d));
+	e = genie(0x8005, 0x7A, 0, 0);
+	cheatemu_patch(&rom, &e, get, set, &im, 100, &d);
+	CHECK_EQ(d.patched, 1);
 	free(im.bytes);
 	// AxROM (7): 32 KB banks
 	im = nes_image(8, 7, 0, &rom);
@@ -604,4 +637,87 @@ void test_cheatemu_table(void)
 	CHECK_EQ(cheatemu_find_table(big, sizeof(big)), 0xFFFFFFFFu);  // two
 	CHECK_EQ(sizeof(struct torii_cheats), 16 + 8 * TORII_CHEATS_MAX);
 	CHECK_EQ(offsetof(struct torii_cheats, e), 16);
+}
+
+// Which console a cheat's code is shaped for: the clean-up leaves a GB or NES game's cheat
+// file alone whatever became of the game, and takes the GBA's unreadable cheats as ever
+void test_cheatemu_shape(void)
+{
+#define SHAPE(code) cheatemu_shape(code, (u32)strlen(code))
+	CHECK_EQ(SHAPE("FA0-999-4C1"), CHEATEMU_GB);
+	CHECK_EQ(SHAPE("FA0-999"), CHEATEMU_GB);
+	CHECK_EQ(SHAPE("09C-56B-E6E+09C-74A-E6E"), CHEATEMU_GB);
+	CHECK_EQ(SHAPE("FA0-999-4C1+01995EDB"), CHEATEMU_GB);
+	CHECK_EQ(SHAPE("0F0-FFF-4C1"), CHEATEMU_GB);  // an address no ROM has: still its shape
+	CHECK_EQ(SHAPE("01??DCC4"), CHEATEMU_GB);  // a wildcard
+	CHECK_EQ(SHAPE("$0D24206E"), CHEATEMU_GB);  // an Xploder's
+	CHECK_EQ(SHAPE("01995EDB"), CHEATEMU_GBA);  // 8 digits alone could be anything
+	CHECK_EQ(SHAPE("SXIOPO"), CHEATEMU_NES);
+	CHECK_EQ(SHAPE("SZESPUVK+AEVYZLAE"), CHEATEMU_NES);
+	CHECK_EQ(SHAPE("0754:00+0756:01"), CHEATEMU_NES);
+	CHECK_EQ(SHAPE("8000:01"), CHEATEMU_NES);  // a write no poke may make: still its shape
+	CHECK_EQ(SHAPE("0754:00+SXIOPO"), CHEATEMU_NES);
+	// The GBA's: CodeBreaker, GameShark, Action Replay, VBA, placeholders, Torii code
+	CHECK_EQ(SHAPE("82001234+0063"), CHEATEMU_GBA);
+	CHECK_EQ(SHAPE("82001234 0063"), CHEATEMU_GBA);
+	CHECK_EQ(SHAPE("3300075C+00??"), CHEATEMU_GBA);
+	CHECK_EQ(SHAPE("0203F000:BEEF+03006000:5A"), CHEATEMU_GBA);
+	CHECK_EQ(SHAPE("A9873144 203A53CE"), CHEATEMU_GBA);
+	CHECK_EQ(SHAPE("02024104=0001+02024106:0063"), CHEATEMU_GBA);
+	CHECK_EQ(SHAPE(""), CHEATEMU_GBA);
+	CHECK_EQ(SHAPE("garbage"), CHEATEMU_GBA);
+#undef SHAPE
+}
+
+// A GB ROM of 8 MB (an MBC5 game's largest): the loader puts a block of the file at the
+// emulator's size plus its offset in its 8 MB page, so the last bytes (the emulator's size
+// worth) went past the window: they aren't patched, the rest are, at the linear address
+void test_cheatemu_gb_8mb(void)
+{
+	static u8 big[0x800000];
+	struct image im = {big, sizeof(big)};
+	for (u32 i = 0; i < im.size; i += 0x4000)
+		memset(big + i, (int)(i / 0x4000 + 1) & 0xFF, 0x4000);
+	struct cheatemu_rom rom;
+	CHECK(cheatemu_rom_gb(&rom, im.size));
+	rom.base = 80 * 1024;  // about Jagoomba's size
+	struct cheatemu_done d = {0};
+	struct emucheat e = genie(0x4123, 0xEE, 0, 0);  // every bank from 1
+	cheatemu_patch(&rom, &e, get, set, &im, 4096, &d);
+	// Banks 1 to 511; those from 507 on (0x7EC000 + base is the window's end) are past it
+	CHECK_EQ(d.patched, 506);
+	CHECK_EQ(d.unmapped, 5);
+	CHECK_EQ(big[0x4000 + 0x123], 0xEE);  // bank 1
+	CHECK_EQ(big[506 * 0x4000 + 0x123], 0xEE);  // the last inside
+	CHECK_EQ(big[507 * 0x4000 + 0x123], 0xFC);  // the first past: its own byte, 508 & FF
+	CHECK_EQ(big[0x7FFFFF - 0x3FFF + 0x123], 0x00);  // bank 511's
+	// A ROM of 4 MB has no byte past the window
+	struct image small = {big, 0x400000};
+	memset(&d, 0, sizeof(d));
+	cheatemu_rom_gb(&rom, small.size);
+	rom.base = 80 * 1024;
+	e = genie(0x4123, 0xEF, 0, 0);
+	cheatemu_patch(&rom, &e, get, set, &small, 4096, &d);
+	CHECK_EQ(d.unmapped, 0);
+	CHECK_EQ(d.patched, 255);
+}
+
+void test_cheatemu_why(void)
+{
+#define WHY(console, code) cheatemu_why_cant(console, code, (u32)strlen(code))
+	CHECK_EQ(WHY(CHEATEMU_GB, "01FF00A1"), CHEATEMU_WHY_SRAM);
+	CHECK_EQ(WHY(CHEATEMU_GB, "01FF00BF"), CHEATEMU_WHY_SRAM);
+	CHECK_EQ(WHY(CHEATEMU_GB, "01FF0080"), CHEATEMU_WHY_VRAM);
+	CHECK_EQ(WHY(CHEATEMU_GB, "01FF009F"), CHEATEMU_WHY_VRAM);
+	CHECK_EQ(WHY(CHEATEMU_GB, "01FF0000"), CHEATEMU_WHY_ROM);
+	CHECK_EQ(WHY(CHEATEMU_GB, "01FF00FE"), CHEATEMU_WHY_ROM);  // OAM
+	CHECK_EQ(WHY(CHEATEMU_GB, "01FF00FF"), CHEATEMU_WHY_ROM);  // I/O
+	CHECK_EQ(WHY(CHEATEMU_GB, "00FF00C1"), CHEATEMU_WHY_TYPE);
+	CHECK_EQ(WHY(CHEATEMU_GB, "8AFF00A0"), CHEATEMU_WHY_TYPE);
+	CHECK_EQ(WHY(CHEATEMU_GB, "FA0-999+01FF00A1"), CHEATEMU_WHY_SRAM);  // the first line that doesn't run
+	CHECK_EQ(WHY(CHEATEMU_NES, "8000:01"), CHEATEMU_WHY_ROM);
+	CHECK_EQ(WHY(CHEATEMU_NES, "0754:00+4015:0F"), CHEATEMU_WHY_ROM);
+	CHECK_EQ(WHY(CHEATEMU_NES, "0754?12:00"), CHEATEMU_WHY_OTHER);
+	CHECK_EQ(WHY(CHEATEMU_GB, "FA0-999"), CHEATEMU_WHY_OTHER);
+#undef WHY
 }

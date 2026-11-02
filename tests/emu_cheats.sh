@@ -39,13 +39,21 @@ new_cart() {
 }
 
 # Launches FILE and plays; the screen is $cart/game.png
+# With dialog=1, a dialog says picks weren't applied (after the load): A closes it
 play() {
+  local ack=()
+  [ "${dialog:-}" != 1 ] || ack=(-w "screen ready: dialog" -k @10:A -k @14:-)
   # shellcheck disable=SC2046 # nav.sh's options
-  OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_launch "$1" at=100) \
+  OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_launch "$1" at=100) "${ack[@]}" \
     -s 700:"$cart/game.png" -m 700:0x03005890:4 -m 700:0x03005990:4 -f 700 >"$cart/out.txt" 2>"$cart/kernel.log" || fail "the emulator failed"
   grep -q '^crash at frame' "$cart/kernel.log" && fail "the emulator caught a crash"
   grep -q '^kernel error:' "$cart/kernel.log" && fail "errors: $(grep '^kernel error:' "$cart/kernel.log" | head -3)"
   grep -qF "kernel: launch: starting the game" "$cart/kernel.log" || fail "$1 wasn't started"
+  if [ "${dialog:-}" = 1 ]; then
+    grep -qF "kernel: screen ready: dialog" "$cart/kernel.log" || fail "$1: no dialog said what wasn't applied"
+  else
+    ! grep -qF "kernel: screen ready: dialog" "$cart/kernel.log" || fail "$1: a dialog said something wasn't applied"
+  fi
   return 0
 }
 
@@ -109,7 +117,7 @@ play /Cheat.gb
 expect red "gb 6-digit genie (every bank)" "cheats: 1 lines made 3 patches in the game"
 
 new_cart /Cheat.gb "$(cht Wrong "$(gb 4001 1F 99)")"
-play /Cheat.gb
+dialog=1 play /Cheat.gb
 expect plain "gb genie whose compare matches no bank" "cheats: cheat 0 (Wrong): line 4001 patches nothing"
 
 # the compare $77 is bank 2's: bank 1 is left alone, so the screen stays green
@@ -125,7 +133,7 @@ expect plain "gb genie not picked"
 
 # a GameShark code to cart RAM reads but isn't run: the game starts all the same
 new_cart /Cheat.gb "$(cht Ram 01FF00A1)"
-play /Cheat.gb
+dialog=1 play /Cheat.gb
 expect plain "gb gameshark"
 grep -qF "cheat 0 (Ram): can't run here, left out" "$cart/kernel.log" || fail "gb gameshark: not left out with its reason"
 
@@ -161,7 +169,7 @@ expect_count "gb gameshark write through the echo" F0
 
 # a write to VRAM or the ROM isn't run: the game starts all the same
 new_cart /Cheat.gb "$(gs 015500A1)"
-play /Cheat.gb
+dialog=1 play /Cheat.gb
 expect_count "gb gameshark write to cart RAM" 00
 grep -qF "cheat 0 (Pokes): can't run here, left out" "$cart/kernel.log" || fail "gb gameshark to cart RAM: not left out with its reason"
 
@@ -193,7 +201,7 @@ new_cart /Cheat.gbc "$(cht Red "$(gb 4001 1F)")"
 play /Cheat.gbc
 expect red "gbc 6-digit genie" "cheats: 1 lines made 3 patches in the game"
 new_cart /Cheat.gbc "$(cht Wrong "$(gb 4001 1F 99)")"
-play /Cheat.gbc
+dialog=1 play /Cheat.gbc
 expect plain "gbc genie whose compare matches no bank"
 gbmode=cheat
 
@@ -264,7 +272,7 @@ play /Cheat.nes
 expect red "nes 6-letter genie" "cheats: 1 lines made 1 patches in the game"
 
 new_cart /Cheat.nes "$(cht Wrong "$(nes "$at" 16 33)")"
-play /Cheat.nes
+dialog=1 play /Cheat.nes
 expect plain "nes genie with the wrong compare" "cheats: cheat 0 (Wrong): line"
 
 # --- NES raw RAM writes: the game (nes_rom.py poke) clears $0300 each frame and
@@ -301,11 +309,19 @@ new_cart /Cheat.nes "$(poke '0311:01+0312:02' 0300:55)"
 play /Cheat.nes
 expect red "nes raw pokes in two cheats" "cheats: 3 pokes written to the emulator's table"
 
-# an address in the ROM, or a register, is no RAM write: the cheat is unreadable and left out
+# an address in the ROM, or a register, is no RAM write: the cheat can't run and is left out
 new_cart /Cheat.nes "$(poke 8000:55)"
-play /Cheat.nes
+dialog=1 play /Cheat.nes
 expect plain "nes raw poke to the ROM"
-grep -qF "cheat 0 (Poke 0): unreadable, left out" "$cart/kernel.log" || fail "nes raw ROM poke: not left out as unreadable"
+grep -qF "cheat 0 (Poke 0): can't run here, left out" "$cart/kernel.log" || fail "nes raw ROM poke: not left out as can't run"
 
 mode=cheat
+
+# A file edited past the budget (the cheat screen refuses a pick that wouldn't fit, but a file can
+# pick them all): at launch the first cheat is in, the second is left out whole, and a dialog says so
+forty() { python3 -c "print('+'.join('%04X:01' % (0x$1 + i) for i in range(40)))"; }
+new_cart /Cheat.nes "$(printf 'cheats = 2\n\ncheat0_desc = "A"\ncheat0_code = "%s"\ncheat0_enable = true\n\ncheat1_desc = "B"\ncheat1_code = "%s"\ncheat1_enable = true\n' "$(forty 400)" "$(forty 500)")"
+dialog=1 play /Cheat.nes
+grep -qF "cheats: 40 pokes written to the emulator's table" "$cart/kernel.log" || fail "the budget: not the first cheat's 40 pokes alone"
+grep -qF "cheat 1 (B): its 3200 bytes" "$cart/kernel.log" || fail "the budget: the second cheat wasn't left out for its bytes"
 echo "PASS: Game Genie patches and RAM writes reach GB, GBC and NES games"

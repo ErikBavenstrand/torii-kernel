@@ -34,3 +34,6 @@
 -k @8:START -k @12:-
 -w "screen ready: cheat-menu"
 -s @24:menu.png
+# B closes it; DOWN twice onto a code for a byte the emulator sums (sampled): its note in the hint bar
+-k @40:B -k @44:- -k @52:DOWN -k @56:- -k @64:DOWN -k @68:-
+-s @84:sampled.png

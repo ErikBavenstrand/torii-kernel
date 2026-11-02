@@ -63,8 +63,10 @@ Research for v0.7 (2026-10-25), before the design in `docs/plans/roadmap.md`.
   97, the CGB WRAM banks 1 to 7; 01 is the plain write).
 - 🟢 No NES line has the compare-poke form `AAAA?CC:VV`; no cheat file has a
   `cheatN_format` line. 24 GB, 4 GBC and 42 NES cheats mix kinds on one line
-  set (the rest are one kind); Torii refuses the mix whole (CANT_RUN) rather
-  than run a part of it.
+  set (the rest are one kind). Torii runs a Game Genie and a poke of one cheat
+  both (a patch at launch, a write each frame); only a line that doesn't run
+  (cart RAM, an unknown type, a NES raw write outside RAM) makes the whole
+  cheat CANT_RUN, never half of it.
 - 🟢 Six-digit GB genies exist (954 lines): they have no compare, so the
   patch goes to every bank that can be mapped there.
 - 🟡 176 of the 4,731 six-letter NES lines have the length flag set in their
@@ -109,6 +111,39 @@ the cartridge's registers on https://www.nesdev.org/wiki/Game_Genie):
   hold 1,802 GBC lines), `8B` names a cartridge RAM bank, other bytes are unknown. Sources: EnHacklopedia's Game Boy page (`01xxyyzz` plain write, `9bxxyyzz` WRAM bank change then write, GBC only; https://doc.kodewerx.org/hacking_gb.html), PyBoy's `gameshark.py` (quoting it), and gambatte's `Interrupter::applyVblankCheats`, which applies only type 01 at the VBlank interrupt. Torii writes 01 and 90-97 at WRAM (C000-DFFF, its echo) and HRAM (FF80-FFFE) each GB frame; every other code reads and shows greyed.
 - The Xploder form (`$` and eight digits) is a different device's code and is
   read as unreadable.
+
+### What Torii runs of them (coverage, 2026-11-02)
+
+`tools/cheat_emu_coverage.py` (with `tools/cheat_emu_coverage.c`, which links
+`source/cheatemu.c` as `decode_emu` in `source/cheatfile.c` calls it) feeds
+every non-empty cheat, once per distinct code string, to `cheatemu_decode` and
+counts the answers (GB and GBC use one decoder). "Runs" means the decoder
+accepts it; a Game Genie that finds no bank or compare match at launch is still
+counted (the launch logs it as patching nothing).
+
+| Console | Distinct cheats | Runs | Can't run: write to ROM, VRAM, cart RAM, OAM or I/O | Can't run: unknown GameShark type | Unreadable: Xploder | Unreadable: wildcards or text | Unreadable: other |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| GB | 13,259 | 11,189 (84.4%) | 1,391 (10.5%) | 37 | 227 | 240 | 175 |
+| GBC | 7,116 | 6,221 (87.4%) | 89 (1.3%) | 4 | 546 (7.7%) | 249 | 7 |
+| NES | 31,448 | 31,301 (99.5%) | 4 (raw writes to ROM, PPU or registers: can't run) | 0 | 0 | 27 | 116 |
+
+Top unsupported line shapes (lines, not cheats):
+- GB: `01` GameShark to cart RAM A000-BFFF 797, `01` to VRAM 8000-9FFF 620,
+  3-digit junk (`hhh`) 316, Xploder 239, `hh??hhhh` wildcards 120, type 00 to
+  WRAM 27 (unknown type), `XX` or `?` wildcards about 100 more.
+- GBC: Xploder 637, `hh??hhhh` 221, `01` to cart RAM 94, `XX` wildcards 40.
+- NES: all under 30 each: 5-digit or 4-digit numbers (`99999`) about 50, and
+  `*` or letter-only malformed Game Genie codes.
+
+Cheapest to add: (1) GameShark `01` to cart RAM, 891 lines (about 6% of GB and
+1% of GBC cheats): a poke into the cart's battery RAM, which the emulator
+already maps (needs the bank the cart's mapper has switched in, or a bank
+byte as `8B` names it; check that it doesn't mark the save dirty wrongly).
+(2) `01` to VRAM, 623 lines: a poke through the emulator's own VRAM view,
+GBC's bank per VBK; it is the same poke table with one more region. (3)
+Xploder (773 lines, GBC mostly) needs its format first: unread. Wildcards
+(`??`, `XX`) are a code the player completes: out of scope. NES has
+nothing worth adding (0.5%).
 
 ## What the kernel does where devices and mGBA differ (v0.7)
 

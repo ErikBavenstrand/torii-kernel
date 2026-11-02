@@ -414,6 +414,6 @@ void test_keypad_emu(void)
 	CHECK(!strcmp(code_of(), "SXIOPO+0754:00"));
 	CHECK(keypad_edit_init_for(&e, CHEATEMU_NES, "8000:01", 7));
 	keypad_check(&e, CHEAT_FMT_AUTO, NULL, &work, cs, &c);
-	CHECK_EQ(c.status, KEYPAD_SHAPE);  // reads as no line: an address with no RAM
+	CHECK_EQ(c.status, KEYPAD_CANT_RUN);  // reads, but there is no RAM at an address in the ROM
 	work.console = CHEATEMU_GBA;
 }

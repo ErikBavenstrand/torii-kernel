@@ -134,13 +134,19 @@ static int nes_line(const char *s, u32 n, struct emucheat *e)
 		}
 		u16 folded;
 		if (!cheatemu_nes_poke_addr(addr, &folded))
-			return 0;  // the ROM's, the PPU's or a register: no RAM write
+			return 2;  // a code, but for the ROM, the PPU or a register: no RAM write to make
 		e->kind = CHEATEMU_POKE;
 		e->addr = folded;
 		e->value = (u8)value;
 		e->has_compare = 0;
 		e->compare = 0;
 		return 1;
+	}
+	if (n == 10 && s[4] == '?' && s[7] == ':') {  // AAAA?CC:VV, a write that waits for a byte
+		for (u32 i = 0; i < 10; i++)
+			if (i != 4 && i != 7 && hex_digit(s[i]) < 0)
+				return 0;
+		return 2;  // reads, but isn't run (libretro has none)
 	}
 	return 0;
 }
@@ -178,6 +184,114 @@ u32 cheatemu_find_table(const u8 *image, u32 n)
 		found = at;
 	}
 	return found;
+}
+
+// 1 if s (n bytes) is every character of a GB 8-digit/Xploder shape: hex digits or '?'
+static int gb_digits(const char *s, u32 n, int *wild)
+{
+	for (u32 i = 0; i < n; i++) {
+		if (s[i] == '?')
+			*wild = 1;
+		else if (hex_digit(s[i]) < 0)
+			return 0;
+	}
+	return 1;
+}
+
+u32 cheatemu_shape(const char *code, u32 len)
+{
+	int gb_ok = 1, nes_ok = 1, gb_sure = 0, nes_sure = 0, lines = 0;
+	for (u32 i = 0; i < len;) {
+		while (i < len &&
+		       (code[i] == '+' || code[i] == ' ' || code[i] == '\t' || code[i] == '\r' || code[i] == '\n'))
+			i++;
+		u32 from = i;
+		while (i < len && code[i] != '+' && code[i] != ' ' && code[i] != '\t' && code[i] != '\r' &&
+		       code[i] != '\n')
+			i++;
+		u32 n = i - from;
+		if (!n)
+			continue;
+		const char *s = code + from;
+		lines++;
+		struct emucheat e;
+		int wild = 0;
+		// GB: XXX-YYY[-ZZZ] whatever its address, 8 digits (or '?'), $ and 8 digits
+		if (gb_ok) {
+			int genie = (n == 7 || n == 11) && s[3] == '-' && (n == 7 || s[7] == '-');
+			for (u32 k = 0; genie && k < n; k++)
+				genie = k == 3 || k == 7 || hex_digit(s[k]) >= 0;
+			if (genie)
+				gb_sure = 1;
+			else if (n == 8 && gb_digits(s, n, &wild))
+				gb_sure |= wild;
+			else if (n == 9 && s[0] == '$' && gb_digits(s + 1, 8, &wild))
+				gb_sure = 1;
+			else
+				gb_ok = 0;
+		}
+		// NES
+		if (nes_ok) {
+			int k = nes_line(s, n, &e);
+			if (k == 1)
+				nes_sure = 1;  // a genie word, or AAAA:VV
+			else if (k == 2)
+				nes_sure = 1;  // AAAA:VV to an address no poke may write, or AAAA?CC:VV
+			else
+				nes_ok = 0;
+		}
+	}
+	if (!lines)
+		return CHEATEMU_GBA;
+	if (gb_ok && gb_sure)
+		return CHEATEMU_GB;
+	if (nes_ok && nes_sure)
+		return CHEATEMU_NES;
+	return CHEATEMU_GBA;
+}
+
+u32 cheatemu_why_cant(u32 console, const char *code, u32 len)
+{
+	for (u32 i = 0; i < len;) {
+		while (i < len &&
+		       (code[i] == '+' || code[i] == ' ' || code[i] == '\t' || code[i] == '\r' || code[i] == '\n'))
+			i++;
+		u32 from = i;
+		while (i < len && code[i] != '+' && code[i] != ' ' && code[i] != '\t' && code[i] != '\r' &&
+		       code[i] != '\n')
+			i++;
+		u32 n = i - from;
+		const char *s = code + from;
+		struct emucheat e;
+		if (console == CHEATEMU_GB && gb_line(s, n, &e) == 2) {
+			u32 v = 0;
+			for (u32 k = 0; k < 8; k++)
+				v = v << 4 | (u32)hex_digit(s[k]);
+			u32 type = v >> 24, addr = (v & 0xFF) << 8 | (v >> 8 & 0xFF);
+			if (type != 0x01 && (type < 0x90 || type > 0x97))
+				return CHEATEMU_WHY_TYPE;
+			return addr >= 0xA000 && addr < 0xC000   ? CHEATEMU_WHY_SRAM
+			       : addr >= 0x8000 && addr < 0xA000 ? CHEATEMU_WHY_VRAM
+								 : CHEATEMU_WHY_ROM;
+		}
+		if (console == CHEATEMU_NES && n == 7 && nes_line(s, n, &e) == 2)
+			return CHEATEMU_WHY_ROM;
+	}
+	return CHEATEMU_WHY_OTHER;
+}
+
+u32 cheatemu_sampled_lines(u32 console, const char *code, u32 len)
+{
+	if (console != CHEATEMU_GB)
+		return 0;
+	struct emucheat lines[CHEATEMU_LINES_SCAN];
+	u32 n = 0;
+	cheatemu_decode(console, code, len, lines, CHEATEMU_LINES_SCAN, &n);
+	struct cheatemu_rom rom = {CHEATEMU_GB, 0, 0, 0x8000, 0, 0};
+	for (u32 i = 0; i < n; i++)
+		if (lines[i].kind == CHEATEMU_GENIE && lines[i].addr < 0x4000 && cheatemu_sampled(&rom, lines[i].addr))
+			return 1;
+	return 0;
 }
 
 u8 cheatemu_decode(u32 console, const char *code, u32 len, struct emucheat *out, u32 max, u32 *n)
@@ -241,6 +355,7 @@ int cheatemu_rom_gb(struct cheatemu_rom *rom, u32 size)
 	rom->banks = 0;
 	rom->size = size;
 	rom->prg_at = 0;
+	rom->base = 0;
 	return size >= 0x4000;
 }
 
@@ -248,6 +363,7 @@ int cheatemu_rom_nes(struct cheatemu_rom *rom, const u8 *hdr, u32 size)
 {
 	rom->console = CHEATEMU_NES;
 	rom->size = size;
+	rom->base = 0;
 	if (hdr[0] != 'N' || hdr[1] != 'E' || hdr[2] != 'S' || hdr[3] != 0x1A)
 		return 0;
 	// The mapper as PocketNES reads it (loadcart.c): the high nibble from
@@ -318,6 +434,10 @@ static void place(const struct cheatemu_rom *rom, const struct emucheat *e, u32 
 		done->sampled++;
 		return;
 	}
+	if ((at & 0x7FFFFFu) + rom->base >= 0x800000u) {
+		done->unmapped++;
+		return;
+	}
 	if (done->patched >= max) {
 		done->limit++;
 		return;
@@ -349,19 +469,27 @@ void cheatemu_patch(const struct cheatemu_rom *rom, const struct emucheat *e, ch
 		place(rom, e, at + a % prg, get, set, ctx, max, done);
 		break;
 	case BANKS_16_LAST:
+		// 8000-BFFF: the switchable banks, not the one fixed at C000 (a code for 8000-BFFF
+		// isn't for it); C000-FFFF: that fixed last bank
 		if (a >= 0x4000)
 			place(rom, e, at + prg - 0x4000u + (a & 0x3FFFu), get, set, ctx, max, done);
 		else
-			for (u32 b = 0; b < rom->banks; b++)
+			for (u32 b = 0; b < (rom->banks > 1 ? rom->banks - 1u : 1u); b++)
 				place(rom, e, at + b * 0x4000u + a, get, set, ctx, max, done);
 		break;
-	case BANKS_8:
+	case BANKS_8: {
+		// MMC3: 8000-BFFF switchable (R6, R7), C000-DFFF the second to last bank (its default
+		// mode), E000-FFFF the last; a code goes to the bank of its own window only
+		u32 n8 = prg / 0x2000u;
 		if (a >= 0x6000)
 			place(rom, e, at + prg - 0x2000u + (a & 0x1FFFu), get, set, ctx, max, done);
+		else if (a >= 0x4000)
+			place(rom, e, at + (n8 > 1 ? n8 - 2u : 0u) * 0x2000u + (a & 0x1FFFu), get, set, ctx, max, done);
 		else
-			for (u32 b = 0; b < prg / 0x2000u; b++)
+			for (u32 b = 0; b < (n8 > 2 ? n8 - 2u : 1u); b++)
 				place(rom, e, at + b * 0x2000u + (a & 0x1FFFu), get, set, ctx, max, done);
 		break;
+	}
 	case BANKS_32:
 		if (prg < 0x8000u) {
 			place(rom, e, at + a % prg, get, set, ctx, max, done);

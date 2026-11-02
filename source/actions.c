@@ -315,6 +315,8 @@ int action_set_boot_mode(const char *path, u32 boot_mode)
 	return res == 0;
 }
 
+static int cheats_shared(const char *path);
+
 int action_delete_file(const char *path)
 {
 	if (!copy_path(path) || path_copy[0] != '/')
@@ -329,7 +331,8 @@ int action_delete_file(const char *path)
 	// that file and no other's. First, so a cut between leaves the game,
 	// not a cheat file another game of that name would take
 	const char *slash = strrchr(path_copy, '/');
-	if (library_console_of(slash + 1) == LIB_GBA && !cheatstore_delete(path_copy))
+	if (library_console_of(slash + 1) != LIB_CONSOLE_NONE && !cheats_shared(path_copy) &&
+	    !cheatstore_delete(path_copy))
 		tlog("delete %s: its cheat file stays", path_copy);
 	res = f_unlink(path_copy);
 	if (res == FR_NO_FILE || res == FR_NO_PATH) {
@@ -369,7 +372,7 @@ enum {
 	SIDE_DIR,     // dir and the game's path: a folder of its own (saves, history)
 	SIDE_EXT,     // name_with_ext's, ext; GBA games only
 	SIDE_ART,     // the file name and ".bin"
-	SIDE_CHEATS,  // dir and the game's path less its extension, then ext (cheatstore.h); GBA games only
+	SIDE_CHEATS,  // dir and the game's path less its extension, then ext (cheatstore.h)
 };
 #define RENAME_JOURNAL "/torii/rename.txt"
 #define RENAME_JOURNAL_MAX (2 * USERDATA_PATH_MAX + 64)  // its one line, and the CRC line
@@ -429,8 +432,8 @@ static int side_path(char *out, const struct sidecar *s, const char *name, u32 c
 	if (s->kind == SIDE_CHEATS) {
 		const char *dot = strrchr(name, '.');
 		u32 stem = dot && dot != name ? (u32)(dot - name) : (u32)strlen(name);
-		return console == LIB_GBA && (u32)snprintf(out, SIDE_PATH_MAX, "%s%s/%.*s%s", s->dir, RW->dir,
-							   (int)stem, name, s->ext) < SIDE_PATH_MAX;
+		return console != LIB_CONSOLE_NONE && (u32)snprintf(out, SIDE_PATH_MAX, "%s%s/%.*s%s", s->dir, RW->dir,
+								    (int)stem, name, s->ext) < SIDE_PATH_MAX;
 	}
 	if (s->kind == SIDE_EXT && console == LIB_GBA)
 		name_with_ext(file, name, s->ext);
@@ -475,11 +478,38 @@ static u32 stem_bytes(const char *name)
 	return dot ? (u32)(dot - name) : (u32)strlen(name);
 }
 
+// 1 if another game of the same folder and name but for the extension is on the card (Foo.gb
+// and Foo.gbc, or Foo.gba): they share one cheat file, which stays where it is when either
+// is renamed or deleted
+static int cheats_shared(const char *path)
+{
+	static const char *const exts[] = {".gba", ".gbc", ".gb", ".nes"};
+	const char *slash = strrchr(path, '/');
+	const char *dot = strrchr(slash ? slash + 1 : path, '.');
+	if (!dot)
+		return 0;
+	char other[USERDATA_PATH_MAX];
+	for (u32 i = 0; i < sizeof(exts) / sizeof(*exts); i++) {
+		if ((u32)snprintf(other, sizeof(other), "%.*s%s", (int)(dot - path), path, exts[i]) >= sizeof(other))
+			continue;
+		if (!same_name(other, path) && there(other))
+			return 1;
+	}
+	return 0;
+}
+
 // 1 if the game name has sidecar i's files
 static int side_exists(u32 i, const char *name, u32 console)
 {
 	struct rename_work *w = RW;
-	return side_path(w->from, &sidecars[i], name, console) && there(w->from);
+	if (!side_path(w->from, &sidecars[i], name, console))
+		return 0;
+	if (sidecars[i].kind == SIDE_CHEATS) {
+		char game[USERDATA_PATH_MAX];
+		if ((u32)snprintf(game, sizeof(game), "%s/%s", w->dir, name) < sizeof(game) && cheats_shared(game))
+			return 0;
+	}
+	return there(w->from);
 }
 
 // 1 if a folder of sidecar i's has nothing in it and goes

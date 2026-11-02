@@ -48,6 +48,47 @@ cart (stage 4). Where the build differs from the design:
   read alone (else "isn't a whole code yet"), then the cheat as cheatemu decodes
   it; what it does is the result line. Buttons stay hidden.
 
+### After the review (2026-11-02)
+
+Fixes from a reviewer's and a tester's findings, each tested:
+
+- **Clean-up and orphaned files.** Settings' clean-up decided a file was a GB, GBC
+  or NES game's by whether the game was still on the card, so a renamed or deleted
+  game's cheat file was cleaned as a GBA one and lost every code. It now goes by the
+  codes' shape (`cheatemu_shape`: a Game Genie, `AAAA:VV`, a `?` wildcard or an
+  Xploder `$` line, and nothing a GBA format has), never by the ROM: such a file, or
+  such a window of a larger one, is left as it is.
+- **NES Game Genie banks.** A 6-letter code for 8000-BFFF no longer patches the
+  fixed last bank (mappers 1, 2, 71, 94), nor MMC3's last two (4, 118, 119); C000-DFFF
+  on MMC3 is the second to last 8 KB bank, E000-FFFF the last.
+- **Rename and delete** move and remove a GB, GBC or NES game's cheat files as a
+  GBA's. A name two games share (`Foo.gb` and `Foo.gbc`) is one file, which stays.
+- **The launch enforces the budget** (63 pokes; the ROM patches kept) after a file
+  edit or in a windowed file, and says what it left out: a dialog after the load
+  ("N cheats or lines weren't applied: no room, or no match in this game"), which counts
+  a cheat left out whole, a poke with no room, and a Game Genie line that patched nothing
+  (another game version, a checksum byte, the patch limit). The cheat screen already says
+  why a pick is refused (the hint bar's reason).
+- **8 MB ROMs.** The loader (`LoadEMU2PSRAM`) pages by the file offset and writes each
+  block at the emulator's size plus its offset in the page; a block of the last 80 KB
+  of an 8 MB page ends past the page's window. The patcher addresses the same linear
+  place the game runs from, so it is right wherever the loader was; but it now leaves a
+  byte there alone (`cheatemu_rom.base`, `done.unmapped`), as it isn't known to be in
+  the copy. Only a ROM of about 8 MB is affected. The loader itself isn't changed here.
+- **NES raw code outside RAM** (4000-5FFF, 8000+) and the compare form are "can't run"
+  with a reason ("Writes the ROM or a register"), not unreadable.
+- **Reasons** name the line that doesn't run: cart RAM ("Writes cart RAM, which a save
+  keeps"), video RAM, the ROM or I/O, an unknown GameShark type.
+- **Checksum bytes.** A GB Game Genie byte on the emulators' sampled words (4 of every
+  128 in the first 16 KB, `cheatemu_sampled`) is skipped, as designed; the cheat's
+  details and the hint bar now say "Checksum bytes stay unpatched" for it, the Info
+  text explains it, and the launch counts it in the dialog. NES can't say before the
+  game loads (the offset depends on the mapper's banks): the launch log and dialog do.
+  `cheatstore_launch_none` also resets the kept patches.
+- **`jagoombacolor.patch`** rewrote five whole files (gbz80.s, lcd.s, main.c, sram.c,
+  ui.c): an edit tool had turned upstream's CRLF into LF. They are CRLF again, the
+  patch is 580 lines, and the binary is the same.
+
 ### Speed of the hooks, measured on the emulated cart (2026-11-02)
 
 TM3 read around the call (1 cycle a tick), 600-700 frames of real games and the

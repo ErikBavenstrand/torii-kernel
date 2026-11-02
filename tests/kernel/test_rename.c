@@ -424,3 +424,48 @@ void test_rename_file(void)
 	f_unlink("/.T18h");
 	userdata_test_paths(NULL, NULL, NULL);
 }
+
+// A GB, GBC or NES game's cheat file follows its game as a GBA game's does (both copies, and
+// the index), and goes with it when it is deleted; a name that two games share (Foo.gb and
+// Foo.gbc) is one cheat file, which stays where it is
+void test_rename_cheats_emu(void)
+{
+	CHECK(card());
+	if (!card())
+		return;
+	userdata_test_paths(T_RECENT, T_FAV, T_OLD);
+	static const char *const games[][2] = {
+		{"Gb.gb", "GbNew.gb"}, {"Gbc.gbc", "GbcNew.gbc"}, {"Nes.nes", "NesNew.nes"}};
+	for (u32 i = 0; i < 3; i++) {
+		char from[64], to[64], cht[64], cht_new[64], bak[72], bak_new[72];
+		const char *name = games[i][0], *new_name = games[i][1];
+		u32 stem = (u32)(strrchr(name, '.') - name), stem_new = (u32)(strrchr(new_name, '.') - new_name);
+		snprintf(from, sizeof(from), T_DIR "/%s", name);
+		snprintf(to, sizeof(to), T_DIR "/%s", new_name);
+		snprintf(cht, sizeof(cht), CH "/%.*s.cht", (int)stem, name);
+		snprintf(cht_new, sizeof(cht_new), CH "/%.*s.cht", (int)stem_new, new_name);
+		snprintf(bak, sizeof(bak), "%s.bak", cht);
+		snprintf(bak_new, sizeof(bak_new), "%s.bak", cht_new);
+		CHECK(put(from, "game"));
+		CHECK(put(cht, "cheats"));
+		CHECK(put(bak, "cheats backup"));
+		CHECK_EQ(action_rename_file(from, new_name), ACTION_RENAMED);
+		CHECK(!there(from) && holds(to, "game"));
+		CHECK(!there(cht) && holds(cht_new, "cheats"));
+		CHECK(!there(bak) && holds(bak_new, "cheats backup"));
+		// Deleting the game takes its cheat files
+		CHECK(action_delete_file(to));
+		CHECK(!there(to) && !there(cht_new) && !there(bak_new));
+	}
+	// Foo.gb and Foo.gbc share Foo.cht: neither rename nor delete of one moves or takes it
+	CHECK(put(T_DIR "/Share.gb", "gb"));
+	CHECK(put(T_DIR "/Share.gbc", "gbc"));
+	CHECK(put(CH "/Share.cht", "shared cheats"));
+	CHECK_EQ(action_rename_file(T_DIR "/Share.gb", "Share2.gb"), ACTION_RENAMED);
+	CHECK(holds(CH "/Share.cht", "shared cheats") && !there(CH "/Share2.cht"));
+	CHECK(action_delete_file(T_DIR "/Share2.gb"));
+	CHECK(holds(CH "/Share.cht", "shared cheats"));
+	f_unlink(T_DIR "/Share.gbc");
+	f_unlink(CH "/Share.cht");
+	f_unlink("/torii/saves/T18/Share.gbc/Main.sav");
+}

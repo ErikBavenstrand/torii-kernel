@@ -406,6 +406,59 @@ void test_cheatstore_clean(void)
 	cheatstore_delete(T_ROM);
 }
 
+// 1 if the file at path holds exactly text
+static __attribute__((noinline)) int holds(const char *path, const char *text)
+{
+	FIL f;
+	u8 *buf = stage_buffer();
+	UINT got = 0;
+	u32 len = (u32)strlen(text);
+	if (f_open(&f, path, FA_READ) != FR_OK)
+		return 0;
+	int ok = f_size(&f) == len && f_read(&f, buf, len, &got) == FR_OK && got == len && !memcmp(buf, text, len);
+	f_close(&f);
+	return ok;
+}
+
+// Settings' clean-up leaves a GB, GBC or NES game's cheat file as it is, though its game is
+// gone or renamed (the ROM isn't on the card here at all): the codes' shape says whose it is
+void test_cheatstore_clean_emu(void)
+{
+	if (!EZcardFs.fs_type && f_mount(&EZcardFs, "", 1) != FR_OK)
+		return;
+	static const struct {
+		const char *path, *text;
+	} files[] = {
+		{"/torii/cheats/T19/Orphan GB.cht",
+		 "cheats = 3\n\ncheat0_desc = \"Lives\"\ncheat0_code = \"FA0-999-4C1\"\ncheat0_enable = true\n\n"
+		 "cheat1_desc = \"Ram\"\ncheat1_code = \"01995EDB\"\n\ncheat2_desc = \"Wild\"\ncheat2_code = "
+		 "\"01??DCC4\"\n"},
+		{"/torii/cheats/T19/Orphan NES.cht", "cheat0_desc = \"Lives\"\ncheat0_code = \"SXIOPO\"\ncheat1_desc = "
+						     "\"Poke\"\ncheat1_code = \"0754:00+0756:01\"\n"
+						     "cheat2_desc = \"ROM\"\ncheat2_code = \"8000:01\"\ncheat3_desc = "
+						     "\"Typo\"\ncheat3_code = \"AOUGTAE\"\n"},
+		{"/torii/cheats/T19/Orphan Xploder.cht", "cheat0_desc = \"X\"\ncheat0_code = \"$0D24206E\"\n"},
+	};
+	for (u32 i = 0; i < sizeof(files) / sizeof(*files); i++) {
+		CHECK(put(files[i].path, files[i].text));
+		CHECK_EQ(cheatstore_clean(files[i].path), 0);
+		CHECK(holds(files[i].path, files[i].text));
+	}
+	// A GBA file beside them is cleaned as ever, and clean-up of every file keeps theirs
+	CHECK(put("/torii/cheats/T19/Orphan GBA.cht", "cheat0_code = \"ZZZZ\"\ncheat1_code = \"32001010+0001\"\n"));
+	struct cheatstore_sum sum;
+	cheatstore_clean_all(NULL, &sum);
+	CHECK_EQ(sum.failed, 0);
+	CHECK(sum.removed >= 1);
+	for (u32 i = 0; i < sizeof(files) / sizeof(*files); i++)
+		CHECK(holds(files[i].path, files[i].text));
+	CHECK(holds("/torii/cheats/T19/Orphan GBA.cht", "cheat1_code = \"32001010+0001\"\n") ||
+	      file_size("/torii/cheats/T19/Orphan GBA.cht") > 0);
+	for (u32 i = 0; i < sizeof(files) / sizeof(*files); i++)
+		f_unlink(files[i].path);
+	f_unlink("/torii/cheats/T19/Orphan GBA.cht");
+}
+
 // Appends cheats from to to - 1 to path, each a write of its own byte to
 // EWRAM under heading folder; from 248 to 253 (a window's edge at 250) one
 // run of variants, the same byte with other values

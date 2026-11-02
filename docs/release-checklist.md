@@ -198,7 +198,10 @@ game's popup, Cheats, + Add code). With Logging on Debug, each launch logs
 | The save stays clean | play a GB game with a battery save with a poke picked, save in game, then power off and launch it with no cheats: its save has none of the cheat's changes |
 | Greyed codes | codes of kinds that don't run here (cart RAM, `8B`, ROM or I/O writes) show greyed with the reason, and the game starts anyway |
 | Typing a code | + Add code in a GB, GBC and NES game: the keypad takes digits and hyphens (GB), or hex and `:` with the GG key's letters (NES); a wrong code is refused with its message |
-| Clean-up leaves them | Settings, Clean up cheats doesn't delete a GB, GBC or NES cheat file |
+| Clean-up leaves them | Settings, Clean up cheats doesn't delete a GB, GBC or NES cheat file, also one whose game was renamed or deleted |
+| Rename and delete | rename a GB game that has a cheat file: its cheats follow it (popup count, the picks); delete it: the cheat file goes |
+| Left out, said | pick more pokes than fit (a file edited by hand), or a Game Genie code from another version of the game: a dialog after the load says how many weren't applied |
+| A checksum byte | a GB Game Genie code for an address like 0100: its details say "Checksum bytes stay unpatched" |
 
 ### The v0.9 firmware update
 

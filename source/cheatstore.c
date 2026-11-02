@@ -1432,21 +1432,17 @@ static u32 clean_text(int masters, int *spoiled)
 	return same ? gone : 0;
 }
 
-// 1 if the game a cheat file at path (CHEATS_DIR/<its folder>/<name>.cht)
-// is for is a GB, GBC or NES game on the card: the GBA decoders would read
-// its codes as unreadable
-static int emu_cheat_file(const char *path)
+// 1 if a cheat of the window read now has the shape of a GB, GBC or NES code
+// (cheatemu_shape): the GBA decoders would read its codes as unreadable and
+// the clean-up would take them. Decided by the codes, never by whether the
+// game's file is still on the card: a cheat file whose game was renamed or
+// moved is as much a GB game's as before.
+static int window_has_emu_codes(void)
 {
-	u32 n = (u32)strlen(path), dir = (u32)strlen(CHEATS_DIR);
-	char rom[SAFEFILE_PATH_MAX];
-	static const char *const exts[] = {".gb", ".gbc", ".nes"};
-	if (n <= dir + 4 || n + 5 >= sizeof(rom) || strncmp(path, CHEATS_DIR, dir) != 0 || path[dir] != '/')
-		return 0;
-	for (u32 i = 0; i < 3; i++) {
-		memcpy(rom, path + dir, n - dir - 4);
-		memcpy(rom + n - dir - 4, exts[i], strlen(exts[i]) + 1);
-		FILINFO info;
-		if (f_stat(rom, &info) == FR_OK)
+	const struct cheatstore *cs = cheatstore();
+	for (u32 i = 0; i < cs->file.count; i++) {
+		const struct cheatfile_cheat *c = &cs->file.cheats[i];
+		if (cheatemu_shape(cs->file.text + c->code, cheatfile_code_len(c)) != CHEATEMU_GBA)
 			return 1;
 	}
 	return 0;
@@ -1456,10 +1452,6 @@ s32 cheatstore_clean(const char *path)
 {
 	struct cheatstore *cs = cheatstore();
 	int spoiled;
-	if (emu_cheat_file(path)) {
-		tlog("cheats: %s: a GB, GBC or NES game's: left as it is", path);
-		return 0;
-	}
 	if (cheatstore_open_file(path) != CHEATSTORE_READ)
 		return -1;
 	if (cs->windows) {
@@ -1467,6 +1459,11 @@ s32 cheatstore_clean(const char *path)
 		for (u32 k = 0; k < cs->windows; k++) {
 			if (!cheatstore_window_go(k))
 				return -1;
+			if (window_has_emu_codes()) {
+				tlog("cheats: %s: window %lu holds GB, GBC or NES codes: left as it is", path,
+				     (unsigned long)k + 1);
+				continue;
+			}
 			u32 n = clean_text(0, &spoiled);
 			if (!n && spoiled)
 				window_read(k);  // as its slot has it
@@ -1475,6 +1472,10 @@ s32 cheatstore_clean(const char *path)
 		if (gone && !cheatstore_write())
 			return -1;
 		return (s32)gone;
+	}
+	if (window_has_emu_codes()) {
+		tlog("cheats: %s: holds GB, GBC or NES codes: left as it is", path);
+		return 0;
 	}
 	u32 gone = clean_text(1, &spoiled);
 	if (!gone && spoiled) {
@@ -2161,6 +2162,10 @@ static void image_set(void *ctx, u32 offset, u8 value)
 // The most bytes a launch patches (a 6-digit code on a banked GB game patches one per bank)
 #define EMU_PATCHES_MAX 2048
 
+// What a launch of a GB, GBC or NES game left out of its picks: whole cheats (cheatstore_launch's
+// pass), then the lines and pokes that didn't apply (cheatstore_launch_emu's)
+static u32 emu_dropped;
+
 struct emu_ctx {
 	struct emu_image im;
 	struct cheatemu_rom rom;
@@ -2169,6 +2174,7 @@ struct emu_ctx {
 	int rom_ok;  // the image reads as a game its patches can go in
 	u32 table;  // the poke table's offset in the emulator's image, 0xFFFFFFFF: none
 	u32 pokes, left_out;
+	u32 nothing;  // Game Genie lines that patched nothing
 };
 
 // A poke into the emulator's table, at the next place (the count is written after them all)
@@ -2201,24 +2207,27 @@ static void emu_one(const struct cheat_patch *pt, u16 number, void *ctx)
 	if (!c->rom_ok)
 		return;
 	cheatemu_patch(&c->rom, &e, image_get, image_set, &c->im, EMU_PATCHES_MAX, &c->done);
-	if (c->done.patched == before.patched)
+	if (c->done.patched == before.patched) {
+		c->nothing++;
 		tlog("cheats: cheat %u (%s): line %04X patches nothing (%lu with another byte, %lu in the "
-		     "emulator's checksum, %lu over the limit%s)",
+		     "emulator's checksum, %lu over the limit, %lu past the load's window%s)",
 		     number, kept_name(number), e.addr, (unsigned long)(c->done.other - before.other),
 		     (unsigned long)(c->done.sampled - before.sampled), (unsigned long)(c->done.limit - before.limit),
+		     (unsigned long)(c->done.unmapped - before.unmapped),
 		     c->done.unknown && !before.unknown ? ", its mapper's banks unknown" : "");
+	}
 }
 
-void cheatstore_launch_emu(const char *rom_path, u32 console, u32 rom_start, u32 size)
+u32 cheatstore_launch_emu(const char *rom_path, u32 console, u32 rom_start, u32 size)
 {
 	if (!kept.n)
-		return;
+		return emu_dropped;
 	u32 start = cycles_now();
 	if (kept.rom != path_crc(rom_path)) {
 		tlog_error("cheats: %s: its patches weren't kept before the load: none written", rom_path);
-		return;
+		return emu_dropped;
 	}
-	struct emu_ctx c = {{rom_start, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, 0, 0, 0xFFFFFFFFu, 0, 0};
+	struct emu_ctx c = {.im = {rom_start, 0}, .table = 0xFFFFFFFFu};
 	if (console == CHEATEMU_NES) {
 		u8 hdr[16];
 		for (u32 i = 0; i < 16; i += 2) {
@@ -2232,6 +2241,7 @@ void cheatstore_launch_emu(const char *rom_path, u32 console, u32 rom_start, u32
 		c.rom_ok = cheatemu_rom_gb(&c.rom, size);
 		c.table = cheatemu_find_table(jagoombacolor_gba, jagoombacolor_gba_size);
 	}
+	c.rom.base = rom_start;
 	if (!c.rom_ok)
 		tlog("cheats: %s: not a ROM its patches can go in (%lu bytes): none written", rom_path,
 		     (unsigned long)size);
@@ -2250,10 +2260,16 @@ void cheatstore_launch_emu(const char *rom_path, u32 console, u32 rom_start, u32
 		     (unsigned long)cycles_since(start));
 	if (c.im.page)
 		SetPSRampage(0);
+	// Whole cheats left out, pokes with no room, Game Genie lines that patched nothing (another
+	// version of the game, a byte the emulator sums, the launch's patch limit)
+	return emu_dropped + c.left_out + c.nothing;
 }
 
 void cheatstore_launch_none(void)
 {
+	kept.n = kept.used = kept.names_used = 0;  // nothing from a launch before it
+	kept.rom = 0;
+	emu_dropped = 0;
 	gl_cheat_count = gl_cheat_bytes = gl_cheat_patches = 0;
 	ingame_cheats_clear();
 }
@@ -2301,6 +2317,8 @@ static int launch_pass(const char *rom_path, int quick)
 	launch_progress(0, 1);  // a long file's read may have taken a while already
 	struct cheatstore *cs = cheatstore();
 	struct cheatfile *f = &cs->file;
+	const int emu_console = cs->work.console != CHEATEMU_GBA;
+	u32 emu_bytes = 0;
 	if (quick)
 		cheatstore_sparse_begin();
 	u32 picks = cheatstore_picks(), last_window = 0;
@@ -2340,18 +2358,23 @@ static int launch_pass(const char *rom_path, int quick)
 			u8 flags = INGAME_WHY_CANT;
 			u32 bit = 0, bytes = cs->work.n_prog * 4;
 			if (c->picked) {
+				// A GB, GBC or NES cheat's pokes count in the table they go to
+				// (CHEATFILE_POKE_WORDS), as the picks do on the cheat screen; a file
+				// edited since, or a window's picks, may hold more than fits
+				u32 used = emu_console ? emu_bytes : gl_cheat_bytes;
 				if (c->status != CHEATFILE_OK) {
 					tlog("cheats: cheat %u (%.*s): %s, left out", c->number, c->desc_len,
 					     f->text + c->desc, status_names[c->status]);
-				} else if (gl_cheat_bytes + bytes > CHEATFILE_BYTES_MAX ||
+					emu_dropped += emu_console;
+				} else if (used + bytes > CHEATFILE_BYTES_MAX ||
 					   cost + cs->work.cost > CHEAT_LOAD_MAX) {
+					emu_dropped += emu_console;
 					tlog("cheats: cheat %u (%.*s): its %lu bytes and load %lu don't fit beside %lu "
 					     "and "
 					     "%lu, "
 					     "left out",
 					     c->number, c->desc_len, f->text + c->desc, (unsigned long)bytes,
-					     (unsigned long)cs->work.cost, (unsigned long)gl_cheat_bytes,
-					     (unsigned long)cost);
+					     (unsigned long)cs->work.cost, (unsigned long)used, (unsigned long)cost);
 					flags = INGAME_WHY_ROOM;
 				} else if (kept.used + (u32)c->patches * CHEATFILE_PATCH_UNIT >
 					   CARTLOG_CHEAT_PATCHES_SIZE) {
@@ -2363,8 +2386,10 @@ static int launch_pass(const char *rom_path, int quick)
 					     (unsigned long)cs->work.n_patches,
 					     (unsigned long)c->patches * CHEATFILE_PATCH_UNIT, (unsigned long)kept.n,
 					     (unsigned long)kept.used, CARTLOG_CHEAT_PATCHES_SIZE);
+					emu_dropped += emu_console;
 					flags = INGAME_WHY_ROOM;
 				} else {
+					emu_bytes += emu_console ? bytes : 0;
 					flags = INGAME_CHEAT_ON |
 						(cs->work.n_patches ? INGAME_WHY_LOCKED : INGAME_WHY_NONE);
 					if (bytes && cs->work.console == CHEATEMU_GBA) {

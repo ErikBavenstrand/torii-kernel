@@ -472,7 +472,7 @@ static u32 share(u32 bytes, u32 cost)
 
 // Why cheat c can't be picked, why being cheatfile_why's: the budget's
 // numbers where they say it
-static const char *cs_reason(const struct cheatfile_cheat *c, u32 why)
+static const char *cs_reason(const struct cheatfile_cheat *c, u32 why, const char *code, u32 code_len)
 {
 	const struct cheatfile *f = &cheatstore()->file;
 	if (why == CHEATFILE_WHY_FULL) {
@@ -496,8 +496,13 @@ static const char *cs_reason(const struct cheatfile_cheat *c, u32 why)
 	}
 	if (why >= CHEATFILE_WHYS)
 		return NULL;
-	if (cs.emu && why == CHEATFILE_WHY_CANT_RUN)
-		return S(STR_CHEATS_WHY_EMU_RAM);
+	if (cs.emu && why == CHEATFILE_WHY_CANT_RUN) {
+		// Which line: a write to cart RAM (a save keeps it), video RAM, the ROM or a register, or a
+		// GameShark type Torii doesn't run
+		static const u16 reasons[] = {STR_CHEATS_WHY_EMU_RAM, STR_CHEATS_WHY_EMU_SRAM, STR_CHEATS_WHY_EMU_VRAM,
+					      STR_CHEATS_WHY_EMU_ROM, STR_CHEATS_WHY_EMU_TYPE};
+		return S(reasons[code ? cheatemu_why_cant(cheatstore_console(), code, code_len) : 0]);
+	}
 	return why ? S(STR_CHEATS_WHY_FULL + why - CHEATFILE_WHY_FULL) : "";
 }
 
@@ -516,8 +521,17 @@ static const char *add_reason(void)
 // The hint bar's line for cheat c, which A may pick: its buttons if it
 // takes some, else when it is set at launch if it runs in game too; NULL
 // for one always on, or one that only patches the ROM (its Guide page says)
-static const char *cs_activation_note(const struct cheatfile_cheat *c)
+static const char *cs_activation_note(const struct cheatfile_cheat *c, u32 g)
 {
+	// A GB code with a byte in the first 16 KB the emulator sums for its states: left unpatched
+	if (cs.emu && c->status == CHEATFILE_OK && c->patches) {
+		u32 at = cheatstore_focus(g);
+		if (at != CHEATFILE_NONE &&
+		    cheatemu_sampled_lines(cheatstore_console(),
+					   cheatstore()->file.text + cheatstore()->cheats[at].code,
+					   cheatfile_code_len(&cheatstore()->cheats[at])))
+			return S(STR_CHEATS_EMU_SAMPLED);
+	}
 	u16 act = shown_keys(c);
 	u32 mode = cheatkeys_mode(act);
 	if (mode == CHEATKEYS_HOLD || mode == CHEATKEYS_PRESS || (mode == CHEATKEYS_LAUNCH && !c->patches)) {
@@ -557,7 +571,17 @@ static void cs_show_hints(void)
 			a = (struct ui_hint){"A", c.picked ? S(STR_CHEATS_HINT_DROP) : S(STR_CHEATS_HINT_PICK)};
 		else if (why == CHEATFILE_WHY_EDIT)
 			a = (struct ui_hint){"A", S(STR_CHEATS_HINT_FILL)};
-		note = why != CHEATFILE_PICKABLE ? cs_reason(&c, why) : cs_activation_note(&c);
+		const char *code = NULL;
+		u32 code_len = 0;
+		if (cs.emu && why == CHEATFILE_WHY_CANT_RUN) {  // the entry has no code: the cheat's in the file
+			u32 at = cheatstore_focus(ROW_AT(v));
+			if (at != CHEATFILE_NONE) {
+				code = cheatstore()->file.text + cheatstore()->cheats[at].code;
+				code_len = cheatfile_code_len(&cheatstore()->cheats[at]);
+			}
+		}
+		note = why != CHEATFILE_PICKABLE ? cs_reason(&c, why, code, code_len)
+						 : cs_activation_note(&c, ROW_AT(v));
 		guide = 1;
 	}
 	u32 n, room = (u32)ui_node(cs.hints)->w;
@@ -1044,8 +1068,12 @@ static void detail_text(u32 at)
 		cs.sub_to = (u16)n;
 	}
 	u32 why = cheatfile_why(f, at);
-	const char *box = why != CHEATFILE_PICKABLE ? cs_reason(c, why) : NULL;
+	const char *box =
+		why != CHEATFILE_PICKABLE ? cs_reason(c, why, f->text + c->code, cheatfile_code_len(c)) : NULL;
 	cs.box_icon = ART_ICON8_INFO;
+	if (!box && cs.emu && c->status == CHEATFILE_OK &&
+	    cheatemu_sampled_lines(cheatstore_console(), f->text + c->code, cheatfile_code_len(c)))
+		box = S(STR_CHEATS_EMU_SAMPLED);
 	if (!box && cheatkeys_sentence(shown_keys(c), cs.note, sizeof(cs.note))) {
 		box = cs.note;
 		cs.box_icon = ART_ICON8_KEYS;
