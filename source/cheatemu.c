@@ -26,8 +26,8 @@ static int nes_nibble(char c)
 }
 
 // Line s (n bytes, trimmed) of a GB code: 1 and *e filled for a Game Genie
-// (XXX-YYY or XXX-YYY-ZZZ); 2 for a GameShark line (8 digits) that is
-// well formed, which doesn't run yet; 0 if it is neither.
+// (XXX-YYY or XXX-YYY-ZZZ) or a GameShark write (8 digits); 2 for a GameShark
+// line that is well formed but isn't a write that runs; 0 if it is neither.
 static int gb_line(const char *s, u32 n, struct emucheat *e)
 {
 	int d[9];
@@ -62,10 +62,29 @@ static int gb_line(const char *s, u32 n, struct emucheat *e)
 		return 1;
 	}
 	if (n == 8) {
-		for (u32 i = 0; i < n; i++)
-			if (hex_digit(s[i]) < 0)
+		u32 v = 0;
+		for (u32 i = 0; i < n; i++) {
+			int h = hex_digit(s[i]);
+			if (h < 0)
 				return 0;
-		return 2;
+			v = v << 4 | (u32)h;
+		}
+		// GameShark, TT VV LL HH (EnHacklopedia's Game Boy page): TT 01 writes VV at
+		// HHLL; 9B does too, with WRAM bank B (GBC) for D000-DFFF; 8B names a cart RAM
+		// bank. Others, and addresses past WRAM and HRAM, read but don't run
+		u32 type = v >> 24, addr = (v & 0xFF) << 8 | (v >> 8 & 0xFF);
+		if (type != 0x01 && (type < 0x90 || type > 0x97))
+			return 2;
+		u32 folded = addr >= 0xE000 && addr < 0xFE00 ? addr - 0x2000 : addr;
+		if (!((folded >= 0xC000 && folded < 0xE000) || (addr >= 0xFF80 && addr < 0xFFFF)))
+			return 2;
+		e->kind = CHEATEMU_POKE;
+		e->addr = (u16)addr;
+		e->value = (u8)(v >> 16);
+		e->has_compare = 0;
+		// The WRAM bank (0: whichever D000 maps to); 9B with B 0 is bank 1, as SVBK's 0
+		e->compare = type >= 0x90 ? (u8)((type & 7) ? (type & 7) : 1) : 0;
+		return 1;
 	}
 	return 0;
 }
@@ -164,7 +183,7 @@ u32 cheatemu_find_table(const u8 *image, u32 n)
 u8 cheatemu_decode(u32 console, const char *code, u32 len, struct emucheat *out, u32 max, u32 *n)
 {
 	u32 count = 0;
-	int unsupported = 0, pokes_ok = console == CHEATEMU_NES;
+	int unsupported = 0;
 	*n = 0;
 	if (console != CHEATEMU_GB && console != CHEATEMU_NES)
 		return CHEATEMU_UNREADABLE;
@@ -184,10 +203,6 @@ u8 cheatemu_decode(u32 console, const char *code, u32 len, struct emucheat *out,
 		if (!kind)
 			return CHEATEMU_UNREADABLE;
 		if (kind == 2) {
-			unsupported = 1;
-			continue;
-		}
-		if (e.kind == CHEATEMU_POKE && !pokes_ok) {
 			unsupported = 1;
 			continue;
 		}

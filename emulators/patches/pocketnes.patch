@@ -214,7 +214,7 @@ index 74f8486..6d6eac0 100644
  	.byte 0
 diff --git a/src/torii_cheats.c b/src/torii_cheats.c
 new file mode 100644
-index 0000000..d8eec02
+index 0000000..a539379
 --- /dev/null
 +++ b/src/torii_cheats.c
 @@ -0,0 +1,45 @@
@@ -243,7 +243,7 @@ index 0000000..d8eec02
 +	struct torii_cheat e[64];
 +};
 +
-+const volatile struct torii_cheats torii_cheats __attribute__((used, aligned(4))) = {
++const volatile struct torii_cheats torii_cheats __attribute__((used, aligned(4), section(".rodata.torii_cheats"))) = {
 +	{'T', 'O', 'R', 'I', 'I', 'C', 'H', 'T'}, 1, 0, 64, {{0, 0, 0, 0, {0, 0, 0}}}};
 +
 +// Once a frame, from timeout.s

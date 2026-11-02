@@ -22,4 +22,5 @@ static void check_image(const u8 *image, u32 size)
 void test_emucheats_tables(void)
 {
 	check_image(pocketnes_gba, pocketnes_gba_size);
+	check_image(jagoombacolor_gba, jagoombacolor_gba_size);
 }

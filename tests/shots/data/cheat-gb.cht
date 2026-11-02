@@ -13,7 +13,7 @@ cheat2_code = "09C-56B-E6E+09C-74A-E6E"
 cheat2_enable = false
 
 cheat3_desc = "Max money"
-cheat3_code = "01FF00C1"
+cheat3_code = "01FF00A1"
 cheat3_enable = false
 
 cheat4_desc = "Walk through walls"

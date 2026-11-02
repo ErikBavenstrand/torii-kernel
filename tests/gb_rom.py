@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Writes a tiny Game Boy ROM for tests/gb_save.sh: usage gb_rom.py OUT.gb [8|cheat]
+"""Writes a tiny Game Boy ROM for tests/gb_save.sh: usage gb_rom.py OUT.gb [8|cheat|poke|pokegbc]
 
 Written for Torii's tests (no third-party code), so it can live in the
 repo. MBC5 with 32 KB of battery-backed RAM (cart type $1B, RAM size $03),
@@ -77,7 +77,38 @@ def cheat_rom() -> bytes:
     return bytes(data)
 
 
+def poke_rom(gbc: bool = False) -> bytes:
+    """tests/emu_cheats.sh's RAM-write game: 32 KB, no MBC.
+
+    A GBC game (gbc) first maps WRAM bank 3 at D000 (SVBK) and watches $D100;
+    the GB one watches $C100. Each time it sees $55 there it clears it and
+    counts at $C102, up to $F0: a cheat that writes $55 every frame (a GameShark
+    code) counts to the top within a few seconds, one that writes once counts 1.
+    """
+    watch = 0xD100 if gbc else 0xC100
+    data = bytearray(0x8000)
+    data[0x100:0x104] = bytes([0x00, 0xC3, 0x50, 0x01])
+    data[0x104:0x108] = bytes([0xCE, 0xED, 0x66, 0x66])
+    data[0x134:0x13C] = b"POKETEST"
+    data[0x143] = 0x80 if gbc else 0x00
+    data[0x14D] = (-sum(data[0x134:0x14D]) - (0x14D - 0x134)) & 0xFF
+    lo, hi = watch & 0xFF, watch >> 8
+    code = bytes([0x3E, 0x03, 0xE0, 0x70]) if gbc else b""  # LD A,3; LDH ($70),A: SVBK
+    code += bytes(
+        [0xFA, lo, hi, 0xFE, 0x55, 0x20, 0xF9]  # loop: LD A,(watch); CP $55; JR NZ,loop
+        + [0xAF, 0xEA, lo, hi]  # XOR A; LD (watch),A
+        + [0xFA, 0x02, 0xC1, 0xFE, 0xF0, 0x30, 0x01, 0x3C, 0xEA, 0x02, 0xC1]  # count, saturating
+        + [0x18, 0xE8]  # JR loop
+    )
+    data[0x150 : 0x150 + len(code)] = code
+    return bytes(data)
+
+
 if __name__ == "__main__":
+    if len(sys.argv) > 2 and sys.argv[2] in ("poke", "pokegbc"):
+        with open(sys.argv[1], "wb") as f:
+            f.write(poke_rom(sys.argv[2] == "pokegbc"))
+        sys.exit(0)
     if len(sys.argv) > 2 and sys.argv[2] == "cheat":
         with open(sys.argv[1], "wb") as f:
             f.write(cheat_rom())

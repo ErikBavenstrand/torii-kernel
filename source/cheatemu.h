@@ -26,7 +26,7 @@ enum cheatemu_console {
 // One decoded line of a code
 enum cheatemu_kind {
 	CHEATEMU_GENIE = 1,  // a ROM patch: addr (a CPU address) becomes value, if the byte there is compare
-	CHEATEMU_POKE = 2,   // a RAM write each frame: value to addr (compare: the WRAM bank, GB)
+	CHEATEMU_POKE = 2,   // a RAM write each frame: value to addr (compare: the GB WRAM bank, 0: the mapped one)
 };
 
 struct emucheat {
@@ -41,8 +41,8 @@ struct emucheat {
 enum {
 	CHEATEMU_OK,
 	CHEATEMU_UNREADABLE,  // no decoder reads one of its lines
-	CHEATEMU_CANT_RUN,    // it reads, but a line is a kind that isn't run yet (GB GameShark, until stage 3)
-	CHEATEMU_TOO_BIG,     // more lines than max
+	CHEATEMU_CANT_RUN,  // it reads, but a line is a kind that isn't run yet (a GameShark code that isn't a WRAM or HRAM write)
+	CHEATEMU_TOO_BIG,  // more lines than max
 };
 
 // Decodes the len bytes of one cheat's code, its lines joined by '+' (or
@@ -77,8 +77,8 @@ struct torii_cheat {
 struct torii_cheats {
 	char magic[8];
 	u32 version;  // 1
-	u16 count;    // entries used
-	u16 max;      // TORII_CHEATS_MAX: the emulator never reads past it
+	u16 count;  // entries used
+	u16 max;  // TORII_CHEATS_MAX: the emulator never reads past it
 	struct torii_cheat e[TORII_CHEATS_MAX];
 };
 
@@ -97,10 +97,10 @@ u32 cheatemu_nes_poke_addr(u32 addr, u16 *folded);
 // (bank 0 first), NES the file with its iNES header kept
 struct cheatemu_rom {
 	u8 console;
-	u8 mapper;    // NES
-	u8 banks;     // NES: PRG's 16 KB banks
-	u32 size;     // the image's bytes
-	u32 prg_at;   // NES: where PRG starts (16, or 528 with a trainer)
+	u8 mapper;  // NES
+	u8 banks;  // NES: PRG's 16 KB banks
+	u32 size;  // the image's bytes
+	u32 prg_at;  // NES: where PRG starts (16, or 528 with a trainer)
 };
 
 // Reads what a patch needs of the game: GB, from its size; NES, from the
@@ -113,11 +113,11 @@ typedef u8 (*cheatemu_get)(void *ctx, u32 offset);
 typedef void (*cheatemu_set)(void *ctx, u32 offset, u8 value);
 
 struct cheatemu_done {
-	u32 patched;   // bytes written
-	u32 other;     // places the code's address is, but the compare byte isn't there
-	u32 sampled;   // places left alone: the emulator keys its states and palette on them
-	u32 limit;     // places left because the launch's patches (max) were all used
-	u8 unknown;    // a NES mapper whose banks aren't known, and no compare to tell them
+	u32 patched;  // bytes written
+	u32 other;  // places the code's address is, but the compare byte isn't there
+	u32 sampled;  // places left alone: the emulator keys its states and palette on them
+	u32 limit;  // places left because the launch's patches (max) were all used
+	u8 unknown;  // a NES mapper whose banks aren't known, and no compare to tell them
 };
 
 // Makes the patches line e stands for in the image (rom, through get and

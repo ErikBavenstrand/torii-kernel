@@ -106,7 +106,7 @@ the cartridge's registers on https://www.nesdev.org/wiki/Game_Genie):
   compare; Torii does the same to the PSRAM copy at launch.
 - GameShark: eight hex digits `TT VV LL HH`: write VV at `HHLL` each frame; TT
   is `01` for the plain write, `90`-`97` for a CGB WRAM bank (type `91` to `97`
-  hold 1,802 GBC lines), other bytes touch cartridge RAM. Not run in stage 1.
+  hold 1,802 GBC lines), `8B` names a cartridge RAM bank, other bytes are unknown. Sources: EnHacklopedia's Game Boy page (`01xxyyzz` plain write, `9bxxyyzz` WRAM bank change then write, GBC only; https://doc.kodewerx.org/hacking_gb.html), PyBoy's `gameshark.py` (quoting it), and gambatte's `Interrupter::applyVblankCheats`, which applies only type 01 at the VBlank interrupt. Torii writes 01 and 90-97 at WRAM (C000-DFFF, its echo) and HRAM (FF80-FFFE) each GB frame; every other code reads and shows greyed.
 - The Xploder form (`$` and eight digits) is a different device's code and is
   read as unreadable.
 

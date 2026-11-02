@@ -26,7 +26,7 @@ new_cart() {
   local file=$1 cht=${2:-}
   rm -rf "$cart" && mkdir -p "$cart"
   case $file in
-  *.gb) python3 tests/gb_rom.py "$cart/game" cheat ;;
+  *.gb) python3 tests/gb_rom.py "$cart/game" "${gbmode:-cheat}" ;;
   *.nes) python3 tests/nes_rom.py "$cart/game" "${mode:-cheat}" ;;
   esac
   mkfs.fat -C -F 32 -n EMU "$cart/sd.img" 65536 >/dev/null
@@ -42,7 +42,7 @@ new_cart() {
 play() {
   # shellcheck disable=SC2046 # nav.sh's options
   OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_launch "$1" at=100) \
-    -s 700:"$cart/game.png" -m 700:0x03005890:4 -f 700 >"$cart/out.txt" 2>"$cart/kernel.log" || fail "the emulator failed"
+    -s 700:"$cart/game.png" -m 700:0x03005890:4 -m 700:0x03005990:4 -f 700 >"$cart/out.txt" 2>"$cart/kernel.log" || fail "the emulator failed"
   grep -q '^crash at frame' "$cart/kernel.log" && fail "the emulator caught a crash"
   grep -q '^kernel error:' "$cart/kernel.log" && fail "errors: $(grep '^kernel error:' "$cart/kernel.log" | head -3)"
   grep -qF "kernel: launch: starting the game" "$cart/kernel.log" || fail "$1 wasn't started"
@@ -123,11 +123,66 @@ play /Cheat.gb
 expect plain "gb genie not picked"
 ! grep -q "lines made" "$cart/kernel.log" || fail "an unpicked cheat patched the game"
 
-# a GameShark code reads but doesn't run yet: the game starts all the same
-new_cart /Cheat.gb "$(cht Ram 01FF00C1)"
+# a GameShark code to cart RAM reads but isn't run: the game starts all the same
+new_cart /Cheat.gb "$(cht Ram 01FF00A1)"
 play /Cheat.gb
 expect plain "gb gameshark"
 grep -qF "cheat 0 (Ram): can't run here, left out" "$cart/kernel.log" || fail "gb gameshark: not left out with its reason"
+
+# --- GB and GBC GameShark (stage 3): the game (gb_rom.py poke, pokegbc) counts, at $C102, how
+# often it sees $55 where the cheat writes it, clearing it each time: a write made every
+# frame counts up to $F0, so it was applied each frame. WRAM is at 0x03005890 + (address - $C000)
+count() { sed -n 's/^mem frame 700 03005990: [0-9A-F]* [0-9A-F]* \([0-9A-F]*\).*/\1/p' "$cart/out.txt"; }
+expect_count() { # NAME WANT
+  local got
+  got=$(count)
+  [ "$got" = "$2" ] || fail "$1: the game counted $got, not $2"
+}
+gs() { printf 'cheats = 1\n\ncheat0_desc = "Pokes"\ncheat0_code = "%s"\ncheat0_enable = true\n' "$1"; }
+
+gbmode=poke
+new_cart /Cheat.gb
+play /Cheat.gb
+expect_count "gb gameshark game without a cheat" 00
+
+new_cart /Cheat.gb "$(gs 015500C1)"
+play /Cheat.gb
+expect_count "gb gameshark write to WRAM, every frame" F0
+grep -qF "cheats: 1 pokes written to the emulator's table" "$cart/kernel.log" || fail "gb gameshark: no poke written"
+
+new_cart /Cheat.gb "$(gs 015500C2)"
+play /Cheat.gb
+expect_count "gb gameshark write elsewhere" 00
+
+# the echo of C100
+new_cart /Cheat.gb "$(gs 015500E1)"
+play /Cheat.gb
+expect_count "gb gameshark write through the echo" F0
+
+# a write to VRAM or the ROM isn't run: the game starts all the same
+new_cart /Cheat.gb "$(gs 015500A1)"
+play /Cheat.gb
+expect_count "gb gameshark write to cart RAM" 00
+grep -qF "cheat 0 (Pokes): can't run here, left out" "$cart/kernel.log" || fail "gb gameshark to cart RAM: not left out with its reason"
+
+# GBC: the game maps WRAM bank 3 at D000
+gbmode=pokegbc
+new_cart /Cheat.gb "$(gs 015500D1)"
+play /Cheat.gb
+expect_count "gbc gameshark, the mapped bank" F0
+new_cart /Cheat.gb "$(gs 935500D1)"
+play /Cheat.gb
+expect_count "gbc gameshark, bank 3" F0
+new_cart /Cheat.gb "$(gs 925500D1)"
+play /Cheat.gb
+expect_count "gbc gameshark, another bank" 00
+new_cart /Cheat.gb "$(gs 975500D1)"
+play /Cheat.gb
+expect_count "gbc gameshark, bank 7" 00
+new_cart /Cheat.gb "$(gs 915500D1)"
+play /Cheat.gb
+expect_count "gbc gameshark, bank 1" 00
+gbmode=cheat
 
 # --- NES (NROM): the backdrop's byte is $2A (green)
 kind=nes
@@ -191,4 +246,4 @@ expect plain "nes raw poke to the ROM"
 grep -qF "cheat 0 (Poke 0): unreadable, left out" "$cart/kernel.log" || fail "nes raw ROM poke: not left out as unreadable"
 
 mode=cheat
-echo "PASS: Game Genie patches reach GB, GBC and NES games"
+echo "PASS: Game Genie patches and RAM writes reach GB, GBC and NES games"

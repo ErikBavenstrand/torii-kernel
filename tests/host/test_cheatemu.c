@@ -260,9 +260,42 @@ void test_cheatemu_gb_genie(void)
 	CHECK_EQ(cheatemu_decode(CHEATEMU_GB, "FA0-9999", 8, e, 3, &n), CHEATEMU_UNREADABLE);
 	CHECK_EQ(cheatemu_decode(CHEATEMU_GB, "FA0999", 6, e, 3, &n), CHEATEMU_UNREADABLE);
 	CHECK_EQ(cheatemu_decode(CHEATEMU_GBA, "FA0-999", 7, e, 3, &n), CHEATEMU_UNREADABLE);
-	// GameShark: reads, doesn't run yet (all or nothing, even with a Game Genie beside it)
-	CHECK_EQ(cheatemu_decode(CHEATEMU_GB, "01995EDB", 8, e, 3, &n), CHEATEMU_CANT_RUN);
-	CHECK_EQ(cheatemu_decode(CHEATEMU_GB, "01995EDB+FA0-999-4C1", 20, e, 3, &n), CHEATEMU_CANT_RUN);
+	// GameShark TT VV LL HH (EnHacklopedia's Game Boy page): 01 writes VV at HHLL, 9B the
+	// same with WRAM bank B for D000-DFFF (GBC); the address is the low byte first
+	CHECK_EQ(cheatemu_decode(CHEATEMU_GB, "01995EDB", 8, e, 3, &n), CHEATEMU_OK);
+	CHECK_EQ(n, 1);
+	CHECK_EQ(e[0].kind, CHEATEMU_POKE);
+	CHECK_EQ(e[0].value, 0x99);
+	CHECK_EQ(e[0].addr, 0xDB5E);
+	CHECK_EQ(e[0].compare, 0);  // the bank mapped now
+	CHECK_EQ(cheatemu_decode(CHEATEMU_GB, "01FF00C1", 8, e, 3, &n), CHEATEMU_OK);
+	CHECK_EQ(e[0].addr, 0xC100);
+	CHECK_EQ(cheatemu_decode(CHEATEMU_GB, "01FF00E1", 8, e, 3, &n), CHEATEMU_OK);  // the echo
+	CHECK_EQ(e[0].addr, 0xE100);
+	CHECK_EQ(cheatemu_decode(CHEATEMU_GB, "01FF80FF", 8, e, 3, &n), CHEATEMU_OK);  // HRAM
+	CHECK_EQ(e[0].addr, 0xFF80);
+	CHECK_EQ(cheatemu_decode(CHEATEMU_GB, "01FFFEFF", 8, e, 3, &n), CHEATEMU_OK);
+	CHECK_EQ(cheatemu_decode(CHEATEMU_GB, "01ff00dd", 8, e, 3, &n), CHEATEMU_OK);
+	CHECK_EQ(e[0].addr, 0xDD00);
+	CHECK_EQ(cheatemu_decode(CHEATEMU_GB, "93AB00D1", 8, e, 3, &n), CHEATEMU_OK);
+	CHECK_EQ(e[0].addr, 0xD100);
+	CHECK_EQ(e[0].value, 0xAB);
+	CHECK_EQ(e[0].compare, 3);
+	CHECK_EQ(cheatemu_decode(CHEATEMU_GB, "97AB00D1", 8, e, 3, &n), CHEATEMU_OK);
+	CHECK_EQ(e[0].compare, 7);
+	CHECK_EQ(cheatemu_decode(CHEATEMU_GB, "90AB00D1", 8, e, 3, &n), CHEATEMU_OK);
+	CHECK_EQ(e[0].compare, 1);  // bank 0 is 1, as SVBK has it
+	// Reads, doesn't run: no WRAM or HRAM there (the ROM, VRAM, cart RAM, OAM, I/O, IE), a cart RAM bank (8B), another type
+	static const char *const cant[] = {"01FF0080", "01FF00A0", "01FF00BF", "01FF00FE", "01FF00FF",
+					   "01FFFFFF", "01FF007F", "01FF0000", "80FF00A0", "8AFF00C0",
+					   "98FF00D0", "00FF00C1", "11FF00C1", "FFFF00C1"};
+	for (u32 i = 0; i < sizeof(cant) / sizeof(*cant); i++)
+		CHECK_EQ(cheatemu_decode(CHEATEMU_GB, cant[i], 8, e, 3, &n), CHEATEMU_CANT_RUN);
+	// One that doesn't run makes the cheat not run, a Game Genie beside a write both go
+	CHECK_EQ(cheatemu_decode(CHEATEMU_GB, "01995EDB+01FF0080", 17, e, 3, &n), CHEATEMU_CANT_RUN);
+	CHECK_EQ(cheatemu_decode(CHEATEMU_GB, "01995EDB+FA0-999-4C1", 20, e, 3, &n), CHEATEMU_OK);
+	CHECK_EQ(n, 2);
+	CHECK_EQ(e[1].kind, CHEATEMU_GENIE);
 	// A sample of the cheat's lines the patch room keeps
 	struct cheat_patch p;
 	struct emucheat back;
@@ -495,17 +528,21 @@ void test_cheatemu_file(void)
 	CHECK_EQ(cheats[0].status, CHEATFILE_OK);
 	CHECK(cheats[0].patches > 0);
 	CHECK_EQ(cheats[0].bytes, 0);
-	CHECK_EQ(cheats[1].status, CHEATFILE_CANT_RUN);
+	CHECK_EQ(cheats[1].status, CHEATFILE_OK);  // 01995EDB: a poke
 	CHECK_EQ(cheats[2].status, CHEATFILE_UNREADABLE);
 	CHECK_EQ(cheats[3].status, CHEATFILE_SAME);
 	CHECK_EQ(cheatfile_why(&file, 0), CHEATFILE_PICKABLE);
-	CHECK_EQ(cheatfile_why(&file, 1), CHEATFILE_WHY_CANT_RUN);
+	CHECK_EQ(cheatfile_why(&file, 1), CHEATFILE_PICKABLE);
 	CHECK_EQ(cheatfile_why(&file, 2), CHEATFILE_WHY_UNREADABLE);
 	CHECK(cheatfile_toggle(&file, 0));
-	CHECK(!cheatfile_toggle(&file, 1));
-	CHECK_EQ(cheatfile_picks(&file), 1);
+	CHECK(cheatfile_toggle(&file, 1));
+	CHECK_EQ(cheatfile_picks(&file), 2);
 	// It sets at launch, whatever the keys say
 	CHECK_EQ(cheatfile_activation(&cheats[0]), CHEATKEYS_AT_LAUNCH);
+	CHECK_EQ(cheatfile_activation(&cheats[1]), CHEATKEYS_ALWAYS_ON);
+	load(CHEATEMU_GB, "cheat0_code = \"01FF0080\"\n");
+	CHECK_EQ(cheats[0].status, CHEATFILE_CANT_RUN);
+	CHECK_EQ(cheatfile_why(&file, 0), CHEATFILE_WHY_CANT_RUN);
 	// The same file as a GBA's is unreadable: the console decides
 	load(CHEATEMU_GBA, "cheat0_code = \"09C-56B-E6E\"\n");
 	CHECK(cheats[0].status != CHEATFILE_OK || work.n_patches == 0);
