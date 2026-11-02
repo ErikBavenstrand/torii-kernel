@@ -3833,8 +3833,8 @@ cheat478_guide = "Legendaries and any other Pokémon may enter every Battle Fron
 cheat478_enable = false
 
 cheat479_desc = "Minigames: Endless Safari Zone"
-cheat479_code = "3203A04C 001E+8203A04E 01F4"
-cheat479_format = "CodeBreaker"
+cheat479_code = "0203A04C:1E+0203A04E:01F4"
+cheat479_format = "Torii"
 cheat479_folder = "Minigames"
 cheat479_keys = "always"
 cheat479_guide = "In the Safari Zone you keep 30 balls and 500 steps."
@@ -3848,33 +3848,33 @@ cheat480_keys = "launch"
 cheat480_guide = "Pokémon in the Safari Zone never run away."
 cheat480_enable = false
 
-cheat481_desc = "Minigames: Level 80 Pokéblock"
-cheat481_code = "42305D8C 04C0FF0E+42305D8C 04C1FFFF+42305D8C 04C2FFFF+42305D8C 04C30001"
-cheat481_format = "PARv3 raw"
+cheat481_desc = "Minigames: Max Pokéblock"
+cheat481_code = "[03005D8C]+0980:FFFFFF0E+[03005D8C]+0984:0001FFFF"
+cheat481_format = "Torii"
 cheat481_folder = "Minigames"
 cheat481_keys = "always"
-cheat481_guide = "Run it once: a gold Pokéblock with every flavor at max goes in your case's last slot."
+cheat481_guide = "Your Pokéblock case's last slot holds a gold Pokéblock with every flavor at 255, back after each use. A feeding or two maxes every condition."
 cheat481_enable = false
 
 cheat482_desc = "Minigames: Quick contests"
-cheat482_code = "72002E30 0000+32002E31 0004"
-cheat482_format = "CodeBreaker"
+cheat482_code = "080DA572:2801"
+cheat482_format = "Torii"
 cheat482_folder = "Minigames"
-cheat482_keys = "always"
-cheat482_guide = "Contests skip straight to the results."
+cheat482_keys = "launch"
+cheat482_guide = "Contests end after one appeal instead of five, then show the results."
 cheat482_enable = false
 
 cheat483_desc = "Minigames: Max contest score"
-cheat483_code = "72002F62 082D+32002EF4 00FF"
-cheat483_format = "CodeBreaker"
+cheat483_code = "02039F06:027D"
+cheat483_format = "Torii"
 cheat483_folder = "Minigames"
 cheat483_keys = "always"
-cheat483_guide = "Your contest appeal score is always the maximum."
+cheat483_guide = "Your Pokémon's first-round contest score is the most there is, as if every condition and its sheen were maxed."
 cheat483_enable = false
 
 cheat484_desc = "Minigames: Full Soot Sack"
-cheat484_code = "42305D8C 0A16270F"
-cheat484_format = "PARv3 raw"
+cheat484_code = "[03005D8C]+142C:270F"
+cheat484_format = "Torii"
 cheat484_folder = "Minigames"
 cheat484_keys = "always"
 cheat484_guide = "Your Soot Sack holds 9,999 ash, for the Glass Workshop on Route 113."

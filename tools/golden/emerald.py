@@ -26,8 +26,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
-from cheat_encode import CB, VBA, Code
-from cheat_encode import PARRaw as AR
+from cheat_encode import VBA, Code
 
 DATA = json.loads(
     (Path(__file__).with_name("emerald.json")).read_text(encoding="utf-8")
@@ -1348,24 +1347,10 @@ class Cheat:
         )
 
 
-def cb(*parts):
-    code = Code(CB)
-    for p in parts:
-        code += p
-    return code
-
-
 def vba(*lines):
     code = Code(VBA)
     for line in lines:
         code += [line]
-    return code
-
-
-def ar(*parts):
-    code = Code(AR)
-    for p in parts:
-        code += p
     return code
 
 
@@ -1729,7 +1714,7 @@ def cheats():
     add(
         "Minigames",
         "Endless Safari Zone",
-        cb(CB.write8(0x0203A04C, 30), CB.write16(0x0203A04E, 500)),
+        vba("0203A04C:1E", "0203A04E:01F4"),  # gNumSafariBalls, sSafariZoneStepCounter
         "In the Safari Zone you keep 30 balls and 500 steps.",
     )
     add(
@@ -1739,37 +1724,37 @@ def cheats():
         "Pokémon in the Safari Zone never run away.",
         "launch",
     )
-    block, slot = (
-        SB1,
-        0x848 + 39 * 8,
-    )  # the Pokéblock case's last slot (40, 8 bytes each)
+    # the Pokéblock case's last slot (40, 8 bytes each): gold, every flavor
+    # 255, feel 1
     add(
         "Minigames",
-        "Level 80 Pokéblock",
-        ar(
-            AR.write_ptr(2, block, 0xFF0E, slot),
-            AR.write_ptr(2, block, 0xFFFF, slot + 2),
-            AR.write_ptr(2, block, 0xFFFF, slot + 4),
-            AR.write_ptr(2, block, 0x0001, slot + 6),
-        ),
-        "Run it once: a gold Pokéblock with every flavor at max goes in your case's last slot.",
+        "Max Pokéblock",
+        vba("[03005D8C]+0980:FFFFFF0E", "[03005D8C]+0984:0001FFFF"),
+        "Your Pokéblock case's last slot holds a gold Pokéblock with every flavor at 255, back after each use. "
+        "A feeding or two maxes every condition.",
     )
     add(
         "Minigames",
         "Quick contests",
-        cb(CB.op("EQ", 0x02002E30, 0), CB.write8(0x02002E31, 4)),
-        "Contests skip straight to the results.",
+        rom_code(
+            [(0x080DA572, 0x2801)]
+        ),  # Task_TryStartNextRoundOfAppeals: 1 appeal, not 5
+        "Contests end after one appeal instead of five, then show the results.",
+        "launch",
     )
     add(
         "Minigames",
         "Max contest score",
-        cb(CB.op("EQ", 0x02002F62, 0x082D), CB.write8(0x02002EF4, 0xFF)),
-        "Your contest appeal score is always the maximum.",
+        # gContestMonRound1Points[3], the player's in a contest on the cart:
+        # 255 + (255 + 255 + 255) / 2, every condition and sheen at 255
+        vba("02039F06:027D"),
+        "Your Pokémon's first-round contest score is the most there is, as if every condition and its sheen "
+        "were maxed.",
     )
     add(
         "Minigames",
         "Full Soot Sack",
-        ar(AR.write_ptr(2, SB1, 9999, var_offset(0x4048))),
+        vba(f"[03005D8C]+{var_offset(0x4048):04X}:270F"),  # VAR_ASH_GATHER_COUNT
         "Your Soot Sack holds 9,999 ash, for the Glass Workshop on Route 113.",
     )
     return out
@@ -1869,12 +1854,11 @@ def main():
         f"cheats = {len(cs)}",
         "",
     ]
-    fmt = {CB: "CodeBreaker", AR: "PARv3 raw", VBA: "Torii"}
     for i, c in enumerate(cs):
         lines.append(f'cheat{i}_desc = "{c.name}"')
         lines.append(f'cheat{i}_code = "{c.code.text()}"')
-        if c.code.fmt:
-            lines.append(f'cheat{i}_format = "{fmt[c.code.fmt]}"')
+        assert c.code.fmt == VBA, c.name  # golden cheats are Torii code
+        lines.append(f'cheat{i}_format = "Torii"')
         lines.append(f'cheat{i}_folder = "{c.folder}"')
         if c.keys:
             lines.append(f'cheat{i}_keys = "{c.keys}"')

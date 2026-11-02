@@ -123,7 +123,7 @@ Every cheat we have (GameHacking, plus libretro's three of its own), grouped. "P
 | 75 | Early Access to Magma Hideout |  | keep |  | drop |
 | 76 | Fly Anywhere On Map |  | keep |  | keep: Overworld: Fly to any town |
 | 77 | Fly codes |  | keep |  | drop |
-| 78 | Free Daycare |  | keep |  | keep: Overworld: Free Day Care |
+| 78 | Free Daycare |  | keep |  | keep: Overworld: Free Day Care (a ROM patch: the price is 0; the code's VAR_0x8005 write broke other scripts) |
 | 79 | Low Game Time |  | keep |  | drop |
 | 80 | Max Repel Steps |  | keep |  | drop |
 | 81 | No Random Battles |  | decide | duplicates: an 8-bit and a 16-bit write | keep: Wild: No wild encounters |
@@ -240,7 +240,7 @@ Every cheat we have (GameHacking, plus libretro's three of its own), grouped. "P
 | --- | --- | --- | --- | --- | --- |
 | 158 | Infinite Safari Balls |  | keep |  | keep: Minigames: Endless Safari Zone |
 | 159 | Infinite Safari Time |  | keep |  | keep: Minigames: Endless Safari Zone |
-| 160 | Lvl 80 Pokeblock |  | keep |  | keep: Minigames: Level 80 Pokéblock (pointer, slot 40) |
+| 160 | Lvl 80 Pokeblock |  | keep |  | keep: Minigames: Max Pokéblock (pointer, slot 40; it shows as Lv. 255) |
 | 161 | Max Direct Hits |  | keep |  | drop |
 | 162 | Max Lvl Gold (Beauty) |  | keep |  | drop |
 | 163 | Max Lvl Gold (Cool) |  | keep |  | drop |
@@ -249,10 +249,10 @@ Every cheat we have (GameHacking, plus libretro's three of its own), grouped. "P
 | 166 | Max Lvl Gold (Tough) |  | keep |  | drop |
 | 167 | Maximum Feel |  | keep |  | drop |
 | 168 | Maximum Hearts |  | keep |  | drop |
-| 169 | Maximum Score |  | keep |  | keep: Minigames: Max contest score |
+| 169 | Maximum Score |  | keep |  | keep: Minigames: Max contest score (the player's round-1 points, not a heap byte) |
 | 170 | No Misses |  | keep |  | drop |
 | 171 | Quick Blend |  | keep |  | drop |
-| 172 | Quick Contest |  | keep |  | keep: Minigames: Quick contests |
+| 172 | Quick Contest |  | keep |  | keep: Minigames: Quick contests (a ROM patch: one appeal, not a heap byte) |
 | 173 | Soot Sack Full |  | keep |  | keep: Minigames: Full Soot Sack (pointer) |
 
 ## The golden set
@@ -267,9 +267,9 @@ Every cheat we have (GameHacking, plus libretro's three of its own), grouped. "P
 | Battle | One-hit KO, Infinite HP, Infinite PP, No trainer challenges, EXP x2/x3/x5/x10/x255, EXP shared with the party, Every ball catches, Pokémon always obey |
 | Wild | Species (386), Level 5-100 (20), No wild encounters, Encounter every step |
 | Overworld | Instant text, Run and bike anywhere, Mirage Island always there, Fly to any town, Free Day Care, Walk through walls (hold R), Field moves without badges, Gym leader rematches, Any Pokémon in the Frontier |
-| Minigames | Endless Safari Zone, Safari Pokémon never flee, Level 80 Pokéblock, Quick contests, Max contest score, Full Soot Sack |
+| Minigames | Endless Safari Zone, Safari Pokémon never flee, Max Pokéblock, Quick contests, Max contest score, Full Soot Sack |
 
-How they're built (D1, D7): CodeBreaker for RAM writes, Action Replay v3 raw for ROM patches and save-block pointer writes, Torii's raw lines only for money and coins (XORed with the save's key). No master codes, nothing encrypted. Nothing writes an item slot: items come from the game's own Mart and "Obtained" scripts, so nothing in the bag or PC is overwritten (D9, D10). The menu (2026-11-01, replacing the L/R shelves in the game's Buy list and the one field-menu cheat, which with the shop was over a cheat's 2,048 ROM patches) is a base cheat and one cheat per section, all in the Menu folder. The base is `tools/golden/field.c` over the unused `Unused_LoadBgPalette` (`0x08001A4C`), which `DoCB1_Overworld`'s call to `ProcessPlayerFieldInput` goes through: the game's input first (trainers, map scripts, warps, talking, START), then, if nothing started and A was just pressed with L and R held, `ScriptContext_SetupScript` on the menu (`0x08F00800`), as a sign's script starts; never in a battle, a menu, a fade or a script. Every list is shown by `tools/golden/menu.c` (`0x08F00000`), called by `callnative` with the list's address after it: the game's own scrolling list (`ListMenuInit`, the Battle Frontier's), 7 rows with the game's scroll arrows, LEFT and RIGHT a page, A sets the script going at the row's script, B at the list's back script, and each list keeps its cursor (its variables at `0x0203F000`, past the game's EWRAM). The main list's rows are 12 slots past the base's end, left as the ROM's free space (0xFF), which the routine leaves out; each section's cheat writes its own slot and its scripts and lists in its own 0x1000 bytes from `0x08F01000`, so no two cheats write the same bytes and any set of sections works. All nine together (2026-11-01, after Warp grew to 106 places): 3,582 halfword ROM patches; Warp's places are list values (`menu.c`'s `LIST_VALUES`, warped by `tools/golden/warp.c`) rather than a script each. A launch keeps patches as runs in 48 KB of cart SRAM, so the menu's blocks take about 7 KB of it. Lists point at the game's own names (region-map names, `gSpeciesNames`, `gItems`) instead of copies. The shop's categories run the game's `pokemart` and `pokemartdecoration` on lists in ROM. Tested on the emulated cart: every section, a purchase, a warp, the PC, page jumps, cursor memory, the empty message with no section picked, and 20 opens and closes with the game's tasks the same after. Walk-through-walls, the Pokédex and the new Pokémon's personality are small Thumb routines (`tools/golden/walls.s` and `pid.s`, over the unused `Unused_AdjustBgMosaic`, and `dex.s`). Shiny, Nature and Gender share `pid.s`: each cheat carries the same routine and hook in `CreateBoxMon` (wild, gift and egg Pokémon, not trainers') and sets only its own switch in free ROM (`0x08F1F000`), so any of them work together; AnyGBA's shiny patch and the old nature and gender patches each set the personality alone and undid the others.
+How they're built (D1, D7): Torii code throughout (2026-11-02): plain lines for RAM writes and ROM patches, `[03005D8C]+O` and `[03005D90]+O` for the save blocks, `^KEY` for money and coins (XORed with the save's key), and tests for One-hit KO; `tools/golden/emerald.py` refuses any other format. No cheat writes the game's heap, whose addresses only mean something inside one screen. No master codes, nothing encrypted. Nothing writes an item slot: items come from the game's own Mart and "Obtained" scripts, so nothing in the bag or PC is overwritten (D9, D10). The menu (2026-11-01, replacing the L/R shelves in the game's Buy list and the one field-menu cheat, which with the shop was over a cheat's 2,048 ROM patches) is a base cheat and one cheat per section, all in the Menu folder. The base is `tools/golden/field.c` over the unused `Unused_LoadBgPalette` (`0x08001A4C`), which `DoCB1_Overworld`'s call to `ProcessPlayerFieldInput` goes through: the game's input first (trainers, map scripts, warps, talking, START), then, if nothing started and A was just pressed with L and R held, `ScriptContext_SetupScript` on the menu (`0x08F00800`), as a sign's script starts; never in a battle, a menu, a fade or a script. Every list is shown by `tools/golden/menu.c` (`0x08F00000`), called by `callnative` with the list's address after it: the game's own scrolling list (`ListMenuInit`, the Battle Frontier's), 7 rows with the game's scroll arrows, LEFT and RIGHT a page, A sets the script going at the row's script, B at the list's back script, and each list keeps its cursor (its variables at `0x0203F000`, past the game's EWRAM). The main list's rows are 12 slots past the base's end, left as the ROM's free space (0xFF), which the routine leaves out; each section's cheat writes its own slot and its scripts and lists in its own 0x1000 bytes from `0x08F01000`, so no two cheats write the same bytes and any set of sections works. All nine together (2026-11-01, after Warp grew to 106 places): 3,582 halfword ROM patches; Warp's places are list values (`menu.c`'s `LIST_VALUES`, warped by `tools/golden/warp.c`) rather than a script each. A launch keeps patches as runs in 48 KB of cart SRAM, so the menu's blocks take about 7 KB of it. Lists point at the game's own names (region-map names, `gSpeciesNames`, `gItems`) instead of copies. The shop's categories run the game's `pokemart` and `pokemartdecoration` on lists in ROM. Tested on the emulated cart: every section, a purchase, a warp, the PC, page jumps, cursor memory, the empty message with no section picked, and 20 opens and closes with the game's tasks the same after. Walk-through-walls, the Pokédex and the new Pokémon's personality are small Thumb routines (`tools/golden/walls.s` and `pid.s`, over the unused `Unused_AdjustBgMosaic`, and `dex.s`). Shiny, Nature and Gender share `pid.s`: each cheat carries the same routine and hook in `CreateBoxMon` (wild, gift and egg Pokémon, not trainers') and sets only its own switch in free ROM (`0x08F1F000`), so any of them work together; AnyGBA's shiny patch and the old nature and gender patches each set the personality alone and undid the others.
 
 `python3 tools/golden/emerald.py > "cheats/gba/Pokemon - Emerald Version (USA, Europe).cht"` rebuilds it. The file is for Torii only (the owner, 2026-10-31): mGBA and RetroArch can't read it (the menus' code lines pass mGBA's 512 characters), and every cheat is tested on Torii's emulated cart.
 
@@ -286,7 +286,7 @@ On the emulated cart with the real ROM (CRC32 `1F1C08FB`) and a 100% save (Proje
 | Cheat | Result |
 | --- | --- |
 | Max money, Max coins | 999,999 and 9,999 decoded with the save's key |
-| Max Battle Points, Eggs hatch fast, Full Soot Sack, Level 80 Pokéblock, Gym rematch flags, No wild encounters | the save bytes as intended (BP 9,999, Day Care byte FE, ash 9,999, slot 40 `0E FF FF FF FF FF 01 00`, rematch 65-72 = 1, immunity 0) |
+| Max Battle Points, Eggs hatch fast, Full Soot Sack, Max Pokéblock, Gym rematch flags, No wild encounters | the save bytes as intended (BP 9,999, Day Care byte FE, ash 9,999, slot 40 `0E FF FF FF FF FF 01 00`, rematch 65-72 = 1, immunity 0) |
 | Species, Level, shiny, Perfect IVs, Wild gender | a wild Ralts in Granite Cave: Lv 50, shiny, all IVs 31, female (male with Male) |
 | Shiny, Nature, Gender | one routine (`tools/golden/pid.s`) picks a personality with all three: shiny + Adamant + female + Perfect IVs gave a shiny female Adamant Ralts with IVs all 31; shiny + Modest and Jolly alone right too; the control a random Lonely one |
 | EXP x10, EXP shared with the party, Infinite PP, One-hit KO | against a control battle: the lead +50 EXP and 1 PP used; with them every party Pokémon +80 (50 shared by six, x10), no PP used, one hit |
@@ -298,11 +298,11 @@ On the emulated cart with the real ROM (CRC32 `1F1C08FB`) and a 100% save (Proje
 | Shop, Shopping costs 1 | the Medicine and Balls marts; TM01 for "₽1", money 329,622 to 329,621, TM01 4 to 5 |
 | Tickets | "Obtained the EON TICKET!"; the ferry flag set; a second pick says you have it |
 | Menu | Heal, PC, Warp (Oldale, Sky Pillar, Southern Island's dock), Legends (Regirock's defeated and hidden flags cleared, Regice's not), Gifts ("Jack received TREECKO!"), Unlock (badges, symbols; the Pokédex's bits restored from zero) |
-| Quick contests, Max contest score | a Normal Cool contest: results after the first round, first place with full stars; without them, still in the appeals |
+| Quick contests, Max contest score | a Normal Cool contest (2026-11-02): judging ends after the first appeal, the player's round-1 points held at 637 (the others 49-61), first place and the ribbon |
 
 | No trainer challenges | Route 102's Rick, his defeat flag cleared: he challenges in the control; with it the player walks past |
 | Fly to any town | GameHacking's RAM code didn't work on this ROM (the Fly map's state isn't where it writes); rebuilt as one ROM patch of `GetMapsecType` (a town not visited is "can fly"): with every visited flag cleared, Littleroot can be flown to, the control can't |
-| Free Day Care | taking a Pokémon back: ₽100 taken in the control, none with it (the lady still names the price; the guide says so) |
+| Free Day Care | checked by disassembly (2026-11-02): `PrepareDaycareCostStringForSelectedMon` prices every Pokémon at 0, so the lady names ₽0 and takes nothing |
 | Field moves without badges | badges cleared: Fly from the party menu says "can't be used until a new BADGE" in the control, opens the Fly map with it |
 | Any Pokémon in the Frontier | a Mewtwo in the party: "NOT ABLE" in the control, "ABLE" with it (Open Level) |
 | Endless Safari Zone | entered by the gate: steps 494 after walking in the control, 500 with it, 30 balls |
