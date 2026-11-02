@@ -64,6 +64,10 @@ struct action_facts {
 	u32 boot_mode;
 };
 u32 action_game_facts(const char *path, struct action_facts *out);
+// The way Play starts a GBA game: ACTION_BOOT_CLEAN or ACTION_BOOT_ADDONS, from the game's
+// own boot mode else Settings' (addons_on: any addon switch is on; with none, cheats picked
+// still start it with addons, so the way isn't known: ACTION_BOOT_DEFAULT)
+u32 action_boot_way(const char *path, int addons_on);
 // Play's « default » for a GBA game, with the way it starts it: "default (clean)" or
 // "default (addons)", from the game's own boot mode else Settings' (addons_on: any
 // addon switch is on; with none, cheats picked still start it with addons, so the

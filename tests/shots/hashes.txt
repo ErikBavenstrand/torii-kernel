@@ -130,7 +130,7 @@ game-saves/backups AE9D90587586F622
 game-saves/new 9273169F93ACF1AE
 game-saves/options 11086025BAC0D54B
 game-saves/other 2949FCC3107B5EFD
-game-saves/popup 77D07DB1BB6B853B
+game-saves/popup 29C7748C02E88E3C
 game-saves/restore 22E46B926989455B
 game-saves/slots 04D53091D5F46A62
 game-saves-light/options 60FA4EF7B048752A
@@ -142,7 +142,7 @@ games-art/recent D6B09D15BF64F7E1
 games-art-box/gba 321156E0336129B2
 games-art-dark/gba 743CC2D257F80E8A
 games-art-dark/gba-none 6DD7FD2BF9FD37DC
-games-art-popup/popup 567BB5B836AD1216
+games-art-popup/popup AF17FBB332EB2469
 games-box-switch/gb 46FF5145036E9096
 games-box-switch/gba 9F73E48DF1E05512
 games-box-switch/gba-next 86E077FAD2BA18F7
@@ -155,23 +155,23 @@ games-box-switch/frames 6-28 9F73E48DF1E05512
 games-cheats/back DE60914D027457D0
 games-cheats/greyed C3995E5ED00A341A
 games-cheats/picked 49524E3471D652DE
-games-cheats/popup 6D3246AFDB3CA9DB
+games-cheats/popup B9AF12EE13D6F941
 games-cheats/screen CAD96F30A2F6BD2A
 games-dedupe/screen 67E86C46698E404E
 games-fav/screen 5F5922C2D6F31804
 games-fav/starred 017306DC53C8BC2C
-games-fav/toggled 7F2A13A6E2C0CA4D
+games-fav/toggled C2D6474DCA6907ED
 games-fav-r/star 248B19FC66C146EF
 games-gb/popup 1E60754161273D33
 games-gb/screen A47EFAC3B4A4039F
-games-gba/cancelled D9DC060C8F7DBC86
+games-gba/cancelled A2080755C6477EE6
 games-gba/closed 7C5107676E6593E0
 games-gba/delete 91DAB5F33422BD04
 games-gba/down 5FDFD6D57D176F66
 games-gba/info 0D8039CD687EB4F4
 games-gba/info-sram 77CB7254B0D68A20
 games-gba/letter 77E7DC56ADF4E619
-games-gba/popup 0CD098FEA19D59CD
+games-gba/popup 40B3AA856287C24E
 games-gba/screen 928ED4ADD2922192
 games-gba/frames 0-0 928ED4ADD2922192
 games-gba/frames 1-1 85DC2B75DEBC640E
@@ -246,18 +246,18 @@ games-light/frames 67-82 621380C02B053ACF
 games-names/gba 92EEE8F8B5064AC3
 games-names/info 2A32B60BB0746E8E
 games-popup-scroll/bottom 9595C379552F5E4B
-games-popup-scroll/open CEB9AC1314511B4D
-games-popup-scroll/top CEB9AC1314511B4D
+games-popup-scroll/open 12444178A2C88683
+games-popup-scroll/top 12444178A2C88683
 games-popup-scroll/wrapped 9595C379552F5E4B
-games-popup-scroll/frames 0-2 CEB9AC1314511B4D
-games-popup-scroll/frames 3-14 F540F44B95BBEB17
-games-popup-scroll/frames 15-26 90D385C711EE999F
-games-popup-scroll/frames 27-38 BD5F8C02D24AB797
-games-popup-scroll/frames 39-50 F22493F9B7B5AAF7
-games-popup-scroll/frames 51-62 59F419AB20727827
-games-popup-scroll/frames 63-74 8C4792422246E08D
+games-popup-scroll/frames 0-2 12444178A2C88683
+games-popup-scroll/frames 3-14 29AA6175419F10AF
+games-popup-scroll/frames 15-26 F09CAED816E1AE97
+games-popup-scroll/frames 27-38 812D4F1C39771F2F
+games-popup-scroll/frames 39-50 DFAFFD09C6F17D4F
+games-popup-scroll/frames 51-62 C4A1D85FEFCF993F
+games-popup-scroll/frames 63-74 045CA51284A69045
 games-popup-scroll/frames 75-92 9595C379552F5E4B
-games-popup-scroll/frames 93-112 CEB9AC1314511B4D
+games-popup-scroll/frames 93-112 12444178A2C88683
 games-popup-scroll/frames 113-128 9595C379552F5E4B
 games-recent/down 0310CB9CF59E5167
 games-recent/screen 1CFB4BFF7E049AFF
@@ -389,14 +389,14 @@ info-about/about-2 B2BB5362EC400E99
 info-about/about-end 958CA4E7A2A59D25
 info-about/cheats 7318FA43A85E9DE3
 info-about/help 4BC6CDF3580262CD
-info-about/ingame 81E1319CA00321FB
+info-about/ingame A761B693C85E61DD
 info-about/saves 02471FDB9F0539CB
 info-counting/about-2 CDE48FAA1AE60BFD
 info-no-free/about-end 743A01B090C6A64F
 info-read/back 4A3C36AFF8C9015F
 info-read/controls 085FB729B4B5C0D4
-info-read/last EFE0B9E1AD3E3DC1
-info-read/last-down F5F00A48FFCD5AC7
+info-read/last 6C482979B38631A1
+info-read/last-down D81D56537C35ABDB
 info-read/scrolled 962D6F5D207EBCF6
 info-read/frames 0-1 4A3C36AFF8C9015F
 info-read/frames 2-2 AA292E3D79669121
@@ -721,7 +721,7 @@ shots-game/bare CEC52ECD02655E0C
 shots-game/delete E1516E8C0FFF62F4
 shots-game/first 0B42A6524702DD73
 shots-game/many 62B0D0BC3104F629
-shots-game/popup DB76763EC08597E0
+shots-game/popup F9E42CE5B998FDB3
 shots-game/small 3DE58173DCD470B7
 shots-sd/back 2A7C6CC3F2E549BD
 shots-sd/deleted 8B2FB35BACC4FB21
@@ -787,21 +787,21 @@ sv-game-saves/backups 12C0B650E6B5199E
 sv-game-saves/new 784B6B331CCC4820
 sv-game-saves/options D27A43251ED7B0B3
 sv-game-saves/other 386C6BADAD8A721D
-sv-game-saves/popup 2C214582A639C2E7
+sv-game-saves/popup 224EF9AB1A78BA98
 sv-game-saves/restore 494720EB7F4DA07B
 sv-game-saves/slots A442299FA32AD077
 sv-games-art/gba 8A322E856040EAEB
 sv-games-art/gba-crc A7C39B893F61CBA4
 sv-games-art/gba-none 86137A257E214459
 sv-games-art/recent B2DE93CF70035B9D
-sv-games-gba/cancelled 081F88A7907D8302
+sv-games-gba/cancelled 71CD3236DD0AD09A
 sv-games-gba/closed 574D4D64B9505124
 sv-games-gba/delete 23F9DB32BE4C434E
 sv-games-gba/down 6E175C8757ABC7CA
 sv-games-gba/info 82B1CA1A85E5CB19
 sv-games-gba/info-sram 6A52485BA443DADD
 sv-games-gba/letter 72687815643AA8D5
-sv-games-gba/popup 7A5A2F5EB33FB101
+sv-games-gba/popup 1A72E965ACF8C452
 sv-games-gba/screen 1F1C05A558B8E446
 sv-games-gba/frames 0-0 1F1C05A558B8E446
 sv-games-gba/frames 1-1 F91E01EC99F36F92
@@ -809,8 +809,6 @@ sv-games-gba/frames 2-2 1A3C954FAF84A6B2
 sv-games-gba/frames 3-3 BDD4FBFC8B168D5A
 sv-games-gba/frames 4-5 7F84B1B4938502BA
 sv-games-gba/frames 6-12 6E175C8757ABC7CA
-sv-games-play/default 2C214582A639C2E7
-sv-games-play/next B1D3B10AEB57B679
 sv-home/gba 0B2C673E7DF2D87B
 sv-home/recent C494216E14388E8F
 sv-home/sd E11E7F51E16DB2C7
@@ -831,12 +829,12 @@ sv-info-about/about-2 725C9630DD4601E4
 sv-info-about/about-end D71F05D7CB63FC50
 sv-info-about/cheats 3D339E50B24A8E1A
 sv-info-about/help 3BC7CD2B37E2A5C4
-sv-info-about/ingame DDB28EBFE4F83070
+sv-info-about/ingame 3FB56528ED794570
 sv-info-about/saves 02B258CE41672BE6
 sv-info-read/back D9FE3C4E2FFE1B23
 sv-info-read/controls C40A3328210C2C42
-sv-info-read/last 28677DD95742C3E7
-sv-info-read/last-down 3ED8F4B6D85DB8A7
+sv-info-read/last 6584A29F0914E845
+sv-info-read/last-down C8BC2CB0BACD9D6B
 sv-info-read/scrolled 80CCED26961285C4
 sv-info-read/frames 0-1 D9FE3C4E2FFE1B23
 sv-info-read/frames 2-2 129B3E8217360A31
@@ -1037,7 +1035,7 @@ sv-settings/frames 104-104 B240AB9DF893CB73
 sv-settings/frames 105-233 D6D328D1012D7203
 sv-shots-game/delete D02DA5FDE23F98D3
 sv-shots-game/first DD025FDE62BDB4C1
-sv-shots-game/popup C251D2B02A30062C
+sv-shots-game/popup DC27FA2C06CA3987
 sv-shots-sd/delete 47625187BF99B47D
 sv-shots-sd/rle 61A07C89F4DBFE17
 sv-slot-picker/picker 15CD6AEB1D37F47A

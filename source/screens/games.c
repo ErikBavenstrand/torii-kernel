@@ -132,7 +132,6 @@ struct games_state {
 	char ask[GAMENAME_MAX + 16];
 	char cheats[12];  // the popup's Cheats: how many the cheat screen lists
 	char shots[8];  // the popup's Screenshots: how many the game has (SHOTLIST_FILES_MAX at most)
-	char boot_default[32];  // Play's « default », with the way it resolves to
 	struct ui_pop_item items[LANG_POP_ITEMS];
 	u8 actions[LANG_POP_ITEMS];
 	struct ui_popup popup;
@@ -1358,11 +1357,6 @@ static void launch(u32 how, u32 hard)
 	action_launch_title(NULL);
 }
 
-static void boot_with_addon(u32 hard)
-{
-	launch(ACTION_ADDON, hard);
-}
-
 // The game's cheat screen, in the page's place in the menu's session (both
 // don't fit), then the page again at row
 static void cheats_game(u32 row)
@@ -1377,20 +1371,6 @@ static void cheats_game(u32 row)
 static int addons_off(void)
 {
 	return (gl_reset_on | gl_rts_on | gl_sleep_on) == 0;
-}
-
-// Play's « » text for boot (LANG_BOOT_*): default names the way it starts
-// the game, its own boot mode else Settings', when that is known (with no
-// addon on, cheats picked still start it with addons: plain default)
-static const char *boot_text(u32 boot)
-{
-	return boot == LANG_BOOT_DEFAULT && games.boot_default[0] ? games.boot_default
-								  : S(STR_GAMES_BOOT_DEFAULT + boot);
-}
-
-static void boot_default_resolve(const char *path)
-{
-	action_boot_default_text(path, !addons_off(), games.boot_default, sizeof(games.boot_default));
 }
 
 static void popup_add(u32 action, const char *value, u8 flags)
@@ -1468,24 +1448,13 @@ static void rename_game(u32 row)
 	}
 }
 
-static void boot_with_addon(u32 hard);
-
-// Starts the picked game the way Play's « » says (LANG_BOOT_*)
-static void play_as(u32 boot, u32 hard)
-{
-	if (boot == LANG_BOOT_ADDONS)
-		boot_with_addon(hard);
-	else
-		launch(boot == LANG_BOOT_CLEAN ? ACTION_CLEAN : ACTION_DEFAULT, hard);
-}
-
-// The game's saves page; playing a slot there starts the game as Play's
-// « » said, without asking for the slot again
-static void saves_game(u32 row, u32 boot)
+// The game's saves page; playing a slot there starts the game as Play does,
+// without asking for the slot again
+static void saves_game(u32 row)
 {
 	if (game_saves_run(games.title) == GAME_SAVES_LAUNCH) {
 		action_slot_chosen(1);
-		play_as(boot, 0);
+		launch(ACTION_DEFAULT, 0);
 		action_slot_chosen(0);  // returned: it did not start
 	}
 	reshow(row);
@@ -1513,20 +1482,14 @@ static void popup_run(u32 i)
 	int gba = !nor && g.console == LIB_GBA;
 	games.popup = (struct ui_popup){games.title, (u8)(g.console < LIB_CONSOLES ? console_icons[g.console] + 1 : 0),
 					games.items, 0,
-					0,           S(STR_GAMES_HINT_BOOT)};
-	// Play: how it starts steps with LEFT/RIGHT (a GBA game: its own way,
-	// clean, or with addons when one is on); A plays
-	u8 boots[LANG_BOOTS];
-	u32 nboots = 0, boot = 0;
-	boots[nboots++] = LANG_BOOT_DEFAULT;
-	games.boot_default[0] = 0;
-	if (gba) {
-		boots[nboots++] = LANG_BOOT_CLEAN;
-		if (!addons_off())
-			boots[nboots++] = LANG_BOOT_ADDONS;
-		boot_default_resolve(games.pick);
-	}
-	popup_add(LANG_POP_PLAY, nboots > 1 ? boot_text(boots[0]) : 0, nboots > 1 ? UI_POP_STEP : 0);
+					0,           NULL};
+	// Play names the way it starts a GBA game (its Game info's Boot mode sets it)
+	u32 way = gba ? action_boot_way(games.pick, !addons_off()) : ACTION_BOOT_DEFAULT;
+	popup_add(LANG_POP_PLAY,
+		  way == ACTION_BOOT_CLEAN    ? S(STR_GAMES_BOOT_CLEAN)
+		  : way == ACTION_BOOT_ADDONS ? S(STR_GAMES_BOOT_ADDONS)
+					      : 0,
+		  0);
 	if (game_saves_probe(games.pick))
 		popup_add(LANG_POP_SAVES, 0, 0);
 	u32 shots = shotlist_count(games.pick);
@@ -1564,12 +1527,6 @@ static void popup_run(u32 i)
 		s32 pick = ui_popup_choose();
 		if (pick < 0)
 			break;
-		if (pick & (UI_POP_LEFT | UI_POP_RIGHT)) {  // Play's way to start
-			boot = (boot + (pick & UI_POP_LEFT ? nboots - 1 : 1)) % nboots;
-			games.items[0].value = boot_text(boots[boot]);
-			ui_popup_changed(0);
-			continue;
-		}
 		u32 action = games.actions[pick], hard = (ui_input()->held & INPUT_L) != 0;
 		if (action == LANG_POP_FAV) {
 			u32 ver = userdata_fav_version();
@@ -1619,13 +1576,13 @@ static void popup_run(u32 i)
 			relist(i, NULL);
 		switch (action) {
 		case LANG_POP_PLAY:
-			play_as(boots[boot], hard);
+			launch(ACTION_DEFAULT, hard);
 			return;
 		case LANG_POP_INFO:
 			game_info(&g);
 			return;
 		case LANG_POP_SAVES:
-			saves_game(i, boots[boot]);
+			saves_game(i);
 			return;
 		case LANG_POP_CHEATS:
 			cheats_game(i);
