@@ -855,7 +855,7 @@ sv-home/frames 10-12 0B2C673E7DF2D87B
 sv-info-about/about 4E749825E4F88906
 sv-info-about/about-2 18132DCFC8FED6CE
 sv-info-about/about-end 32316FB368EBEE28
-sv-info-about/cheats FA90636F6E77DDB6
+sv-info-about/cheats C4CA4D26133F21C4
 sv-info-about/help 1B30145884B6D974
 sv-info-about/ingame 7BCA4F3624E8A550
 sv-info-about/saves C5D7160EBF9DCEBC
