@@ -16,7 +16,7 @@ git log, not here.
 - **Added:** Settings, Saves, Ask for a slot (on by default). Off, a launch of
   a game with several slots plays its active slot at once; SELECT with A still
   asks. Info's Controls and Saves pages say so, in Swedish too. It answers the
-  old open question, whether a launch should ask at all.
+  old open question, whether a launch should ask at all. (669cb8df)
 
 ## v0.9.20
 
