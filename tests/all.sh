@@ -101,6 +101,7 @@ jobs=(
   "tests/menu_keys.sh nor"
   "tests/scan_engine.sh"
   "tests/nes.sh"
+  "tests/gb_mode.sh"
   "tests/gb_save.sh"
   "tests/gb_settings.sh"
   "tests/nes_save.sh"
