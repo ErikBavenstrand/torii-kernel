@@ -53,7 +53,7 @@ GBATEK and Tonc; every layout is checked against it.
 
 FatFs runs with `FF_FS_LOCK 0`: nothing stops a delete freeing a file another `FIL` holds open, so code that deletes checks the open files itself (`tlog_open_now` before an SD delete). Every job step and every FatFs call is whole on the one thread, so `FIL`s kept across frames don't interleave mid-call.
 
-The vendored FatFs carries one Torii addition, `f_readdir_sub` (marked "Torii" in `source/ff15/ff.c`), which the library walk needs: keep it across a FatFs upgrade. The SD driver's `Read_SD_sectors` reports no errors (it returns 0), so FatFs never sees a failed card read and the "read failed" branches above it are untested on hardware.
+The vendored FatFs carries one Torii addition, `f_readdir_sub` (marked "Torii" in `source/ff15/ff.c`), which the library walk needs: keep it across a FatFs upgrade. The SD driver's `Read_SD_sectors` returns 1 when the card never answers, so FatFs sees a failed read; the emulated cart fails reads on request (`OMEGA_SD_READ_ERROR`), and `tests/saves.sh read-error` and `rom-read-error` cover a save and a ROM the card can't read. The "read failed" branches are untested on a real card.
 
 ## Testing
 

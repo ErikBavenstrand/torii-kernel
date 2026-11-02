@@ -30,6 +30,7 @@ jobs=(
   "tests/save_types.sh eeprom8k-to-flash"
   "tests/saves.sh copy"
   "tests/saves.sh record-slots"
+  "tests/saves.sh rom-read-error"
   "tests/pending_slots.sh cut-new"
   "tests/pending_slots.sh cut-clear"
   "tests/pending_slots.sh half"
