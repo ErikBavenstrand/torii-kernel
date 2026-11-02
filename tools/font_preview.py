@@ -5,10 +5,12 @@
 # ///
 """Render the font candidates as mock Torii screens (docs/research/fonts.md).
 
-usage: font_preview.py [--out DIR] [--cache DIR] [KEY...]
+usage: font_preview.py [--out DIR] [--cache DIR] [--offline] [KEY...]
 
 Downloads each candidate's font files once into the cache (default
-dist/fonts/candidates, checked against the SHA-256 below), converts them with
+dist/fonts/candidates, checked against the SHA-256 below), except Galmuri's,
+which come from assets/fonts/galmuri. --offline downloads nothing: it draws the
+candidates whose files are vendored or cached, and names the others. Converts them with
 tools/font.py and draws, at 240x160, a list and a heading sample, in a
 light and a dark palette. The text is drawn from the packed bitmaps the kernel
 would get, so the sheet shows exactly what the blitter will draw. Writes
@@ -274,7 +276,22 @@ def sample(body: Face, heading: Face, palette: list[int]) -> Image.Image:
     return image
 
 
+VENDORED = Path(__file__).resolve().parent.parent / "assets/fonts/galmuri"
+
+
+def have(name: str, cache: Path) -> bool:
+    """Whether fetch() needs no download for the font file."""
+    url = FILES[name][0]
+    return (
+        (VENDORED / name).exists()
+        or (cache / name).exists()
+        or (cache / Path(url).name).exists()
+    )
+
+
 def fetch(name: str, cache: Path) -> Path:
+    if (VENDORED / name).exists():
+        return VENDORED / name
     path = cache / name
     if path.exists():
         return path
@@ -329,9 +346,21 @@ def main(argv: list[str]) -> int:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--out", type=Path, default=Path("docs/research/fonts"))
     p.add_argument("--cache", type=Path, default=Path("dist/fonts/candidates"))
+    p.add_argument("--offline", action="store_true", help="download nothing")
     p.add_argument("keys", nargs="*", default=list(CANDIDATES))
     args = p.parse_args(argv)
     args.out.mkdir(parents=True, exist_ok=True)
+    if args.offline:
+        keys = []
+        for key in args.keys:
+            _, (body_file, _), (heading_file, _) = CANDIDATES[key]
+            if have(body_file, args.cache) and have(heading_file, args.cache):
+                keys.append(key)
+            else:
+                print(f"font_preview.py: {key}: not cached, skipped", file=sys.stderr)
+        args.keys = keys
+        if not keys:
+            sys.exit("font_preview.py: nothing to draw offline")
 
     gap = 4
     rows = []

@@ -23,7 +23,9 @@ options:
                       the font's own advance minus 2, at least 2)
   --squeeze           fit glyphs that stick out above the line by closing
                       blank rows inside them, the topmost first (the gap
-                      between an accent and its capital); ASCII never changes
+                      between an accent and its capital), and those below it
+                      by closing the lowest or, with none, rising; ASCII
+                      never changes
   --clip              drop ink rows still outside the line instead of failing
                       (the bottom of a cedilla too deep for the line)
   --subset-bdf FILE   also write SRC (a BDF) cut to the glyphs read, to vendor
@@ -39,9 +41,10 @@ which declares the menu's fonts):
   other code point. Code points the font lacks, and C1 controls, share the
   replacement glyph's entry.
   Each glyph is `rows` bitmap rows starting `top` rows below the line's top;
-  rows outside that are blank. A row is `row_bytes` (2) bytes, little-endian,
-  and bit 0 is the leftmost pixel, at the pen position, so glyphs are at most
-  16 px wide.
+  rows outside that are blank. A row is 1 byte for a glyph 8 px wide or less
+  (`width`), else 2 bytes starting at an even offset, little-endian, and bit 0
+  is the leftmost pixel, at the pen position, so glyphs are at most 16 px wide.
+  The font's `row_bytes` is the widest glyph's (1 or 2).
 Why that layout: a GBA 4bpp tile row is one little-endian word whose low
 nibble is the leftmost pixel. With bit 0 leftmost, a row expands to that word
 by table lookup (bit i to nibble i) with no bit reversal, and drawing at pixel
@@ -50,12 +53,12 @@ word as `word >> (32 - 4x)` (none when x is 0: a shift by 32 is undefined in
 C). The second byte expands to the next word the same way. Storing only the
 inked rows skips the blank ones (about a third of a 12 px line), and keeping
 them contiguous lets the blitter walk one pointer.
-Why always 2 bytes: rows of 1 byte would fit a font whose glyphs are all 8 px
-or narrower, but the blitter (source/engine/text_blit.s) reads the first byte
-of a row the same way at either size, and in the same cycles (measured:
-tests/kernel/test_text.c), so one size keeps one code path, and the body
-font's few 9 px glyphs (the copyright and fraction signs, the replacement
-glyph) keep their shapes.
+Why rows of 1 or 2 bytes by glyph: most glyphs are 8 px or narrower, and a
+1 byte row takes half the ROM; the blitter (source/engine/text_blit.s) reads
+a row's first byte the same way at either size, and in the same cycles, so
+only the step to the next row differs. A wider glyph (the body font's few 9 px
+ones: the copyright and fraction signs, the replacement glyph) keeps its
+shape in 2 byte rows.
 """
 
 import argparse
@@ -308,7 +311,10 @@ def build(raw: Raw, args, source: str) -> Font:
 def squeeze(pixels: set[tuple[int, int]], height: int) -> set[tuple[int, int]]:
     """Fit a glyph that sticks out above the line without losing ink or
     moving its baseline: close blank rows inside it, the topmost first (an
-    accent moves down onto its capital)."""
+    accent moves down onto its capital). One that sticks out below the line
+    closes the lowest blank row inside it, and so brings its tail up (a
+    cedilla onto its letter); with none, it rises by what it sticks out, keeping
+    its tail whole."""
     if not pixels:
         return pixels
     while min(y for _, y in pixels) < 0:
@@ -317,6 +323,15 @@ def squeeze(pixels: set[tuple[int, int]], height: int) -> set[tuple[int, int]]:
         if not gaps:
             break
         pixels = {(x, y + 1 if y < gaps[0] else y) for x, y in pixels}
+    while max(y for _, y in pixels) >= height:
+        ys = {y for _, y in pixels}
+        gaps = [y for y in range(min(ys), max(ys)) if y not in ys]
+        if not gaps:
+            break
+        pixels = {(x, y - 1 if y > gaps[-1] else y) for x, y in pixels}
+    over = max(y for _, y in pixels) - height + 1
+    if over > 0 and min(y for _, y in pixels) >= over:
+        pixels = {(x, y - over) for x, y in pixels}  # no gap to close: rise
     return pixels
 
 
@@ -365,7 +380,7 @@ class Packed:
 
 
 def pack(font: Font) -> Packed:
-    rb = font.row_bytes
+    font.row_bytes  # checks the widest glyph fits
     bits = bytearray()
     offsets: dict[int, int] = {}  # id(glyph) -> offset, so shared glyphs share bits
     entries, art = [], []
@@ -373,6 +388,9 @@ def pack(font: Font) -> Packed:
         top, rows = rows_of(glyph)
         width = max(x for x, _ in glyph.pixels) + 1 if glyph.pixels else 0
         if id(glyph) not in offsets:
+            rb = 2 if width > 8 else 1
+            if rb == 2 and len(bits) % 2:
+                bits.append(0)  # 2 byte rows are read as halfwords
             offsets[id(glyph)] = len(bits)
             for row in rows:
                 bits.extend(row >> (8 * b) & 0xFF for b in range(rb))
@@ -403,7 +421,7 @@ def emit(font: Font) -> str:
     ]
     source = (
         f"/* Made by tools/font.py from {font.source}. Do not edit.\n"
-        f" * {len(packed.bits)} bytes of bitmaps in {font.row_bytes} byte rows. */\n"
+        f" * {len(packed.bits)} bytes of bitmaps in 1 byte rows (2 for glyphs over 8 px). */\n"
         '#include "font.h"\n\n'
         f"static const uint8_t font_{name}_bits[] __attribute__((aligned(4))) = {{\n"
         + "\n".join(data)

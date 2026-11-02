@@ -122,9 +122,8 @@ class Layout(unittest.TestCase):
         offset, _, top, rows, width = packed.entries[font.index(ord("A"))]
         self.assertEqual((top, rows, width), (0, 5, 3))
         # bit 0 is the leftmost pixel: ".#." is 0b010, "#.#" is 0b101
-        rows = packed.bits[offset : offset + 10]
-        self.assertEqual(list(rows[0::2]), [2, 5, 7, 5, 5])
-        self.assertEqual(list(rows[1::2]), [0] * 5)  # 2 bytes a row
+        rows = packed.bits[offset : offset + 5]
+        self.assertEqual(list(rows), [2, 5, 7, 5, 5])  # 1 byte a row, 3 px wide
         _, _, top, rows, _ = packed.entries[font.index(ord("g"))]
         self.assertEqual((top, rows), (2, 4))
 
@@ -139,6 +138,22 @@ class Layout(unittest.TestCase):
         offset = packed.entries[font.index(ord("A"))][0]
         self.assertEqual(offset % 2, 0)
         self.assertEqual(packed.bits[offset : offset + 2], bytes([0x02, 0x01]))
+
+    def test_narrow_glyphs_stay_one_byte_beside_a_wide_one(self):
+        wide = BDF.replace(
+            "BBX 3 5 0 0\nBITMAP\n40\nA0\nE0\nA0\nA0",
+            "BBX 9 5 0 0\nBITMAP\n4080\n0000\n0000\n0000\n0000",
+        )
+        packed = font.pack(convert("--line-height", "6", "--squeeze", text=wide))
+        # every glyph's bytes are rows * (2 if wider than 8 px, else 1), and
+        # a 2 byte row starts at an even offset
+        for offset, _, _, rows, width in packed.entries:
+            if rows and width > 8:
+                self.assertEqual(offset % 2, 0)
+        end = max(
+            o + r * (2 if w > 8 else 1) for o, _, _, r, w in packed.entries if r
+        )
+        self.assertLessEqual(len(packed.bits), end)
 
     def test_short_bitmap_row_fails(self):
         short = BDF.replace("BBX 3 5 0 0", "BBX 9 5 0 0")
@@ -155,7 +170,7 @@ class Layout(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "U\\+00C9"):
             convert("--line-height", "6")
 
-    def test_deep_descender_clipped_not_lifted(self):
+    def test_deep_descender_rises_whole(self):
         deep = BDF.replace(
             "BBX 3 4 0 -1\nBITMAP\nE0\nA0\n60\nC0",
             "BBX 3 5 0 -2\nBITMAP\nE0\nA0\n60\n20\nC0",
@@ -166,8 +181,22 @@ class Layout(unittest.TestCase):
         f = convert(
             "--line-height", "6", "--baseline", "5", "--squeeze", "--clip", text=deep
         )
-        self.assertEqual(f.clipped, [0xE7])
-        self.assertEqual(sorted({y for _, y in glyph(f, "ç").pixels}), [2, 3, 4, 5])
+        # no blank row to close, so it rises by what stuck out, tail whole
+        self.assertEqual((f.squeezed, f.clipped), ([0xC9, 0xE7], []))
+        self.assertEqual(sorted({y for _, y in glyph(f, "ç").pixels}), [1, 2, 3, 4, 5])
+
+    def test_deep_descender_closes_its_gap(self):
+        gap = BDF.replace(
+            "BBX 3 4 0 -1\nBITMAP\nE0\nA0\n60\nC0",
+            "BBX 3 6 0 -3\nBITMAP\nE0\nA0\n60\n00\n20\nC0",
+        ).replace("ENCODING 103", "ENCODING 231")
+        f = convert(
+            "--line-height", "6", "--baseline", "5", "--squeeze", "--clip", text=gap
+        )
+        # the blank row closes (the tail comes up onto the letter), and the
+        # one row still out rises with the rest
+        self.assertEqual((f.squeezed, f.clipped), ([0xC9, 0xE7], []))
+        self.assertEqual(sorted({y for _, y in glyph(f, "ç").pixels}), [1, 2, 3, 4, 5])
 
     def test_nonstandard_encoding_ignored(self):
         f = convert(
@@ -326,7 +355,9 @@ class Vendored(unittest.TestCase):
             f = font.load(font.parse_args([str(src), "--name", name, *options]))
             self.assertEqual(font.emit(f), committed, f"{path.name}: run `just font`")
 
-    @unittest.skipUnless(shutil.which("cc"), "no C compiler")
+    @unittest.skipUnless(
+        shutil.which("arm-none-eabi-gcc") or shutil.which("cc"), "no C compiler"
+    )
     def test_compiles_without_warnings(self):
         with tempfile.TemporaryDirectory() as tmp:
             src = Path(tmp) / "tiny.bdf"
@@ -336,12 +367,14 @@ class Vendored(unittest.TestCase):
                 self.assertEqual(
                     font.main([*args, "--line-height", "6", "--squeeze"]), 0
                 )
-            # The kernel's WARNFLAGS (Makefile) and -pedantic, on the host's compiler
+            # The kernel's WARNFLAGS (Makefile) and -pedantic, on devkitARM's GCC
+            # when it is on PATH (the kernel's compiler), else the host's
+            compiler = shutil.which("arm-none-eabi-gcc") and "arm-none-eabi-gcc" or "cc"
             flags = "-std=gnu11 -Wall -Wextra -Wshadow -Wundef -Wformat=2 -Wstrict-prototypes"
             flags += " -Wmissing-prototypes -Werror -pedantic"
             run = subprocess.run(
                 [
-                    "cc",
+                    compiler,
                     *flags.split(),
                     "-I",
                     str(ROOT / "source/engine"),

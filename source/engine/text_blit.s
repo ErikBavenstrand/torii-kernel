@@ -64,8 +64,8 @@
 	orr	\r, \r, \t, lsl #3
 	.endm
 
-@ text_blit for a font with \stride byte rows
-	.macro	BLIT name, stride
+@ text_blit; a glyph 8 px or narrower has \narrow byte rows, a wider one \wide
+	.macro	BLIT name, narrow, wide
 	.section .iwram,"ax",%progbits
 	.arm
 	.align	2
@@ -130,7 +130,7 @@
 	str	r11, [sp, #SP_X]
 	str	r12, [sp, #SP_G]
 .L\name\()_wide:
-	ldrh	r0, [r3], #\stride
+	ldrh	r0, [r3], #\wide
 	cmp	r0, #0
 	beq	.L\name\()_wide_next
 	mov	r1, r0, lsr #8		@ pixels 8-15
@@ -170,7 +170,7 @@
 
 	@ Inside one tile column
 .L\name\()_one:
-	ldrb	r0, [r3], #\stride
+	ldrb	r0, [r3], #\narrow
 	orrs	r0, r0, r0, lsl #12
 	beq	.L\name\()_one_next
 	orr	r0, r0, r0, lsl #6
@@ -191,7 +191,7 @@
 
 	@ 8 px or narrower, across two tile columns (px is 1-7, rs 4-28)
 .L\name\()_two:
-	ldrb	r0, [r3], #\stride
+	ldrb	r0, [r3], #\narrow
 	orrs	r0, r0, r0, lsl #12
 	beq	.L\name\()_two_next
 	orr	r0, r0, r0, lsl #6
@@ -222,10 +222,6 @@
 	.size	\name, . - \name
 	.endm
 
-	BLIT	text_blit, 2
+	BLIT	text_blit, 1, 2
 
-#ifdef TORII_TEST_KERNEL
-@ For a font with 1 byte rows (8 px glyphs at most): the benchmark compares
-@ the two row sizes
-	BLIT	text_blit_rows1, 1
-#endif
+

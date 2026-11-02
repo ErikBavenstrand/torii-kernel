@@ -98,7 +98,6 @@ The UX reviews' open proposals (`docs/design/v0.5/ux-review.md`, `settings-ux-re
 Pokémon Emerald's set is done (v0.9.16). Left:
 
 - **Forget HMs, the level-up path:** the summary screen's swap runs on the emulated cart (v0.9.17); an HM move swapped out on a level-up in battle (`IsHMMove2`, also evolution learning) is read in the disassembly only. Run it with a level-up in battle.
-- **Navel Rock's ladder tiles (owner, 2026-11-01):** after a warp, some tiles looked wrong on the real cart; the emulator's renders match the reference pixel for pixel. Waiting for a photo from the cart.
 - **Declined (owner, 2026-11-02), not to be built unless asked:** Fishing always bites, Feebas everywhere on Route 119, fast walking, trainers' Pokémon with perfect IVs; earlier declines are D52–D59 in the curation doc.
 
 ### Tooling, alongside any patch

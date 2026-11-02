@@ -82,8 +82,9 @@ static void percent_glyph_load(struct percent_glyph *g, const struct torii_font 
 	g->top = src->top;
 	g->count = (u8)(src->rows < PERCENT_ROWS ? src->rows : PERCENT_ROWS);
 	for (u32 r = 0; r < g->count; r++) {
-		const u8 *b = f->bits + src->offset + r * f->row_bytes;
-		g->rows[r] = (u16)(b[0] | (f->row_bytes > 1 ? b[1] << 8 : 0));
+		u32 stride = torii_glyph_row_bytes(src);
+		const u8 *b = f->bits + src->offset + r * stride;
+		g->rows[r] = (u16)(b[0] | (stride > 1 ? b[1] << 8 : 0));
 	}
 }
 

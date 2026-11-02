@@ -18,15 +18,22 @@ struct torii_glyph {
 	uint8_t advance;  // pen advance in pixels
 	uint8_t top;      // first bitmap row, from the line's top
 	uint8_t rows;     // bitmap rows (0 for blank glyphs)
-	uint8_t width;    // inked columns from the pen, at most 8 * row_bytes
+	uint8_t width;    // inked columns from the pen, at most 16
 };
+
+// A glyph's rows are 1 byte when it is 8 px wide or less, else 2 (at an even
+// offset): rows narrower than the font's widest are no bigger than they need to be
+static inline uint32_t torii_glyph_row_bytes(const struct torii_glyph *g)
+{
+	return g->width > 8 ? 2 : 1;
+}
 
 struct torii_font {
 	const struct torii_glyph *glyphs;  // TORII_FONT_GLYPHS entries
-	const uint8_t *bits;               // rows of row_bytes bytes, bit 0 leftmost
+	const uint8_t *bits;               // rows of torii_glyph_row_bytes() bytes, bit 0 leftmost
 	uint8_t line_height;               // pixels from one line's top to the next
 	uint8_t baseline;                  // rows above the baseline
-	uint8_t row_bytes;                 // 1, 2 or 4
+	uint8_t row_bytes;                 // the widest glyph's row: 1 or 2
 	uint8_t max_width;                 // widest glyph's inked columns
 };
 

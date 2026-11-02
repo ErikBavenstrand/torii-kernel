@@ -10,14 +10,14 @@ void cycles_report(const char *name, u32 cycles)
 }
 
 // Measured frames per name since the last summary. Names beyond the table
-// count in no summary (their console lines still go out).
+// count together under "other" (their console lines still go out by name).
 #define SUMMARY_NAMES 8
 static struct {
 	const char *name;
 	u32 frames;
 	u32 worst;
 	unsigned long long total;
-} summary[SUMMARY_NAMES] EWRAM_BSS;
+} summary[SUMMARY_NAMES + 1] EWRAM_BSS;  // the last: "other"
 
 void cycles_frame(const char *name, u32 cycles)
 {
@@ -32,11 +32,16 @@ void cycles_frame(const char *name, u32 cycles)
 			summary[i].worst = cycles;
 		return;
 	}
+	summary[SUMMARY_NAMES].name = "other";
+	summary[SUMMARY_NAMES].frames++;
+	summary[SUMMARY_NAMES].total += cycles;
+	if (cycles > summary[SUMMARY_NAMES].worst)
+		summary[SUMMARY_NAMES].worst = cycles;
 }
 
 void cycles_summary(void)
 {
-	for (u32 i = 0; i < SUMMARY_NAMES && summary[i].name; i++)
+	for (u32 i = 0; i <= SUMMARY_NAMES && summary[i].name; i++)
 		if (summary[i].worst > ENGINE_FRAME_CYCLES)
 			tlog_debug("frame-cycles summary: %s: %lu frames, worst %lu, mean %lu", summary[i].name,
 				   (unsigned long)summary[i].frames, (unsigned long)summary[i].worst,

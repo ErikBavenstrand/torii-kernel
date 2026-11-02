@@ -25,8 +25,9 @@ to docs only, then runs nothing again. --no-cache runs every tier.
 Kernel source is the default for compat: every file in source/ and
 tests/kernel/ links into the one kernel binary, so a change anywhere can break
 launching (EWRAM data, IWRAM code and the stack share tight limits, which
-`just size` checks). Only the files in NO_COMPAT skip compat. A path no rule
-knows runs everything.
+`just size` checks). Compat then plays only the games that ran a changed
+function (CompatJobs, the way `just test` selects its jobs), none for a change
+to menu code that no launch runs. A path no rule knows runs everything.
 
 `just test` runs only the jobs of tests/all.sh that the change touches
 (TestJobs): every run records the kernel functions each job executes, and a
@@ -61,103 +62,6 @@ LINT, TEST_HOST, TEST, SIZE, REPRO, ANALYZE, COMPAT = (
 ORDER = [LINT, TEST_HOST, TEST, SIZE, REPRO, ANALYZE, COMPAT]
 KERNEL = {LINT, TEST, SIZE, COMPAT}
 EVERYTHING = {LINT, TEST, SIZE, ANALYZE, COMPAT}
-
-# Kernel C files that only draw menus or text and never run while a game
-# launches or saves: they skip compat (not size). Other headers never skip
-# it, as launching code includes them (only menu code includes the text
-# engine's); nor does lang.c, whose strings it uses. The menu pages a player
-# opens (games, SD card, NOR, cheats, saves, settings) are here too: compat
-# launches through the tests' hook in screens/nav.c, straight into
-# actions.c, so their code never runs there; `just test` drives them.
-# Pages a launch itself can show (slot picker, slot flow, save page) and
-# headers nav.c or actions.c include are not.
-NO_COMPAT = {
-    "source/artkey.c",
-    "source/artkey.h",
-    "source/artpack.c",
-    "source/artpack.h",
-    "source/boxart.c",
-    "source/boxart.h",
-    "source/charset.c",
-    "source/diag_render.c",
-    "source/engine/affine.c",
-    "source/engine/affine.h",
-    "source/engine/ease_lut.c",
-    "source/engine/font.h",
-    "source/engine/font_body.c",
-    "source/engine/font_heading.c",
-    "source/engine/input.c",
-    "source/engine/input_hw.c",
-    "source/engine/motion.c",
-    "source/engine/text.c",
-    "source/engine/text.h",
-    "source/engine/text_blit.s",
-    "source/engine/text_layout.c",
-    "source/gamelist.c",
-    "source/gamelist.h",
-    "source/gamename.c",
-    "source/gamename.h",
-    "source/keypad_edit.c",
-    "source/keypad_edit.h",
-    "source/picture.c",
-    "source/picture.h",
-    "source/rename_edit.c",
-    "source/rename_edit.h",
-    "source/screens/carousel.c",
-    "source/screens/carousel_ring.c",
-    "source/screens/cheats.c",
-    "source/screens/cheats.h",
-    "source/screens/game_saves.c",
-    "source/screens/game_saves.h",
-    "source/screens/games.c",
-    "source/screens/home.c",
-    "source/screens/info.c",
-    "source/screens/info.h",
-    "source/screens/keypad.c",
-    "source/screens/keypad.h",
-    "source/screens/nor.c",
-    "source/screens/registry.c",
-    "source/screens/rename.c",
-    "source/screens/rename.h",
-    "source/screens/saves.c",
-    "source/screens/saves.h",
-    "source/screens/sdcard.c",
-    "source/screens/settings_layout.c",
-    "source/screens/settings_layout.h",
-    "source/screens/settings_page.c",
-    "source/screens/shots.c",
-    "source/screens/shots.h",
-    "source/screens/slot_list.c",
-    "source/screens/slot_list.h",
-    "source/sdlist.c",
-    "source/sdlist.h",
-    "source/shotlist.c",
-    "source/shotlist.h",
-    "source/ui/art.c",
-    "source/ui/art.h",
-    "source/ui/art_data.c",
-    "source/ui/art_ids.h",
-    "source/ui/letter.c",
-    "source/ui/letter.h",
-    "source/ui/paint.h",
-    "source/ui/palette.c",
-    "source/ui/palette.h",
-    "source/ui/ring.h",
-    "source/ui/rowcache.c",
-    "source/ui/rowcache.h",
-    "source/ui/ui.h",
-    "source/ui/ui_core.c",
-    "source/ui/ui_list.c",
-    "source/ui/ui_paper.c",
-    "source/ui/ui_popup.c",
-    "source/ui/ui_priv.h",
-    "source/ui/ui_reading.c",
-    "source/ui/ui_reading.h",
-    "source/ui/ui_ring.c",
-    "source/ui/ui_run.c",
-    "source/ui/ui_theme.c",
-    "source/ui/ui_widgets.c",
-}
 
 # (patterns, tiers, why): fnmatch patterns, where "*" also matches "/"
 RULES = [
@@ -320,11 +224,6 @@ RULES = [
         {LINT, TEST_HOST, TEST},
         "library index reader: the library tests and art-scrape's tests use it",
     ),
-    (
-        sorted(NO_COMPAT),
-        {LINT, TEST, SIZE, ANALYZE},
-        "menu or text only, listed in NO_COMPAT",
-    ),
     (["source/*.c", "source/*.h"], EVERYTHING, "kernel C"),
     (["Makefile"], EVERYTHING | {REPRO}, "kernel build flags"),
     (["source/*", "tests/kernel/*", "image.bin"], KERNEL, "kernel"),
@@ -338,6 +237,7 @@ RULES = [
         [
             "tests/games*",
             "tests/compat_report.py",
+            "tests/cov_merge.py",
             "tests/hook_watch.lua",
             "tools/games.py",
         ],
@@ -561,6 +461,7 @@ class TestJobs:
     each of tests/shots.py's scenarios, as shots:NAME (TORII_SHOTS,
     TORII_SHOTS_COVERAGE)."""
 
+    TIER = TEST
     MAP = "dist/.check/testmap.json"
     COVERAGE = "dist/.check/coverage"
     HARNESS = "dist/.check/harness.json"
@@ -589,7 +490,7 @@ class TestJobs:
         own = {job: hashlib.sha256() for job in jobs}
         for path in sorted(state):
             name = path.rstrip("/")
-            if name == "roms" or TEST not in tiers_for(name)[0]:
+            if name == "roms" or self.TIER not in tiers_for(name)[0]:
                 continue
             if any(
                 fnmatch.fnmatchcase(name, p)
@@ -677,7 +578,60 @@ class TestJobs:
             )
 
 
-def run(plan: list[list[str]], just: str, test_jobs: TestJobs) -> dict[str, bool]:
+class CompatJobs(TestJobs):
+    """Which games `just compat` plays: one job per game (compat:KEY) and
+    compat:cheat_codes, each recording the kernel functions it runs as the
+    test jobs do, so a change runs only the games that ran a changed function
+    (a change that moves data is for --full, as with the tests)."""
+
+    TIER = COMPAT
+    MAP = "dist/.check/testmap-compat.json"
+    COVERAGE = "dist/.check/coverage-compat"
+    HARNESS = "dist/.check/harness-compat.json"
+
+    @classmethod
+    def own_files(cls, job: str) -> list[str]:
+        return ["tests/cheat_codes*"] if job == "compat:cheat_codes" else []
+
+    def env(self) -> dict[str, str]:
+        listing = subprocess.run(
+            [
+                os.environ.get("JUST", "just"),
+                "compat-jobs",
+                *(["--all"] if self.full else []),
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        jobs = [j for j in listing.stdout.splitlines() if j.startswith("compat:")]
+        if listing.returncode != 0 or not jobs:
+            return {}  # no list: the recipe plays everything, recording nothing
+        Path(self.HARNESS).parent.mkdir(parents=True, exist_ok=True)
+        Path(self.HARNESS).write_text(json.dumps(self.harness(jobs)))
+        if self.full:
+            chosen, why = jobs, ""
+        else:
+            picked = subprocess.run(
+                [sys.executable, "tools/testmap.py", "select", self.MAP, self.HARNESS],
+                input="\n".join(jobs),
+                capture_output=True,
+                text=True,
+                check=True,
+            )
+            chosen, why = picked.stdout.splitlines(), picked.stderr
+        print(f"check: compat runs {len(chosen)} of {len(jobs)} jobs", flush=True)
+        print(why, end="", flush=True)
+        subprocess.run(["rm", "-rf", self.COVERAGE], check=True)
+        return {
+            "TORII_COMPAT_JOBS": "\n".join(chosen) or "-",  # "-": none
+            "TORII_COMPAT_COVERAGE": self.COVERAGE,
+        }
+
+
+def run(
+    plan: list[list[str]], just: str, test_jobs: TestJobs, compat_jobs: CompatJobs
+) -> dict[str, bool]:
     """Run the plan's tiers side by side, each into its own log in
     dist/.check, and print each log whole as its tier ends.
 
@@ -692,7 +646,11 @@ def run(plan: list[list[str]], just: str, test_jobs: TestJobs) -> dict[str, bool
 
     def start(cmd: list[str]) -> None:
         log = logs / (names[id(cmd)].replace(" ", "_") + ".log")
-        env = {**os.environ, **test_jobs.env()} if cmd[1] == TEST else None
+        env = None
+        if cmd[1] == TEST:
+            env = {**os.environ, **test_jobs.env()}
+        elif cmd[1] == COMPAT:
+            env = {**os.environ, **compat_jobs.env()}
         out = log.open("wb")
         proc = subprocess.Popen(cmd, stdout=out, stderr=subprocess.STDOUT, env=env)
         out.close()
@@ -704,6 +662,8 @@ def run(plan: list[list[str]], just: str, test_jobs: TestJobs) -> dict[str, bool
         ok = proc.returncode == 0
         if cmd[1] == TEST:
             test_jobs.record()
+        elif cmd[1] == COMPAT:
+            compat_jobs.record()
         results[name] = ok
         print(f"\ncheck: just {name}", flush=True)
         sys.stdout.buffer.write(log.read_bytes())
@@ -834,7 +794,7 @@ def main() -> int:
                 + " (--no-cache runs them)"
             )
         plan = [cmd for cmd in plan if cmd not in cached]
-    results = run(plan, just, TestJobs(full))
+    results = run(plan, just, TestJobs(full), CompatJobs(full))
     if use_cache:
         # A file edited while the tiers ran may not be what they checked
         state = tree_state()

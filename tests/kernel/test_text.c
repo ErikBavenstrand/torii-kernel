@@ -53,8 +53,9 @@ static void ref_draw(u32 *tiles, const struct torii_font *font, const u8 *glyphs
 	for (u32 i = 0; i < count; i++) {
 		const struct torii_glyph *g = &font->glyphs[glyphs[i]];
 		const u8 *row = font->bits + g->offset;
-		for (u32 r = 0; r < g->rows; r++, row += font->row_bytes) {
-			u32 bits = row[0] | (font->row_bytes > 1 ? row[1] << 8 : 0);
+		u32 stride = torii_glyph_row_bytes(g);
+		for (u32 r = 0; r < g->rows; r++, row += stride) {
+			u32 bits = row[0] | (stride > 1 ? row[1] << 8 : 0);
 			for (u32 c = 0; c < 16; c++)
 				if (bits >> c & 1)
 					set_pixel(tiles, x + c, y + g->top + r, ink);
@@ -322,36 +323,6 @@ void test_text_cycles(void)
 	cycles_report("text-row38-tonc", cycles(bench_blit_tonc, &run));
 	cycles_report("text-heading20-c", cycles(bench_blit_c, &head));
 	cycles_report("text-heading20-tonc", cycles(bench_blit_tonc, &head));
-
-	// The body font with 1 byte rows (its 8 px glyphs only) against 2 byte
-	// rows, both copied to EWRAM after the test windows so that the bitmaps
-	// are read from the same memory
-	u32 size = 0;
-	for (u32 i = 0; i < TORII_FONT_GLYPHS; i++) {
-		const struct torii_glyph *g = &font_body.glyphs[i];
-		if (g->offset + g->rows * 2u > size)
-			size = g->offset + g->rows * 2u;
-	}
-	struct torii_glyph *glyphs1 = (struct torii_glyph *)(pReadCache + 0x2000);
-	struct torii_glyph *glyphs2 = (struct torii_glyph *)(pReadCache + 0x2800);
-	u8 *bits1 = pReadCache + 0x3000, *bits2 = pReadCache + 0x4000;
-	memcpy(glyphs2, font_body.glyphs, sizeof(*glyphs2) * TORII_FONT_GLYPHS);
-	memcpy(glyphs1, font_body.glyphs, sizeof(*glyphs1) * TORII_FONT_GLYPHS);
-	for (u32 i = 0; i < TORII_FONT_GLYPHS; i++)
-		glyphs1[i].offset /= 2;
-	memcpy(bits2, font_body.bits, size);
-	for (u32 i = 0; i < size / 2; i++)
-		bits1[i] = font_body.bits[2 * i];
-	struct torii_font body1 = font_body, body2 = font_body;
-	body1.glyphs = glyphs1;
-	body1.bits = bits1;
-	body1.row_bytes = 1;
-	body2.glyphs = glyphs2;
-	body2.bits = bits2;
-	run.font = &body1;
-	cycles_report("text-row38-rows1-ewram", cycles(text_blit_rows1, &run));
-	run.font = &body2;
-	cycles_report("text-row38-rows2-ewram", cycles(text_blit, &run));
 #endif
 }
 

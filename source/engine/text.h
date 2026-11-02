@@ -109,7 +109,7 @@ void text_clear_rows(const struct text_window *win, u32 y, u32 h);
 struct text_run {
 	u32 *tiles;          // the window's first tile
 	u32 column_words;    // words in a tile column: window height * 8
-	const struct torii_font *font;  // row_bytes 2
+	const struct torii_font *font;  // glyphs wider than 8 px have 2 byte rows
 	const u8 *glyphs;    // indices into font->glyphs
 	u32 count;
 	u32 x;               // pen position of the first glyph
@@ -119,9 +119,5 @@ struct text_run {
 
 // Draws a run into 4bpp column-major tiles. ARM code in IWRAM.
 IWRAM_CODE void text_blit(const struct text_run *run);
-#ifdef TORII_TEST_KERNEL
-// The same for a font with 1 byte rows, for the tests' benchmark
-IWRAM_CODE void text_blit_rows1(const struct text_run *run);
-#endif
 
 #endif

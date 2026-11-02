@@ -1,6 +1,6 @@
 # Checks every push to main and every pull request: lint, build the kernel
 # (kept as a download), run the host tests and the homebrew tests on the
-# emulated cart, and run the advisory static analysis. Each
+# emulated cart, and run the static analysis against its baseline. Each
 # job runs the same `just` recipe as on a developer's machine. The images
 # and the emulator build are cached (.github/actions/image and the test job);
 # tools/fresh.py's records come with them, so `just` rebuilds whatever doesn't
@@ -131,12 +131,11 @@ jobs:
           if-no-files-found: ignore
 
   analyze:
-    name: Static analysis (advisory)
+    name: Static analysis
     runs-on: ubuntu-26.04
     timeout-minutes: 30
-    # Advisory: the job fails only on findings missing from
-    # tools/analyze-baseline.txt, and that doesn't fail the workflow.
-    continue-on-error: true
+    # Fails on findings missing from tools/analyze-baseline.txt (the baseline's
+    # 97 findings are triaged: style, or false alarms; see the roadmap).
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: extractions/setup-just@53165ef7e734c5c07cb06b3c8e7b647c5aa16db3 # v4.0.0

@@ -28,7 +28,7 @@ pocketnes_image := "devkitpro/devkitarm@sha256:a8a5fbf5336ba400fd960d20c4c4c370d
 emu_image := "torii-emu"
 kernel_docker := "docker run --rm --platform linux/amd64 -u $(id -u):$(id -g) -v \"$PWD\":/src -w /src -e LIBGBA=/opt/devkitpro/libgba " + kernel_image
 # LC_ALL: mtools stores UTF-8 file names correctly only in a UTF-8 locale
-emu_docker := "docker run --rm -u $(id -u):$(id -g) -e LC_ALL=C.UTF-8 -e TORII_JOBS -e TORII_COVERAGE_DIR -e TORII_SHOTS -e TORII_SHOTS_COVERAGE -v \"$PWD\":/src " + emu_image
+emu_docker := "docker run --rm -u $(id -u):$(id -g) -e LC_ALL=C.UTF-8 -e TORII_JOBS -e TORII_COVERAGE_DIR -e TORII_SHOTS -e TORII_SHOTS_COVERAGE -e TORII_COMPAT_JOBS -e TORII_COMPAT_COVERAGE -v \"$PWD\":/src " + emu_image
 # C formatter for `just lint` and `just format`; .clang-format-ignore lists the files it skips
 clang_format := "23.1.2"
 # Advisory analysis for `just analyze` (cppcheck is pinned in docker/analyze.Dockerfile)
@@ -286,10 +286,16 @@ compat *filters: build emu-headless
     #!/usr/bin/env bash
     set -uo pipefail
     cheats=
-    if [ $# = 0 ] || [ "$*" = --all ]; then
+    # `just check` passes the jobs to run (TORII_COMPAT_JOBS: compat:GAME for each game,
+    # compat:cheat_codes) and where to record the code they execute (TORII_COMPAT_COVERAGE)
+    if { [ $# = 0 ] || [ "$*" = --all ]; } && { [ -z "${TORII_COMPAT_JOBS+x}" ] || grep -qxF compat:cheat_codes <<<"$TORII_COMPAT_JOBS"; }; then
       cheats=$(mktemp)
       trap 'kill $(jobs -p) 2>/dev/null; rm -f "$cheats"' EXIT
-      {{emu_docker}} tests/cheat_codes.sh >"$cheats" 2>&1 &
+      if [ -n "${TORII_COMPAT_COVERAGE:-}" ]; then
+        {{emu_docker}} bash -c 'runs=${TMPDIR:-/tmp}/torii-compat-coverage/cheat_codes; rm -rf "$runs"; mkdir -p "$runs"; TORII_COVERAGE=$runs tests/cheat_codes.sh; status=$?; python3 tests/cov_merge.py "$runs" "$TORII_COMPAT_COVERAGE/compat:cheat_codes" compat:cheat_codes $status; rm -rf "$runs"; exit $status' >"$cheats" 2>&1 &
+      else
+        {{emu_docker}} tests/cheat_codes.sh >"$cheats" 2>&1 &
+      fi
     fi
     {{emu_docker}} python3 tests/games.py "$@"; status=$?
     if [ -n "$cheats" ]; then
@@ -297,6 +303,11 @@ compat *filters: build emu-headless
       cat "$cheats"
     fi
     exit $status
+
+# The compat jobs `just compat` would run (all of them with --all), one per line, as `just check` selects among them
+compat-jobs *filters: emu-headless
+    @{{emu_docker}} python3 tests/games.py --list {{filters}}
+    @if [ $# = 0 ] || [ "$*" = --all ]; then echo compat:cheat_codes; fi
 
 # Build the hardware-free kernel code with tests/host for the host, under ASan and UBSan, and run it;
 # test tools/font.py, tools/asset.py, tools/art.py, tools/art_scrape.py, tools/cheats.py, tools/cheat_encode.py, tools/art_pack.py, tools/library_report.py, tools/card.py, the palette and the upgrade file's layout.

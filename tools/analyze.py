@@ -2,7 +2,7 @@
 # /// script
 # requires-python = ">=3.9"
 # ///
-"""Run the advisory static analysis and compare it with its baseline.
+"""Run the static analysis and compare it with its baseline.
 
 usage: analyze.py files                 C files to analyze, one per line
        analyze.py tidy                  for each, its cache key and the file (clang-tidy's)

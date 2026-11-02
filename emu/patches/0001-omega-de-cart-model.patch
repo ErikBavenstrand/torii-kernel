@@ -448,10 +448,10 @@ index 1d0c0dd..80e46af 100644
  		return;
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
-index 0000000..e947ded
+index 0000000..86a5562
 --- /dev/null
 +++ b/src/gba/cart/omega.c
-@@ -0,0 +1,1904 @@
+@@ -0,0 +1,1911 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -1818,7 +1818,8 @@ index 0000000..e947ded
 +	// loader does (hold R): at most 3 MB, each 64 KB sector it reaches erased
 +	// and programmed, and the sectors after it, like the kernel's data,
 +	// left as they were. The last sector's bytes past the file read 0xFF
-+	// here; the loader programs whatever its buffer held there on a PL064J.
++	// here; the loader programs whatever its buffer held there on a PL064J,
++	// which depends on the loader's own state, so no model can match it.
 +	// memory.romSize can include padding, so use the file's real size.
 +	size_t kernelSize = gba->pristineRomSize ? gba->pristineRomSize : gba->memory.romSize;
 +	if (kernelSize > LOADER_INSTALL_MAX) {
@@ -1831,7 +1832,13 @@ index 0000000..e947ded
 +	omega->fpgaVersion = FPGA_VERSION;
 +	const char* fpga = getenv("OMEGA_FPGA_VERSION");
 +	if (fpga && *fpga) {
-+		omega->fpgaVersion = strtoul(fpga, NULL, 16);
++		char* end;
++		unsigned long version = strtoul(fpga, &end, 16);
++		if (end == fpga || *end || version > 0xFFFF) {
++			fprintf(stderr, "omega: bad OMEGA_FPGA_VERSION %s (up to 4 hex digits, e.g. B006)\n", fpga);
++			exit(2);
++		}
++		omega->fpgaVersion = version;
 +		omega->fpgaFlash = _mapFile(&omega->fpgaFlashVf, dir, "fpga-flash.bin", FPGA_FLASH_SIZE, 0xFF);
 +	}
 +

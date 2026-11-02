@@ -467,6 +467,10 @@ keypad-fill/fill 136F31FAAFF87126
 keypad-fill/filled 375673E41D851CBF
 keypad-raw/symbols 8686D4BD3838432D
 keypad-raw/typed 9F10551A2261490E
+lang-live/gba 0B2C673E7DF2D87B
+lang-live/recent C494216E14388E8F
+lang-live/sd E11E7F51E16DB2C7
+lang-live/settings 4CA4B78C2AB509B4
 lang-packs/english 2DD0B0104659B12F
 lang-packs/home 97F8D1DFA6418E84
 lang-packs/picked 8D897020252DBBCF
@@ -739,13 +743,13 @@ slot-picker-light/picker E78F04DF444B1F8D
 slot-picker-list/picker 9111134E5D665F59
 sv-cheats-buttons/capture 35F7A7E0636F5746
 sv-cheats-buttons/edited 6C0B4BDB3E93DA81
-sv-cheats-buttons/keyboard 9CF6A251B5C34C78
+sv-cheats-buttons/keyboard C413A4346C921620
 sv-cheats-buttons/list 77C5ABCBF1055847
 sv-cheats-buttons/menu C123A6A5BE8755B9
 sv-cheats-buttons/page 9EE13B03996CF380
 sv-cheats-buttons/refused 70A6380723807EF8
 sv-cheats-buttons/set C9A0541CDAA54234
-sv-cheats-buttons/typed D071861B190AF645
+sv-cheats-buttons/typed F1B78D7AD6DA25CD
 sv-cheats-choices/back 7A15C7D7065A7630
 sv-cheats-choices/choices 4205AD79DCC50025
 sv-cheats-choices/list B471EDD3C327822F
@@ -785,7 +789,7 @@ sv-dialog-overflow/dialog 867E6E658CDE0E48
 sv-dialog-overflow/home C68D6010BD741B53
 sv-game-saves/backups 12C0B650E6B5199E
 sv-game-saves/new 784B6B331CCC4820
-sv-game-saves/options D27A43251ED7B0B3
+sv-game-saves/options 25B8B9D71B04E10F
 sv-game-saves/other 386C6BADAD8A721D
 sv-game-saves/popup 224EF9AB1A78BA98
 sv-game-saves/restore 494720EB7F4DA07B
@@ -911,10 +915,10 @@ sv-nor-page/frames 4-5 62FE69EEB9A06DF6
 sv-nor-page/frames 6-12 7AC98F55F169EDF6
 sv-nor-page/frames 13-13 10414FE0F3F7B12B
 sv-nor-page/frames 14-17 FFD4D455248EA544
-sv-rename/full 80B1C9557D713AEA
-sv-rename/latin 73D23D2C2D919015
-sv-rename/prefilled 2F61128190A476DB
-sv-rename/shifted 067D454AFB503B70
+sv-rename/full FB024546FE3AE182
+sv-rename/latin BBF62F479C2A343D
+sv-rename/prefilled BE840D174E1BA5E3
+sv-rename/shifted A5192F22B7F05254
 sv-saves-games/back B8680E2627A93B73
 sv-saves-games/down B8680E2627A93B73
 sv-saves-games/game CF235D9A2A7D2EE3

@@ -111,14 +111,16 @@ void test_text_width(void)
 				   "cd"),
 		 width(&font_body, "abcd"));  // a soft hyphen draws nothing
 
-	// What text_blit and TEXT_MAX_GLYPHS rely on: 2 byte rows, glyphs no
-	// wider than 16 px, and no advance under 2 px
+	// What text_blit and TEXT_MAX_GLYPHS rely on: 1 byte rows up to 8 px and
+	// 2 byte rows (at even offsets) above, glyphs no wider than 16 px, and no
+	// advance under 2 px
 	const struct torii_font *fonts[] = {&font_body, &font_heading};
 	for (u32 f = 0; f < 2; f++) {
 		CHECK_EQ(fonts[f]->row_bytes, 2);
 		CHECK(fonts[f]->max_width <= 16);
 		for (u32 i = 0; i < TORII_FONT_GLYPHS; i++) {
 			CHECK(fonts[f]->glyphs[i].advance >= 2);
+			CHECK(torii_glyph_row_bytes(&fonts[f]->glyphs[i]) == 1 || fonts[f]->glyphs[i].offset % 2 == 0);
 			CHECK(fonts[f]->glyphs[i].width <= fonts[f]->max_width);
 			CHECK(fonts[f]->glyphs[i].top + fonts[f]->glyphs[i].rows <= fonts[f]->line_height);
 		}

@@ -71,11 +71,14 @@ import struct
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import tomllib
 import zlib
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+
+import cov_merge
 
 KERNEL = "dist/ezkernelnew.bin"
 SHOT = "emu/build-linux/mgba-shot"
@@ -211,6 +214,14 @@ def make_cart(cart: Path, rom: Path, sd_name: str, start_save: Path | None) -> N
         mtools("mcopy", "-i", img, str(start_save), f"::/{save_path(sd_name)}")
 
 
+# With TORII_COMPAT_COVERAGE=DIR, each game's runs record the kernel code they
+# execute in DIR/compat:KEY (mgba-shot's TORII_COVERAGE, merged by
+# tests/cov_merge.py), for tools/testmap.py: `just check` then runs only the
+# games that ran a changed function (TORII_COMPAT_JOBS lists the ones to run).
+COVERAGE = os.environ.get("TORII_COMPAT_COVERAGE")
+_run_state = threading.local()
+
+
 def power_on(cart: Path, keys, frames: int, extra: list[str] = ()) -> tuple[str, str]:
     """Run the cart once from power-on; return (stdout, cart trace)."""
     args = [SHOT, KERNEL, "-f", str(frames), *extra]
@@ -224,6 +235,8 @@ def power_on(cart: Path, keys, frames: int, extra: list[str] = ()) -> tuple[str,
         if key != "-":
             args += ["-k", f"{frame + 6}:-"]
     env = dict(os.environ, OMEGA_DIR=str(cart), OMEGA_TRACE="1")
+    if getattr(_run_state, "coverage", None):
+        env["TORII_COVERAGE"] = _run_state.coverage
     run = subprocess.run(
         args, env=env, capture_output=True, text=True, errors="replace", check=False
     )
@@ -1061,12 +1074,24 @@ def main() -> int:
         return 1
     games = tomllib.loads((ROMS / "games.toml").read_text()).get("game", [])
     every = "--all" in sys.argv[1:]
-    filters = [a for a in sys.argv[1:] if a != "--all"]
+    list_only = "--list" in sys.argv[1:]
+    filters = [a for a in sys.argv[1:] if a not in ("--all", "--list")]
     roms, saves = rom_index(), save_index()
     table = kernel_table()
     hooks = hook_table()
     wanted = [g for g in games if not g.get("skip") and matches(g, filters)]
     chosen = [(g, []) for g in wanted] if every else pick(wanted, roms, table)
+    if list_only:
+        for game, _ in chosen:
+            print(f"compat:{key_of(game)}")
+        return 0
+    only = os.environ.get("TORII_COMPAT_JOBS")
+    if only is not None:  # `just check`'s selection: "-" none
+        picked = set(only.split())
+        chosen = [(g, a) for g, a in chosen if f"compat:{key_of(g)}" in picked]
+        if not chosen:
+            print("compat: no game ran a function that changed")
+            return 0
     results = []
     for game, alike in chosen:
         result = Result(game)
@@ -1089,6 +1114,12 @@ def main() -> int:
         carts = [CARTS / key, CARTS / f"{key}-menu", CARTS / f"{key}-trips"]
         for cart in carts:
             shutil.rmtree(KEPT / cart.name, ignore_errors=True)
+        runs = None
+        if COVERAGE:
+            runs = Path(tempfile.gettempdir()) / "torii-compat-coverage" / key
+            shutil.rmtree(runs, ignore_errors=True)
+            runs.mkdir(parents=True)
+            _run_state.coverage = str(runs)
         try:
             run_game(result, roms, saves, hooks)
         except Exception as e:  # noqa: BLE001 - one game going wrong must not stop the run
@@ -1104,6 +1135,15 @@ def main() -> int:
             if cart.exists() and result.status == "fail":
                 shutil.copytree(cart, KEPT / cart.name)
             shutil.rmtree(cart, ignore_errors=True)
+        if runs:
+            _run_state.coverage = None
+            cov_merge.merge(
+                runs,
+                Path(COVERAGE) / f"compat:{key}",
+                f"compat:{key}",
+                "1" if result.status == "fail" else "0",
+            )
+            shutil.rmtree(runs, ignore_errors=True)
         result.seconds = time.monotonic() - began
         print(
             f"{result.status:7} {result.game['file'][:60]}", file=sys.stderr, flush=True

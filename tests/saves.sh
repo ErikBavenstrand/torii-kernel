@@ -168,7 +168,29 @@ rom-read-error)
   # shellcheck disable=SC2046
   boot $(nav_launch /Test.gba save=5 at=180) -s 600:"$shots/1-game.png"
   logged "launch: starting the game"
-  echo "PASS: saves rom-read-error: a ROM the card can't read stops the launch with an error, and the next launch starts it"
+  # A read that fails part-way in: a fresh card with a ROM of three 128 KB
+  # blocks, the last one unreadable (the first two load, then rom_read_failed
+  # stops the launch at block 3)
+  rm -rf "$cart" && mkdir -p "$cart"
+  mkfs.fat -C -F 32 -n SAVES "$cart/sd.img" 65536 >/dev/null
+  { cat tests/roms/savetest/flash128.gba; head -c $((0x60000 - $(stat -c %s tests/roms/savetest/flash128.gba))) /dev/zero; } >"$cart/big.gba"
+  mcopy -i "$cart/sd.img" "$cart/big.gba" ::/Test.gba
+  sectors=$(sd_sectors "$cart/sd.img" /Test.gba)
+  late=$((${sectors%-*} + 0x40000 / 512))-${sectors#*-}
+  # The in-game menu on every game, so the launch scans its last block for the
+  # IRQ hook (the third)
+  python3 tests/setnor.py set "$cart/kernel-nor.bin" 0=0xE1E1 1=1 2=0 3=0 4=0 5=9 6=8 7=2 8=9 9=8 10=1 11=1 12=0 13=1 14=1 25=1
+  # Its CRC first, as a card that has read the game once: the background pass
+  # would hit the bad sectors
+  boot -f 6000 -u "names: wrote /torii/crc.txt"
+  # shellcheck disable=SC2046
+  OMEGA_SD_READ_ERROR=$late boot $(nav_launch /Test.gba addon at=180) -f 1500
+  err=$(grep -a '^kernel error: launch: reading Test.gba at ' "$cart/run.log" | head -1 || true)
+  [ -n "$err" ] || fail "no read error line: $(grep -a 'kernel: launch' "$cart/run.log" | tail -3)"
+  case $err in *"at 262144 "*) ;; *) fail "the error is not at block 3: $err" ;; esac
+  echo "  the launch logged: $err"
+  ! grep -q 'launch: starting the game' "$cart/run.log" || fail "the game started after a late read failed"
+  echo "PASS: saves rom-read-error: a ROM the card can't read stops the launch with an error, and the next launch starts it; so does a failure at its third block"
   ;;
 
 delete)

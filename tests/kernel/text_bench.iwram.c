@@ -50,7 +50,7 @@ IWRAM_CODE void bench_blit_c(const struct text_run *run)
 		if (px + w <= 8) {
 			do {
 				u32 b = *src;
-				src += 2;
+				src += 1;
 				if (b)
 					*dst = put_left(*dst, spread(b, m), ink, ls);
 				dst++;
@@ -58,7 +58,7 @@ IWRAM_CODE void bench_blit_c(const struct text_run *run)
 		} else if (w <= 8) {
 			do {
 				u32 b = *src;
-				src += 2;
+				src += 1;
 				if (b) {
 					u32 e = spread(b, m);
 					dst[0] = put_left(dst[0], e, ink, ls);
@@ -89,8 +89,8 @@ IWRAM_CODE void bench_blit_c(const struct text_run *run)
 // J. Vijn): each 8 px column strip of a glyph in turn, every row's word
 // read-modify-written, and the next tile column's word too whenever the
 // strip crosses into it. A glyph wider than 8 px so writes its middle words
-// twice. Adapted to the torii_font format (rows from `top`, 2 bytes a row:
-// strip s reads byte s), and the second word skipped when x is a multiple of
+// twice. Adapted to the torii_font format (rows from `top`, 1 byte a row for
+// a glyph 8 px wide or less, else 2: strip s reads byte s), and the second word skipped when x is a multiple of
 // 8 (a shift by 32, which ARM code gives as 0, is undefined in C).
 IWRAM_CODE void bench_blit_tonc(const struct text_run *run)
 {
@@ -108,12 +108,13 @@ IWRAM_CODE void bench_blit_tonc(const struct text_run *run)
 		u32 *column = base + (x >> 3) * cw + glyph->top;
 		const u8 *strip = bits + glyph->offset;
 		int right = glyph->width + px;
+		u32 stride = torii_glyph_row_bytes(glyph);
 		x += glyph->advance;
 		for (int left = glyph->width; left > 0; left -= 8, right -= 8, column += cw, strip++) {
 			u32 *dst = column;
 			const u8 *src = strip;
 			int two = right > 8 && px;
-			for (u32 n = glyph->rows; n; n--, src += 2, dst++) {
+			for (u32 n = glyph->rows; n; n--, src += stride, dst++) {
 				u32 raw = *src;
 				if (!raw)
 					continue;

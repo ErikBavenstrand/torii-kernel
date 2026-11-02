@@ -90,8 +90,9 @@ static u32 bits_draw(vu8 *out, u32 row_bytes, const char *s, u32 len, u32 max_w,
 		const u8 *bits = font_body.bits + g->offset;
 		for (u32 r = 0; r < g->rows && g->top + r < INGAME_TEXT_ROWS; r++) {
 			u32 row = 0;
-			for (u32 b = 0; b < font_body.row_bytes; b++)
-				row |= (u32)bits[r * font_body.row_bytes + b] << (8 * b);
+			u32 stride = torii_glyph_row_bytes(g);
+			for (u32 b = 0; b < stride; b++)
+				row |= (u32)bits[r * stride + b] << (8 * b);
 			for (u32 i = 0; row >> i; i++)
 				if ((row >> i & 1) && x + i < max_w)
 					out[(g->top + r) * row_bytes + ((x + i) >> 3)] |= (u8)(1u << ((x + i) & 7));

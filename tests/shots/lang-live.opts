@@ -1,0 +1,33 @@
+# A pack switched in Settings reaches the screens behind it (v0.9.18): home
+# was drawn in English before Settings opened, and after the switch to Swedish
+# its labels, and the pages reached from it, must be the pack's text, not the
+# English or the pack-before pointers they held. The frames match sv-home's
+# (the same card and clock, with Swedish set at boot there): the switch is
+# the only difference.
+#! sd-file /torii/lang/sv.lng 0 dist/lang/sv.lng
+#! settings 28=1
+-C 1792586096
+-w "nav: home ready"
+-k @8:LEFT -k @12:- -k @16:LEFT -k @20:- -k @24:A -k @28:-
+-w "screen ready: settings"
+-k @8:L -k @12:-
+-w "settings: row 29"
+-k @8:DOWN -k @12:-
+-w "settings: row 30"
+-k @8:A -k @12:- -k @20:RIGHT -k @24:-
+-w "settings: row 30 set to"
+-k @12:A -k @16:-
+-w "lang: sv"
+-w "screen ready: settings"
+-k @12:B -k @16:-
+-w "nav: home ready"
+-s @8:settings.png
+-k @8:RIGHT -k @12:- -k @24:RIGHT -k @28:-
+-w "home: facing recent"
+-s @1:recent.png
+-k @8:RIGHT -k @12:-
+-w "home: facing gba"
+-s @1:gba.png
+-k @8:LEFT -k @12:- -k @24:LEFT -k @28:- -k @40:LEFT -k @44:- -k @56:LEFT -k @60:- -k @72:LEFT -k @76:-
+-w "home: facing sd"
+-s @1:sd.png
