@@ -2976,6 +2976,13 @@ uint32_t ov_entry(const struct ingame_call *call)
 	const struct ingame_session *s = session();
 	m.have_session = s->magic == INGAME_SESSION_MAGIC && s->version == INGAME_SESSION_VERSION;
 	uint32_t menu_key = m.have_session && s->menu_key ? s->menu_key : MENU_KEY_DEFAULT;
+	// Torii (v0.9.17): In-game menu Off. An SD game's hook never gets here, but a
+	// NOR game's has the key it was written with: give the game back, once the keys
+	// are up so the hook doesn't open it again at once
+	if (m.have_session && (s->flags & INGAME_MENU_OFF)) {
+		wait_release(menu_key);
+		return INGAME_ACT_RESUME;
+	}
 	cheats_load();
 	states_load();
 	search_load();

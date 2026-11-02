@@ -343,7 +343,7 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 	h->sleep_key = sleep_key & 0x3FF;
 	h->rtc_status = Game_GPIO_status();
 	h->flags = (gl_sleep_on == 1 ? INGAME_SLEEP_KEY_ON : 0) | (tlog_level != TLOG_OFF ? INGAME_DEBUG_ON : 0) |
-		   (Game_clock_on() ? INGAME_CLOCK_ON : 0);
+		   (Game_clock_on() ? INGAME_CLOCK_ON : 0) | (gl_menu_off ? INGAME_MENU_OFF : 0);
 	// The clock now, for the screenshots' times (shotstore_file)
 	rtc_enable();
 	rtc_get(h->launch_clock);

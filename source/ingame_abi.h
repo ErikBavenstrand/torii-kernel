@@ -371,6 +371,7 @@ struct ingame_shot {
 #define INGAME_SLEEP_KEY_ON (1u << 0)  // the sleep key is on in Settings
 #define INGAME_DEBUG_ON (1u << 1)  // LOGGING is on: the menu offers the DEBUG snapshot
 #define INGAME_CLOCK_ON (1u << 2)  // the game has the cart's clock: a screenshot reads it
+#define INGAME_MENU_OFF (1u << 3)  // In-game menu Off: the overlay gives the game back at once (a NOR game's hook has the key burned in)
 
 // The menu's text, drawn by the kernel (the engine's body font) so the
 // overlay needs no font: each line 1bpp, INGAME_TEXT_ROWS rows of

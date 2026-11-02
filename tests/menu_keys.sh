@@ -8,6 +8,9 @@
 #          ("L+R+B or B: resume"), and B gives the game back.
 #   off    In-game menu: Off, Save states on and a cheat picked: L+R+START
 #          opens nothing, and the cheat still runs every frame.
+#   nor    a NOR game written under Every game (hook with L+R+B burned in): it
+#          opens the menu on L+R+B, and after In-game menu Off is picked the
+#          overlay gives the game back at once (v0.9.17).
 #
 # Runs inside the torii-emu container after `just build`, `just emu-headless`
 # and `just test-roms`.
@@ -17,7 +20,7 @@ set -euo pipefail
 # shellcheck source=tests/nav.sh
 . tests/nav.sh
 
-mode=${1:?usage: menu_keys.sh every|off}
+mode=${1:?usage: menu_keys.sh every|off|nor}
 local_carts "dist/cart-menu-keys-$mode"
 
 fail() {
@@ -70,5 +73,33 @@ off)
   grep -q 'screen ready: ingame' "$cart/log" && fail "the menu opened"
   [ "$(awk '$1 == "mem" { print $5 }' <<<"$out")" = 58 ] || fail "the cheat didn't run: $(grep '^mem' <<<"$out")"
   echo "PASS: menu_keys off: In-game menu Off opens nothing on the menu keys, and the game's cheat still runs"
+  ;;
+nor)
+  head -c $((64 << 20)) /dev/urandom >"$cart/game-nor.bin"
+  every_slots="0=0xE1E1 1=1 2=0 3=0 4=0 5=9 6=8 7=2 8=9 9=8 10=1 11=1 12=0 13=1 14=1 25=1 32=2"
+  python3 tests/setnor.py set "$cart/kernel-nor.bin" $every_slots
+  # Power-on 1: Hello written to the NOR with the addons' hook
+  # shellcheck disable=SC2046 # option lists
+  boot $(nav_launch /Hello.gba nor-addon at=150) -f 600 >/dev/null 2>"$cart/log-write" || fail "the NOR write failed"
+  # Power-on 2: under Every game the menu opens on L+R+B
+  # shellcheck disable=SC2046
+  boot $(nav_nor_launch_page 0) -w "launch: in-game menu in cart SRAM" \
+    -k @300:L+R+B -k @306:- -w "screen ready: ingame" -k @30:B -k @34:- -f 1200 \
+    >/dev/null 2>"$cart/log-on" || fail "the NOR game's menu didn't open on L+R+B"
+  # Power-on 3: Off picked since: the hook still sees the keys, the overlay gives the game back
+  # (the kernel wrote both copies; a setting changed from outside needs the newer one gone)
+  python3 tests/setnor.py set "$cart/kernel-nor.bin" 1=2
+  python3 - "$cart/kernel-nor.bin" <<'PY'
+import sys
+with open(sys.argv[1], "r+b") as f:
+    f.seek(0x7B2000)
+    f.write(b"\xff" * 0x2000)
+PY
+  # shellcheck disable=SC2046
+  boot $(nav_nor_launch_page 0) -w "launch: in-game menu in cart SRAM" \
+    -k @300:L+R+B -k @306:- -f 700 >/dev/null 2>"$cart/log-off" || fail "the NOR run failed"
+  grep -q '^crash at frame' "$cart/log-off" && fail "crashed"
+  grep -q 'screen ready: ingame' "$cart/log-off" && fail "the NOR game's menu opened with In-game menu Off"
+  echo "PASS: menu_keys nor: a NOR game written under Every game opens the menu, and gives the game back at once once In-game menu is Off"
   ;;
 esac
