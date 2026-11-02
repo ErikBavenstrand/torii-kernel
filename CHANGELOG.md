@@ -6,6 +6,15 @@ git log, not here.
 
 ## Unreleased
 
+- **Added:** typing codes for GB, GBC and NES games. + Add code and Edit code
+  are back on their cheat screens, with a keypad of their own: GB codes take
+  hex digits and `-` (the `:` key becomes `-`), NES codes the hex digits and
+  `:`, the GG key swapping the digits for the 16 genie letters. A line must
+  read alone ("Line 1 isn't a whole code yet"), then the cheat as the cheat
+  file decodes it; the result line says what it does ("Patch 4001 to 1F when
+  it is E0", "Write 55 to C100 every frame"), and a code no console run is
+  refused at Save. Buttons stay hidden. (c6cbbb61)
+
 - **Added:** GB and GBC GameShark codes run. Jagoomba Color calls a small
   function as each GB frame's vertical blank starts (inside `newframe_vblank`,
   which has saved every register) that writes the kernel's table: type 01
