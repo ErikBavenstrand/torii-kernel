@@ -38,14 +38,18 @@ Each release's details are in `CHANGELOG.md`; the planning, ticket reports and r
   - **Swedish:** `lang/sv.ini`, with its own date and number formats. The release attaches `torii-lang.zip`, which holds the bare `.lng` files.
   - **Firmware updater:** writes only to an allowlisted LX16 cart on older firmware, after a power-cut warning and an L+R+A hold. LX9 and unknown boards are never written, and About shows the raw version word.
   - **Design notes:** the decisions are in git history up to 3edfc929 (PSRAM split: 64 KB for the active pack, 320 KB held for a script font; page 1 untouched).
+- **v0.9.1–v0.9.6 Cheat files:** cheat files up to 4 MB; each cheat's guide and activation (always, on launch, held or pressed buttons); the in-game Cheats list shows the picks, and SELECT runs one once; AnyGBA's raw lines and their keypad; cheats that write the same places marked; a PSRAM patch write across an 8 MB boundary fixed; packs name the Torii they were built for.
+- **v0.9.7–v0.9.10 Screenshots and the cheat search:** screenshots in a game's popup and `.bmp` files on the SD card page, moved with a renamed game; the in-game cheat search (same, changed, up, down, equals, Up/Down by, More/Less than, From A to B, signed, BCD, a one-level pointer scan, Undo), its finds filed as cheats on Back to Torii; R toggles a favourite; Play « default » names its way on the games pages.
+- **v0.9.11–v0.9.15 The cheat screen:** cheat folders (`cheatN_folder`) and choice groups; ROM patches free in game, 2,048 a launch; one flat list with scroll bars; any cheat's code editable on the cart; launches decode only the picks; the game popup trimmed (Hide box art, Load state and starting straight into a state removed); the in-game menu no longer lets a bright game show through.
+- **v0.9.16 Torii code and golden cheats (2026-11-02):** Torii code, a superset of VBA's lines with tests, blocks, buttons and bit operations (`docs/torii-code.md`); the menu reads the cart at WS0 3/1; a launch keeps ROM patches as runs in 48 KB of cart SRAM (about 23,000 patches, 4,096 a cheat). Pokémon Emerald's golden set (`tools/golden/emerald.py`, curation in `docs/research/cheats-emerald-curation.md`): 489 cheats, all Torii code, in Menu, Money, Pokémon, Battle, Wild, Overworld and Safari & Contests; an L+R+B menu (Heal party, PC, Shop, Warp, Gift Pokémon, Trade evolution, Legendaries again, Event tickets, Unlock); every folder reviewed against pokeemerald and on the emulated cart, with the bugs found fixed.
 
-## Before 1.0: the v0.9.x patches
+## Open work, before 1.0
 
-Everything still open after v0.9.0, swept on 2026-10-28 from this roadmap, the code's TODOs, `docs/design`, `docs/research`, the release checklist, `tools/analyze-baseline.txt` and the v0.9 sessions' hand-over notes.
+**Everything below is not done.** When an item ships, move it to [Done](#done) (one line under its release) and delete it here; an item partly done keeps only what is left. Swept on 2026-10-28 from the code's TODOs, `docs/design`, `docs/research`, the release checklist, `tools/analyze-baseline.txt` and hand-over notes; checked again against git history on 2026-11-02, after v0.9.16. The groups were first planned as patches v0.9.1–v0.9.5, but the releases went to cheats instead, so they are themes now, not version numbers.
 
-1.0 is tagged when every patch below has shipped and a full pass of `docs/release-checklist.md` on the real cart finds nothing new. Items marked **(1.0?)** were planned as 1.0 projects; the owner decides whether each one must ship before 1.0 or can come after it.
+1.0 is tagged when every item below is done or deferred and a full pass of `docs/release-checklist.md` on the real cart finds nothing new. Items marked **(1.0?)** were planned as 1.0 projects; the owner decides whether each one must ship before 1.0 or can come after it.
 
-### v0.9.1 Fixes
+### Fixes
 
 Code fixes that the emulator can test, plus the leftovers from v0.9.
 
@@ -57,40 +61,47 @@ Code fixes that the emulator can test, plus the leftovers from v0.9.
   - Test a text pointer that another screen keeps across a pack switch. Only Settings' own redraw is covered today.
   - The owner's corrections to the Swedish terms. The texts shortened for width to check are `rename.key_space` "Blank", `gsaves.keys` "Backup", `games.fact_size`/`fact_played` "Strl"/"Sist", `ingame.unsaved_both` and `gsaves.act_copy` "Kopiera".
 
-### v0.9.2 Menus
+### Menus
 
 The UX reviews' open proposals (`docs/design/v0.5/ux-review.md`, `settings-ux-review.md`) and the owner's asks.
 
-- The SD page's popup offers Play's « » stepper under the games pages' rules, and names default's way as they do.
+- The SD page's popup offers Play's « » stepper under the games pages' rules, and names default's way as they do (the games pages do since v0.9.7, d00ed28e; the SD page doesn't).
 - **One place for how a game boots** (owner, 2026-10-27): the popup's Play « addons » and Game info's Boot mode set the same thing. Keep only one, and point the cheat screen's "needs Boot with addon" note to it.
 
-### v0.9.3 In game
+### In game
 
 - **Menu speed:** the target is the menu visible within 2 frames; it measures 4 frames to the panel and 5 to the rows (`ingame-menu.md`).
 - **Hook coverage:** the exact-ROM hook patches cover only the EU builds of GTA Advance, Super Monkey Ball Jr., LEGO Star Wars II and Tomb Raider: Legend. Add the other regions (`docs/research/hook-coverage.md`).
 - **Sleep:** Pokémon Emerald's sleep stayed black on the real cart, and START+SELECT didn't wake it. It could be the real BIOS or the cart during Stop (`omega-de-hardware.md`); find out on the cart first.
 - **Sound after LOAD (1.0?):** games on Nintendo's MP2000 engine keep the PCM buffer's position in RAM, which could re-sync DMA1 at LOAD.
-- **Cheat search (built on `claude/cheat-search-5360ad`, not merged; [design](../design/v0.9/cheat-search.md)):** an in-game RAM finder that keeps what it finds as cheats. Reviewed 2026-10-31 (a code reviewer and an adversarial tester in the emulator). Fixed from the review: found cheats whose filing failed weren't retried, a cheat kept on and then kept again was filed unpicked, and two footers. Open:
+- **Cheat search (shipped in v0.9.7–v0.9.10; [design](../design/v0.9/cheat-search.md)):** what is left of it. Reviewed 2026-10-31 (a code reviewer and an adversarial tester in the emulator); the review's fixes shipped. Open:
   - **Contestable decisions:** it borrows the save-state buffer (no other cart SRAM has 288 KB), so a state not yet on the card blocks it and saving a state ends it; a game whose stack top is the BIOS's default (`0x03007F00`) gets its stack 32 bytes lower for the live block, others none (Street Fighter Alpha 3, top `0x03007EC0`, crashed with it: "on now" sets the value once there); the Cheat search row is on the Cheats page when the game has a cheat list (the menu has room for nine rows); the menu's lines past the seventh draw a frame later, with the footer.
   - **Not done:** naming a found cheat in game (the overlay has no font or keyboard: rename it on the Cheats page); more than one Undo; pointer chains (one level only); "on now" through a pointer (set once instead); a memory view around a candidate; VRAM, palette and OAM searches.
-  - **Added after the review:** Up/Down by N, More/Less than, From A to B, signed numbers, and compare with the first scan (kept for up to 49,024 bytes of values after the first filter); BCD scores; a one-level pointer scan with Check after the value moves.
   - **Cart check:** a pointer kept in Pokémon Emerald (money through gSaveBlock1Ptr) across a door.
   - **Untested:** a card write that fails while filing (the records wait for the next boot); a 32-bit search with large values and 16 different addresses kept, in the emulator.
 - **States that survive a power-off (1.0?, research):** point the FPGA's `/RTS` write-back of cart SRAM at a per-game file. Watch out: with a crosslinked FAT the write-back would land in both files.
 
-### v0.9.4 Fonts and scripts
+### Fonts and scripts
 
 - **(1.0?) Scripts beyond Latin-1:** a font file named in the pack's font field, loaded into the 320 KB held in PSRAM, plus a `charset` path past Latin-1. Glyphs outside Latin-1 draw a replacement box today.
 - Kerning.
 - Galmuri9's Ç ç ¡ ¿ µ lose a tail pixel at 12 px.
 - Per-glyph row sizes would save about 1.5 KB of ROM (`tools/font.py`).
 
-### v0.9.5 Emulators and cheats
+### Emulators and cheats
 
 - **(1.0?) Hi-colour GBC:** these games lose mid-frame palette writes (jagoombacolor#20, #53). A per-line palette path in Jagoomba needs about 18 KB and its last DMA channel (`docs/research/gbc-hicolor.md`).
 - **(1.0?) GB, GBC and NES cheats** (owner, 2026-10-25): libretro's GameShark and Game Genie files, with the codes passed to Jagoomba and PocketNES (PocketNES has its own cheat finder).
 - **(maybe) Live values in game** (owner, 2026-10-30: less useful than the rest): each cheat in the in-game list shows the value now at the address it writes ("Money 3,421"), with digits the kernel draws for the overlay. Encrypted values (Pokémon's money) would read as nonsense.
 - From the trackers: jagoombacolor#42 accuracy tests, #43 a GBC-compatible ROM run as DMG, #34 the default palette; PocketNES#14 multiboot.
+
+### Golden cheats
+
+Pokémon Emerald's set is done (v0.9.16). Left:
+
+- **Two Emerald fixes not run in the emulator, only read in the disassembly:** Free Day Care (the Day Care lady prices every Pokémon at 0) and Any Pokémon in the Frontier letting Mew in. Also Forget HMs (an HM move swapped out in the summary screen and on a level-up in battle). Run each on the emulated cart.
+- **Navel Rock's ladder tiles (owner, 2026-11-01):** after a warp, some tiles looked wrong on the real cart; the emulator's renders match the reference pixel for pixel. Waiting for a photo from the cart.
+- **Declined (owner, 2026-11-02), not to be built unless asked:** Fishing always bites, Feebas everywhere on Route 119, fast walking, trainers' Pokémon with perfect IVs; earlier declines are D52–D59 in the curation doc.
 
 ### Tooling, alongside any patch
 
@@ -105,7 +116,8 @@ The UX reviews' open proposals (`docs/design/v0.5/ux-review.md`, `settings-ux-re
 
 The steps are in `docs/release-checklist.md`.
 
-- **Cheat search, before it ships:** a search in a game with a flash save and one with an EEPROM save (Pokémon Emerald's lives or money); "on now" holding a value; the found cheat filed on Back to Torii; a screenshot after a search in the same menu (the overlay's on-demand code); that games with the default stack top still boot and save with it 32 bytes lower.
+- **Cheat search (shipped in v0.9.7, never run on the cart):** a search in a game with a flash save and one with an EEPROM save (Pokémon Emerald's lives or money); "on now" holding a value; the found cheat filed on Back to Torii; a screenshot after a search in the same menu (the overlay's on-demand code); that games with the default stack top still boot and save with it 32 bytes lower.
+- **New in v0.9.16:** a cheat in Torii code with a test and a block, and one with buttons; Emerald's golden file with the menu, a warp, the shop and a ROM-patch cheat (Shop items cost 1) picked with many others, to check the 48 KB of patch runs in cart SRAM; the menu at WS0 3/1.
 - **New in v0.9:** Swedish from `torii-lang.zip`; the firmware screens on an up-to-date cart (none should show); About's raw version word. Record the raw word, so the allowlist can be narrowed.
 - **v0.8 still to check:**
   - In-game menu Off, and custom menu keys.
