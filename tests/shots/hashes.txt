@@ -562,10 +562,10 @@ saves-orphans/picker-down 5BC2C5A48DA65656
 saves-orphans/popup 9BE41776246FECB0
 saves-orphans/relink-confirm 64765D53F2508709
 saves-orphans/settings 556316DBE670462E
-sd-confirm-tall/again 1FC30D30652EB214
-sd-confirm-tall/back 9B58314A2C71BD30
+sd-confirm-tall/again 34F0EAAD9A383077
+sd-confirm-tall/back 833ECC284A2B9390
 sd-confirm-tall/confirm AA98D891D91A2B35
-sd-confirm-tall/popup 1FC30D30652EB214
+sd-confirm-tall/popup 34F0EAAD9A383077
 sd-dark/folder 6BBE1F91FDB75B4E
 sd-dark/root 27DE7F36FF5317D1
 sd-empty/empty 4FBA4DEC6BFBD4AA

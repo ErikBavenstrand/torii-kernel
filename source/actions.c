@@ -240,6 +240,21 @@ u32 action_game_facts(const char *path, struct action_facts *out)
 	return ok;
 }
 
+void action_boot_default_text(const char *path, int addons_on, char *out, u32 size)
+{
+	out[0] = 0;
+	struct action_facts facts;
+	if (!action_game_facts(path, &facts))
+		return;
+	u32 mode = facts.boot_mode == ACTION_BOOT_ADDONS || facts.boot_mode == ACTION_BOOT_CLEAN ? facts.boot_mode
+		   : Read_SET_info(assress_boot_mode) == 1                                       ? ACTION_BOOT_CLEAN
+												 : ACTION_BOOT_ADDONS;
+	if (mode == ACTION_BOOT_ADDONS && !addons_on)
+		return;
+	SF(out, size, STR_GAMES_BOOT_DEFAULT_AS,
+	   LS(S(mode == ACTION_BOOT_CLEAN ? STR_GAMES_BOOT_CLEAN : STR_GAMES_BOOT_ADDONS)));
+}
+
 int action_game_saves(const char *path, char *rom, u32 rom_size, u32 *bytes)
 {
 	*bytes = 0;

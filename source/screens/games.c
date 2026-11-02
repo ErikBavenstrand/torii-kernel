@@ -1390,17 +1390,7 @@ static const char *boot_text(u32 boot)
 
 static void boot_default_resolve(const char *path)
 {
-	games.boot_default[0] = 0;
-	struct action_facts facts;
-	if (!action_game_facts(path, &facts))
-		return;
-	u32 mode = facts.boot_mode == ACTION_BOOT_ADDONS || facts.boot_mode == ACTION_BOOT_CLEAN ? facts.boot_mode
-		   : Read_SET_info(assress_boot_mode) == 1                                       ? ACTION_BOOT_CLEAN
-												 : ACTION_BOOT_ADDONS;
-	if (mode == ACTION_BOOT_ADDONS && addons_off())
-		return;
-	SF(games.boot_default, sizeof(games.boot_default), STR_GAMES_BOOT_DEFAULT_AS,
-	   LS(S(mode == ACTION_BOOT_CLEAN ? STR_GAMES_BOOT_CLEAN : STR_GAMES_BOOT_ADDONS)));
+	action_boot_default_text(path, !addons_off(), games.boot_default, sizeof(games.boot_default));
 }
 
 static void popup_add(u32 action, const char *value, u8 flags)

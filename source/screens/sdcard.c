@@ -127,6 +127,7 @@ struct sd_state {
 	u8 pop_ids[UI_POPUP_ITEMS];
 	u8 boots[LANG_BOOTS];  // Play's ways to start (LANG_BOOT_*), stepped
 	u8 nboots, boot;
+	char boot_default[32];  // Play's « default », with the way it resolves to (the game popup's)
 	struct ui_pop_item pop_items[UI_POPUP_ITEMS];
 	struct ui_popup popup;
 	struct ui_hint hints[3];
@@ -825,6 +826,12 @@ static void file_popup(u32 arg)
 		file_popup_run(arg & 0xFFFF);
 }
 
+// Play's « » text for boot (LANG_BOOT_*): default names the way it starts the game
+static const char *boot_text(u32 boot)
+{
+	return boot == LANG_BOOT_DEFAULT && sd.boot_default[0] ? sd.boot_default : S(STR_GAMES_BOOT_DEFAULT + boot);
+}
+
 // The popup of entry i, opened; 0 if it isn't (the keys held go to the page)
 static int file_popup_open(u32 i)
 {
@@ -853,6 +860,7 @@ static int file_popup_open(u32 i)
 		// the way Play says
 		sd.nboots = 0;
 		sd.boot = 0;
+		sd.boot_default[0] = 0;
 		sd.boots[sd.nboots++] = LANG_BOOT_DEFAULT;
 		if (console == LIB_GBA) {  // as the game popup's: GB, GBC and NES start clean
 			sd.boots[sd.nboots++] = LANG_BOOT_CLEAN;
@@ -860,8 +868,10 @@ static int file_popup_open(u32 i)
 				sd.boots[sd.nboots++] = LANG_BOOT_ADDONS;
 		}
 		pop_add(POP_LAUNCH, S(STR_SD_LAUNCH), sd.nboots > 1 ? UI_POP_STEP : 0);
-		if (sd.nboots > 1)
-			sd.pop_items[0].value = S(STR_GAMES_BOOT_DEFAULT);
+		if (sd.nboots > 1) {
+			action_boot_default_text(sd.full, any_addon(), sd.boot_default, sizeof(sd.boot_default));
+			sd.pop_items[0].value = boot_text(LANG_BOOT_DEFAULT);
+		}
 		if (console == LIB_GBA) {  // only GBA games go to the game NOR, and have slots
 			pop_add(POP_NOR, S(STR_SD_NOR), 0);
 			if (game_saves_probe(sd.full))
@@ -890,7 +900,7 @@ static void file_popup_run(u32 i)
 			return;  // B: it has closed
 		if (pick & (UI_POP_LEFT | UI_POP_RIGHT)) {  // Play's way to start
 			sd.boot = (u8)((sd.boot + (pick & UI_POP_LEFT ? sd.nboots - 1u : 1u)) % sd.nboots);
-			sd.pop_items[0].value = S(STR_GAMES_BOOT_DEFAULT + sd.boots[sd.boot]);
+			sd.pop_items[0].value = boot_text(sd.boots[sd.boot]);
 			ui_popup_changed(0);
 			continue;
 		}

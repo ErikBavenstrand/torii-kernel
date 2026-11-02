@@ -64,6 +64,11 @@ struct action_facts {
 	u32 boot_mode;
 };
 u32 action_game_facts(const char *path, struct action_facts *out);
+// Play's « default » for a GBA game, with the way it starts it: "default (clean)" or
+// "default (addons)", from the game's own boot mode else Settings' (addons_on: any
+// addon switch is on; with none, cheats picked still start it with addons, so the
+// plain word). out is empty when it isn't known.
+void action_boot_default_text(const char *path, int addons_on, char *out, u32 size);
 // Sets a GBA game's save type (0 AUTO, 1-5 a type: ACTION_SAVE_TYPES) in
 // its record in its folder of saves (gamerec.h), which its next launch uses.
 // 1 if written.
