@@ -8,6 +8,7 @@ never committed; CC-BY-SA-4.0).
 A cheat is one `cheatN_code` string; `+` joins lines. The tool classifies each
 line by its shape and counts cheats and lines per console and kind.
 """
+
 import collections
 import re
 import subprocess
@@ -55,10 +56,25 @@ def main():
         root = Path("dist/cheat-emu-corpus")
         if not root.exists():
             root.parent.mkdir(exist_ok=True)
-            subprocess.run(["git", "clone", "-q", "--depth", "1", "--filter=blob:none", "--sparse",
-                            "https://github.com/libretro/libretro-database.git", str(root)], check=True)
-            subprocess.run(["git", "-C", str(root), "sparse-checkout", "set"] +
-                           ["cht/" + f for f in FOLDERS.values()], check=True)
+            subprocess.run(
+                [
+                    "git",
+                    "clone",
+                    "-q",
+                    "--depth",
+                    "1",
+                    "--filter=blob:none",
+                    "--sparse",
+                    "https://github.com/libretro/libretro-database.git",
+                    str(root),
+                ],
+                check=True,
+            )
+            subprocess.run(
+                ["git", "-C", str(root), "sparse-checkout", "set"]
+                + ["cht/" + f for f in FOLDERS.values()],
+                check=True,
+            )
     for console, folder in FOLDERS.items():
         files = sorted((root / "cht" / folder).glob("*.cht"))
         cheats = lines = empty = 0
@@ -85,7 +101,9 @@ def main():
                         others.append(p)
                 if len(ks) > 1:
                     mixed += 1
-        print(f"{console}: {len(files)} files, {cheats} cheats with a code ({empty} empty), {lines} lines, {mixed} cheats mixing kinds")
+        print(
+            f"{console}: {len(files)} files, {cheats} cheats with a code ({empty} empty), {lines} lines, {mixed} cheats mixing kinds"
+        )
         for k, n in sorted(kinds.items(), key=lambda kv: -kv[1]):
             print(f"  {k:14} {n}")
         if others:
