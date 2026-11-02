@@ -6,6 +6,14 @@ git log, not here.
 
 ## Unreleased
 
+- **Added:** NES raw RAM codes (`AAAA:VV`) run. The kernel writes them into
+  a table inside its copy of PocketNES in PSRAM (found by its `TORIICHT`
+  magic; the emulator gets a small patch) and PocketNES applies it to its RAM
+  once every frame, apart from its own cheat finder's list: RAM mirrors fold
+  to 0000-07FF, 6000-7FFF is the PRG-RAM, anything else (the ROM, the PPU) is
+  unreadable. Up to 63 pokes picked together. The cheat's details say it
+  runs every frame. (d3888220)
+
 - **Added:** cheats for GB, GBC and NES games, the first stage. The game
   popup's Cheats row and the cheat screen now open for them, over the same
   `/torii/cheats/<game>.cht` files. A picked Game Genie code (GB `XXX-YYY` and
