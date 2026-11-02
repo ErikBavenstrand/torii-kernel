@@ -14,6 +14,7 @@
 #include "ff.h"
 #include "ingame.h"
 #include "ingame_abi.h"
+#include "library.h"
 #include "namesdb.h"
 #include "lang.h"
 #include "tlog.h"
@@ -1037,6 +1038,26 @@ static int open_windows(const char *rom_path)
 
 static int open_read(const char *rom_path);
 
+// The console of the game at rom_path (a file name's extension; NULL: GBA,
+// the interpreter's)
+static u32 console_of(const char *rom_path)
+{
+	switch (rom_path ? library_console_of(rom_path) : LIB_GBA) {
+	case LIB_GBC:
+	case LIB_GB:
+		return CHEATEMU_GB;
+	case LIB_NES:
+		return CHEATEMU_NES;
+	default:
+		return CHEATEMU_GBA;
+	}
+}
+
+u32 cheatstore_console(void)
+{
+	return cheatstore()->work.console;
+}
+
 int cheatstore_open(const char *rom_path)
 {
 	struct cheatstore *cs = cheatstore();
@@ -1065,6 +1086,7 @@ static int open_read(const char *rom_path)
 	struct cheatstore *cs = cheatstore();
 	cs->file.count = 0;
 	cs->work.next = 0;
+	cs->work.console = (u8)console_of(rom_path);
 	cs->room_failed = 0;
 	cs->windows = 0;
 	cs->window = 0;
@@ -1408,10 +1430,34 @@ static u32 clean_text(int masters, int *spoiled)
 	return same ? gone : 0;
 }
 
+// 1 if the game a cheat file at path (CHEATS_DIR/<its folder>/<name>.cht)
+// is for is a GB, GBC or NES game on the card: the GBA decoders would read
+// its codes as unreadable
+static int emu_cheat_file(const char *path)
+{
+	u32 n = (u32)strlen(path), dir = (u32)strlen(CHEATS_DIR);
+	char rom[SAFEFILE_PATH_MAX];
+	static const char *const exts[] = {".gb", ".gbc", ".nes"};
+	if (n <= dir + 4 || n + 5 >= sizeof(rom) || strncmp(path, CHEATS_DIR, dir) || path[dir] != '/')
+		return 0;
+	for (u32 i = 0; i < 3; i++) {
+		memcpy(rom, path + dir, n - dir - 4);
+		strcpy(rom + n - dir - 4, exts[i]);
+		FILINFO info;
+		if (f_stat(rom, &info) == FR_OK)
+			return 1;
+	}
+	return 0;
+}
+
 s32 cheatstore_clean(const char *path)
 {
 	struct cheatstore *cs = cheatstore();
 	int spoiled;
+	if (emu_cheat_file(path)) {
+		tlog("cheats: %s: a GB, GBC or NES game's: left as it is", path);
+		return 0;
+	}
 	if (cheatstore_open_file(path) != CHEATSTORE_READ)
 		return -1;
 	if (cs->windows) {
@@ -2007,16 +2053,10 @@ static void keep_patches(const struct cheatfile *f, const struct cheatfile_cheat
 	SetRampage(0);
 }
 
-// The second pass: the kept ROM patches into the game in PSRAM (psram_bytes
-// of it), but for any past its end or over the kernel's own patches
-static void write_patches(const char *rom_path, u32 psram_bytes)
+// Calls fn for each of the kept patches, in the order they were kept, with
+// the number of the cheat each comes from
+static void kept_each(void (*fn)(const struct cheat_patch *pt, u16 number, void *ctx), void *ctx)
 {
-	u32 applied = 0, skipped = 0, guarded = 0, start = cycles_now();
-	if (kept.rom != path_crc(rom_path)) {
-		tlog_error("cheats: %s: its ROM patches weren't kept before the load: none written", rom_path);
-		return;
-	}
-	u16 page = 0;  // as every user of another PSRAM page leaves it
 	u16 some[32] = {0};
 	for (u32 at = 0; at + sizeof(struct kept_run) <= kept.used;) {
 		struct kept_run run;
@@ -2034,28 +2074,148 @@ static void write_patches(const char *rom_path, u32 psram_bytes)
 			pt.value = some[j];
 			if (per == 2)
 				pt.mask = some[j + 1];
-			if (pt.offset + 2 > psram_bytes) {
-				skipped++;
-				continue;
-			}
-			// Not over the kernel's own patches: the patch area (the hook,
-			// the interpreter, this table), the entry branch, the hook's words
-			if (rom_guard_hits(pt.offset, 2)) {
-				if (!guarded++ || tlog_wants(TLOG_DEBUG))
-					tlog("cheats: cheat %u (%s): its ROM patch at %08lX is over the kernel's own, "
-					     "left out",
-					     run.number, kept_name(run.number), (unsigned long)0x08000000 + pt.offset);
-				continue;
-			}
-			rom_patch(&pt, &page);
-			applied++;
+			fn(&pt, run.number, ctx);
 		}
 	}
-	if (page)
+}
+
+struct write_ctx {
+	u32 psram_bytes, applied, skipped, guarded;
+	u16 page;  // as every user of another PSRAM page leaves it
+};
+
+// The second pass's patch: into the game in PSRAM, but for one past its end
+// or over the kernel's own patches
+static void write_one(const struct cheat_patch *pt, u16 number, void *ctx)
+{
+	struct write_ctx *c = ctx;
+	if (pt->offset + 2 > c->psram_bytes) {
+		c->skipped++;
+		return;
+	}
+	// Not over the kernel's own patches: the patch area (the hook,
+	// the interpreter, this table), the entry branch, the hook's words
+	if (rom_guard_hits(pt->offset, 2)) {
+		if (!c->guarded++ || tlog_wants(TLOG_DEBUG))
+			tlog("cheats: cheat %u (%s): its ROM patch at %08lX is over the kernel's own, "
+			     "left out",
+			     number, kept_name(number), (unsigned long)0x08000000 + pt->offset);
+		return;
+	}
+	rom_patch(pt, &c->page);
+	c->applied++;
+}
+
+// The second pass: the kept ROM patches into the game in PSRAM (psram_bytes
+// of it), but for any past its end or over the kernel's own patches
+static void write_patches(const char *rom_path, u32 psram_bytes)
+{
+	u32 start = cycles_now();
+	if (kept.rom != path_crc(rom_path)) {
+		tlog_error("cheats: %s: its ROM patches weren't kept before the load: none written", rom_path);
+		return;
+	}
+	struct write_ctx c = {psram_bytes, 0, 0, 0, 0};
+	kept_each(write_one, &c);
+	if (c.page)
 		SetPSRampage(0);
-	tlog("cheats: %lu ROM patches written into the game%s%s (%lu cycles)", (unsigned long)applied,
-	     skipped ? ", some past its end left out" : "",
-	     guarded ? ", some over the kernel's own patches left out" : "", (unsigned long)cycles_since(start));
+	tlog("cheats: %lu ROM patches written into the game%s%s (%lu cycles)", (unsigned long)c.applied,
+	     c.skipped ? ", some past its end left out" : "",
+	     c.guarded ? ", some over the kernel's own patches left out" : "", (unsigned long)cycles_since(start));
+}
+
+// --- GB, GBC and NES: the kept patches are Game Genie lines (cheatemu.h) ---
+
+// The game's image in PSRAM: the emulator's copy of the file, from base
+struct emu_image {
+	u32 base;
+	u16 page;
+};
+
+static vu16 *image_at(struct emu_image *im, u32 offset)
+{
+	u32 abs = im->base + offset;
+	u16 want = (u16)((abs >> 23) * 0x1000);
+	if (im->page != want)
+		SetPSRampage(im->page = want);
+	return (vu16 *)((u8 *)PSRAMBase_S98 + (abs & 0x7FFFFF));
+}
+
+static u8 image_get(void *ctx, u32 offset)
+{
+	struct emu_image *im = ctx;
+	u16 h = *image_at(im, offset & ~1u);
+	return (u8)(offset & 1 ? h >> 8 : h);
+}
+
+static void image_set(void *ctx, u32 offset, u8 value)
+{
+	struct emu_image *im = ctx;
+	vu16 *at = image_at(im, offset & ~1u);
+	u16 h = *at;
+	*at = offset & 1 ? (u16)((h & 0x00FF) | value << 8) : (u16)((h & 0xFF00) | value);
+}
+
+// The most bytes a launch patches (a 6-digit code on a banked GB game patches one per bank)
+#define EMU_PATCHES_MAX 2048
+
+struct emu_ctx {
+	struct emu_image im;
+	struct cheatemu_rom rom;
+	struct cheatemu_done done;
+	u32 lines;
+};
+
+static void emu_one(const struct cheat_patch *pt, u16 number, void *ctx)
+{
+	struct emu_ctx *c = ctx;
+	struct emucheat e;
+	struct cheatemu_done before = c->done;
+	cheatemu_from_patch(pt, &e);
+	c->lines++;
+	cheatemu_patch(&c->rom, &e, image_get, image_set, &c->im, EMU_PATCHES_MAX, &c->done);
+	if (c->done.patched == before.patched)
+		tlog("cheats: cheat %u (%s): line %04X patches nothing (%lu with another byte, %lu in the "
+		     "emulator's checksum, %lu over the limit%s)",
+		     number, kept_name(number), e.addr, (unsigned long)(c->done.other - before.other),
+		     (unsigned long)(c->done.sampled - before.sampled), (unsigned long)(c->done.limit - before.limit),
+		     c->done.unknown && !before.unknown ? ", its mapper's banks unknown" : "");
+}
+
+void cheatstore_launch_emu(const char *rom_path, u32 console, u32 rom_start, u32 size)
+{
+	if (!kept.n)
+		return;
+	u32 start = cycles_now();
+	if (kept.rom != path_crc(rom_path)) {
+		tlog_error("cheats: %s: its patches weren't kept before the load: none written", rom_path);
+		return;
+	}
+	struct emu_ctx c = {{rom_start, 0}, {0, 0, 0, 0, 0}, {0, 0, 0, 0, 0}, 0};
+	int ok;
+	if (console == CHEATEMU_NES) {
+		u8 hdr[16];
+		for (u32 i = 0; i < 16; i += 2) {
+			u16 h = *image_at(&c.im, i);
+			hdr[i] = (u8)h;
+			hdr[i + 1] = (u8)(h >> 8);
+		}
+		ok = cheatemu_rom_nes(&c.rom, hdr, size);
+	} else {
+		ok = cheatemu_rom_gb(&c.rom, size);
+	}
+	if (!ok) {
+		tlog("cheats: %s: not a ROM its patches can go in (%lu bytes): none written", rom_path,
+		     (unsigned long)size);
+	} else {
+		kept_each(emu_one, &c);
+		tlog("cheats: %lu lines made %lu patches in the game%s%s (%lu cycles)", (unsigned long)c.lines,
+		     (unsigned long)c.done.patched, c.done.limit ? ", some over the limit left out" : "",
+		     c.done.sampled ? ", some in the emulator's checksum left out" : "",
+		     (unsigned long)cycles_since(start));
+	}
+	if (c.im.page)
+		SetPSRampage(0);
 }
 
 void cheatstore_launch_none(void)
@@ -2141,7 +2301,8 @@ static int launch_pass(const char *rom_path, int quick)
 				cheatstore_sparse_end();
 				return 0;
 			}
-			int show = c->picked && cheatfile_shown(c) && listed < INGAME_CHEATS;
+			int show = c->picked && cheatfile_shown(c) && listed < INGAME_CHEATS &&
+				   cs->work.console == CHEATEMU_GBA;
 			u8 flags = INGAME_WHY_CANT;
 			u32 bit = 0, bytes = cs->work.n_prog * 4;
 			if (c->picked) {

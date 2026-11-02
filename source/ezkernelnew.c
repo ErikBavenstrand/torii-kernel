@@ -945,6 +945,9 @@ void CheckSwitch(void)
 	Set_LED_control(led_status);
 }
 //---------------------------------------------------------------
+// Where LoadEMU2PSRAM put the game (in PSRAM, from the start) and how long it is
+static u32 emu_rom_start, emu_rom_size;
+
 u32 IWRAM_CODE LoadEMU2PSRAM(TCHAR *filename, u32 is_EMU)
 {
 	UINT ret;
@@ -969,10 +972,13 @@ u32 IWRAM_CODE LoadEMU2PSRAM(TCHAR *filename, u32 is_EMU)
 		dmaCopy((void *)pReadCache, PSRAMBase_S98 + done, n);
 	}
 	u32 rom_start_address = (is_EMU == 3) ? (emu_size + 0x30 + 0xFF) & ~0xFFu : emu_size;
+	emu_rom_start = rom_start_address;
+	emu_rom_size = 0;
 
 	res = f_open(&gfile, filename, FA_READ);
 	if (res == FR_OK) {
 		filesize = f_size(&gfile);
+		emu_rom_size = filesize;
 
 		if (is_EMU == 3) {
 			// Torii: PocketNES's romheader, whole, after zeros from
@@ -1908,6 +1914,10 @@ static u8 Game_boot(TCHAR *pfilename, u32 is_EMU, u32 MENU_line, u8 Save_num, u8
 			Show_error_num(1);
 			return 0;
 		}
+		// Torii: the picked cheats' Game Genie patches, in the game's copy
+		// (cheatstore_launch kept them before the load)
+		cheatstore_launch_emu(launch_save.rom, (is_EMU == 3) ? CHEATEMU_NES : CHEATEMU_GB, emu_rom_start,
+				      emu_rom_size);
 		progress_done(NULL);
 		Launch_now(0x200, key_L, (is_EMU == 3) ? "plugin PocketNES" : "plugin Jagoomba Color");
 		while (1)

@@ -503,6 +503,33 @@ static int seen_before(struct cheatfile_work *w, u32 h)
 	return 0;
 }
 
+// A GB, GBC or NES cheat: its Game Genie lines as patches (cheatemu.h)
+static u8 decode_emu(struct cheatfile_work *w, const char *code, u32 len, struct cheat_patches *ps)
+{
+	struct emucheat lines[CHEATFILE_EMU_LINES];
+	u32 n = 0;
+	switch (cheatemu_decode(w->console, code, len, lines, CHEATFILE_EMU_LINES, &n)) {
+	case CHEATEMU_OK:
+		break;
+	case CHEATEMU_CANT_RUN:
+		return CHEATFILE_CANT_RUN;
+	case CHEATEMU_TOO_BIG:
+		return CHEATFILE_BIG;
+	default:
+		return CHEATFILE_UNREADABLE;
+	}
+	for (u32 i = 0; i < n; i++) {
+		struct cheat_patch p;
+		cheatemu_to_patch(&lines[i], &p);
+		if (ps->put)
+			ps->put(&ps->at[i], &p);
+		else
+			ps->at[i] = p;
+	}
+	w->n_patches = n;
+	return CHEATFILE_OK;
+}
+
 u8 cheatfile_decode(struct cheatfile_work *w, struct cheat_decoder *dec, const char *code, u32 len, u32 *ops,
 		    u8 *lowered)
 {
@@ -511,6 +538,10 @@ u8 cheatfile_decode(struct cheatfile_work *w, struct cheat_decoder *dec, const c
 	w->n_prog = w->n_patches = w->cost = 0;
 	w->patches = ps.at;
 	*lowered = CHEATFILE_NOT_LOWERED;
+	if (w->console != CHEATEMU_GBA) {
+		*ops = 0;
+		return decode_emu(w, code, len, &ps);
+	}
 	u8 decoded = cheat_decode_split(dec, code, len, w->ops, CHEATFILE_OPS_MAX, &n_ops, &ps);
 	*ops = n_ops;
 	switch (decoded) {

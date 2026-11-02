@@ -194,6 +194,13 @@ void action_launch(const char *path, u32 how, u32 save_type, u32 hard_reset)
 		how = game.is_emu ? ACTION_CLEAN : default_how(&game);
 	if (how == ACTION_CLEAN || how == ACTION_NOR)
 		cheatstore_launch_none();  // a clean boot: nothing patched in
+	// A GB, GBC or NES game's picks are the opt-in: its Game Genie lines are
+	// kept for the patches after the load (cheatstore_launch_emu)
+	if (ok && game.is_emu && how < ACTION_NOR) {
+		char rom[GAMESAVE_PATH_BYTES];
+		if (gamesave_rom_path_in(rom, sizeof(rom), currentpath, game.name) >= 0)
+			cheatstore_launch(rom, 0);
+	}
 	if (!ok) {
 		tlog("launch %s: not a game the cart starts", path_copy);
 	} else if (game.is_emu && how >= ACTION_NOR) {

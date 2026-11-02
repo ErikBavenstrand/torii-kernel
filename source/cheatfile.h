@@ -43,6 +43,7 @@
 #include <gba_base.h>
 
 #include "cheatcode.h"
+#include "cheatemu.h"
 #include "cheatkeys.h"
 
 #define CHEATFILE_TEXT_MAX 0x30000  // the largest text read (192 KB; exports reach 90 KB); a longer file is refused
@@ -53,6 +54,7 @@
 #define CHEATFILE_CYCLES_MAX (CHEAT_LOAD_MAX - CHEAT_LOAD(CHEAT_COST_CALL))
 #define CHEATFILE_PROG_MAX (CHEATFILE_BYTES_MAX / 4)  // a cheat's table words
 #define CHEATFILE_OPS_MAX 256      // a cheat's decoded ops
+#define CHEATFILE_EMU_LINES 64     // a GB, GBC or NES cheat's lines (cheatemu.h); more is "too big"
 // A cheat's ROM patches (8 KB of ROM data): they are decoded straight into
 // the patch room (cheatfile_patch_room), not into ops
 #define CHEATFILE_PATCHES_MAX 4096
@@ -298,6 +300,11 @@ int cheatfile_empty(const struct cheatfile *f);
 
 struct cheatfile_work {
 	struct cheat_decoder dec;
+	// The console of the game the file is for (enum cheatemu_console): for GB,
+	// GBC and NES a cheat decodes into patches only, one per Game Genie
+	// line (cheatemu.h), and its ops and table part are empty. Kept by
+	// cheatfile_begin; the store sets it after a read.
+	u8 console;
 	u32 next;  // the next cheat to decode
 	u32 n_prog, n_patches;  // prog's words, patches
 	u32 cost;

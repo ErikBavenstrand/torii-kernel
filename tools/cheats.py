@@ -785,6 +785,7 @@ def patch_unchanged(base, hack, patch):
 PATCH_SOURCES = (
     "tools/cheat_patches.c",
     "source/cheatfile.c",
+    "source/cheatemu.c",
     "source/cheatcode.c",
     "source/cheatlower.c",
     "source/cheatindex.c",
@@ -792,6 +793,7 @@ PATCH_SOURCES = (
 )
 PATCH_DEPS = PATCH_SOURCES + (
     "source/cheatfile.h",
+    "source/cheatemu.h",
     "source/cheatcode.h",
     "source/cheatindex.h",
     "source/crc32.h",

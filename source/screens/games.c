@@ -1497,7 +1497,7 @@ static void popup_run(u32 i)
 		snprintf(games.shots, sizeof(games.shots), "%u", (unsigned)(shots % 100000));
 		popup_add(LANG_POP_SHOTS, games.shots, 0);
 	}
-	// Every GBA game on the card has Cheats, for the code keypad's Add code,
+	// Every game on the card has Cheats (a GB, GBC or NES one too), for the code keypad's Add code,
 	// but one whose cheat file's path is too long; the cheat screen says why
 	// a file it can't take is left alone. The popup never reads the file
 	// (190 KB takes over a second): its count, what the cheat screen lists,
@@ -1505,7 +1505,7 @@ static void popup_run(u32 i)
 	// session, or in counts.txt), else none
 	s32 listed = -1;
 	u32 start = cycles_now();
-	if (gba && cheatstore_peek(games.pick, &listed)) {
+	if (!nor && cheatstore_peek(games.pick, &listed)) {
 		tlog_debug("cheats: popup: %ld listed, %lu cycles", (long)listed, (unsigned long)cycles_since(start));
 		if (listed >= 0)
 			snprintf(games.cheats, sizeof(games.cheats), "%lu", (unsigned long)listed);

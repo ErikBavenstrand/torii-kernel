@@ -88,6 +88,11 @@ cheats-folders/picked 71E91CFF81A68D78
 cheats-folders/scrolled 983868B7CF141C87
 cheats-folders/starter FBE737CC9CE72B16
 cheats-folders/under 9F8B5D48FD6D625C
+cheats-gb/details CFAEF2DEE8DCE11C
+cheats-gb/greyed 04BE9D2DE3495C92
+cheats-gb/menu F00858F23F352199
+cheats-gb/popup A2C501DE9604328D
+cheats-gb/screen FEDD6DEB3C5B6846
 cheats-guide/guide FD1A43726E4B66E2
 cheats-guide/hold 1DF6DB629634C752
 cheats-guide/list 50B89831D8690BBF
@@ -771,6 +776,11 @@ sv-cheats-folders/picked E939C515AC80C912
 sv-cheats-folders/scrolled D09972BD57E2DC2E
 sv-cheats-folders/starter 460E01EC700C547B
 sv-cheats-folders/under 7F312ADC0A7E26B0
+sv-cheats-gb/details 885375A7C516A7B9
+sv-cheats-gb/greyed DED0939F552B5E40
+sv-cheats-gb/menu 5FFD1EE6D52CB44D
+sv-cheats-gb/popup 73D6C0720EF1DE2A
+sv-cheats-gb/screen FA07AEEF1D275777
 sv-cheats-guide/guide 55E29B6C200AAF52
 sv-cheats-guide/hold B7427F99E8C1E2EA
 sv-cheats-guide/list AEA8FF8247D56ECE

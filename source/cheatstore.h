@@ -170,6 +170,9 @@ int cheatstore_path(char *out, u32 size, const char *rom_path);
 // yet: 1 if it has one with a cheat in it. Call only where FatFs calls may
 // run.
 int cheatstore_read(const char *rom_path);
+// The console of the game the file read last is for (cheatemu.h's enum
+// cheatemu_console, from its path's extension)
+u32 cheatstore_console(void);
 // The same for the cheat screen: CHEATSTORE_READ if the file was read
 // (cheats in it or not), CHEATSTORE_NEW if the game has none (an empty
 // file, made on cheatstore_write; a larger file read in windows, cheatstore_windows
@@ -337,6 +340,11 @@ int cheatstore_drop(void);
 // cart SRAM.
 #define CHEATSTORE_ROM_PATCH_UNITS CHEATFILE_PICKED_PATCH_UNITS
 void cheatstore_launch(const char *rom_path, u32 psram_bytes);
+// The second pass of a GB, GBC or NES game's launch (the first, cheatstore_launch
+// with no psram_bytes, kept the picked cheats' Game Genie lines): the game's
+// file of size bytes is in PSRAM from rom_start, after the emulator; the
+// lines' patches are made in it (cheatemu.h). Nothing without kept lines.
+void cheatstore_launch_emu(const char *rom_path, u32 console, u32 rom_start, u32 size);
 // A larger file's picks in the window decoded now, as decoded: what each
 // takes of the budget, for the index (an older kernel's counted patches,
 // not cheatfile_patch_units). The cheat list's build calls it.

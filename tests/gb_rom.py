@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Writes a tiny Game Boy ROM for tests/gb_save.sh: usage gb_rom.py OUT.gb [8]
+"""Writes a tiny Game Boy ROM for tests/gb_save.sh: usage gb_rom.py OUT.gb [8|cheat]
 
 Written for Torii's tests (no third-party code), so it can live in the
 repo. MBC5 with 32 KB of battery-backed RAM (cart type $1B, RAM size $03),
@@ -51,6 +51,36 @@ def rom(ram_kb: int = 32) -> bytes:
     return bytes(data)
 
 
+def cheat_rom() -> bytes:
+    """tests/emu_cheats.sh's game: MBC5, four 16 KB banks, no RAM.
+
+    The program stores what the routine at $4000 returns at $C001 and loops
+    (bank 1: LD A,$E0; RET; bank 2 has $77 there), and the test reads WRAM
+    from the emulator's memory (Jagoomba's XGB_RAM, 0x03005890). A Game Genie
+    code for 4001 with the compare $E0 makes the byte $1F, in bank 1 alone.
+    """
+    data = bytearray(0x10000)
+    data[0x100:0x104] = bytes([0x00, 0xC3, 0x50, 0x01])
+    data[0x104:0x108] = bytes([0xCE, 0xED, 0x66, 0x66])
+    data[0x134:0x13C] = b"CHEATTST"
+    data[0x147] = 0x19  # MBC5
+    data[0x148] = 0x01  # 64 KB
+    data[0x14D] = (-sum(data[0x134:0x14D]) - (0x14D - 0x134)) & 0xFF
+    code = bytes(
+        [0xCD, 0x00, 0x40]  # CALL $4000
+        + [0xEA, 0x01, 0xC0]  # LD ($C001),A
+        + [0x18, 0xFE]  # JR $
+    )
+    data[0x150 : 0x150 + len(code)] = code
+    data[0x4000:0x4003] = bytes([0x3E, 0xE0, 0xC9])
+    data[0x8000:0x8003] = bytes([0x3E, 0x77, 0xC9])
+    return bytes(data)
+
+
 if __name__ == "__main__":
+    if len(sys.argv) > 2 and sys.argv[2] == "cheat":
+        with open(sys.argv[1], "wb") as f:
+            f.write(cheat_rom())
+        sys.exit(0)
     with open(sys.argv[1], "wb") as f:
         f.write(rom(int(sys.argv[2]) if len(sys.argv) > 2 else 32))

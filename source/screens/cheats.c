@@ -164,6 +164,7 @@ static struct {
 	u8 act;      // ACT_*, and its row and entry
 	u8 only;     // only the picked cheats show
 	u8 add_why;  // cheatstore_can_add's: + Add code greyed unless CHEATFILE_EDIT_OK
+	u8 emu;      // a GB, GBC or NES game's file: no + Add code, Edit code or Buttons; Game Genie lines only
 	u8 picked;   // a cheat was picked on this visit: the boot mode is checked on leaving
 	u8 measure;  // frames left to measure as "cheats-toggle"
 	u8 close;    // B on the Guide page or the Buttons page
@@ -495,6 +496,8 @@ static const char *cs_reason(const struct cheatfile_cheat *c, u32 why)
 	}
 	if (why >= CHEATFILE_WHYS)
 		return NULL;
+	if (cs.emu && why == CHEATFILE_WHY_CANT_RUN)
+		return S(STR_CHEATS_WHY_EMU_RAM);
 	return why ? S(STR_CHEATS_WHY_FULL + why - CHEATFILE_WHY_FULL) : "";
 }
 
@@ -1073,14 +1076,18 @@ static void detail_text(u32 at)
 	cs.key_w = (u8)(w + 8 < CS_KEY_W_MAX ? w + 8 : CS_KEY_W_MAX);
 	detail_pair(&n, STR_CHEATS_LABEL_STATE,
 		    c->picked ? S(STR_CHEATS_DETAIL_PICKED) : S(STR_CHEATS_DETAIL_NOT_PICKED));
-	if (c->detected != CHEAT_FMT_AUTO && c->detected <= CHEAT_FMT_TORII) {
+	if (cs.emu) {
+		// The kind of line is its own format: no row for it
+	} else if (c->detected != CHEAT_FMT_AUTO && c->detected <= CHEAT_FMT_TORII) {
 		SF(line, sizeof(line), STR_CHEATS_FORMAT, LS(S(STR_KEYPAD_FORMAT_NONE + c->detected)),
 		   LS(c->format != CHEAT_FMT_AUTO ? S(STR_CHEATS_DETAIL_SET) : S(STR_CHEATS_DETAIL_DETECTED)));
 		detail_pair(&n, STR_CHEATS_LABEL_FORMAT, line);
 	} else {
 		detail_pair(&n, STR_CHEATS_LABEL_FORMAT, S(STR_CHEATS_DETAIL_UNKNOWN));
 	}
-	if (c->status == CHEATFILE_OK) {
+	if (c->status == CHEATFILE_OK && cs.emu) {
+		detail_pair(&n, STR_CHEATS_LABEL_RUNS, S(STR_CHEATS_DETAIL_RUNS));
+	} else if (c->status == CHEATFILE_OK) {
 		if (c->bytes) {
 			SF(line, sizeof(line), STR_CHEATS_BUDGET, LN(share(c->bytes, c->cost)));
 			detail_pair(&n, STR_CHEATS_LABEL_FRAME, line);
@@ -1348,10 +1355,10 @@ static u32 cs_rows(u32 at)
 		}
 		if (!cs.only && run_n > 1)
 			run_done(run_row, run_start, run_n);
-		if (!cs.only)
+		if (!cs.only && !cs.emu)
 			cheatlist_row_put(r++, ROW(ROW_ADD, 0));
 	}
-	cs.has_add = cs.group == CHEATFILE_NONE && !cs.only;
+	cs.has_add = cs.group == CHEATFILE_NONE && !cs.only && !cs.emu;
 	cs.count = r;
 	cs.sel = r - cs.n_heads;
 	cs.picks = cheatstore_picks();
@@ -2298,9 +2305,11 @@ static u32 cs_menu(u32 row)
 		const char *name = entry_name(&e, &len);
 		name_copy(cs.pop_title, sizeof(cs.pop_title), name, len);
 		ITEM(MENU_GUIDE, S(STR_CHEATS_MENU_GUIDE), 0);
-		ITEM(MENU_EDIT, S(STR_CHEATS_MENU_EDIT), 0);
+		if (!cs.emu)
+			ITEM(MENU_EDIT, S(STR_CHEATS_MENU_EDIT), 0);
 		ITEM(MENU_RENAME, S(STR_CHEATS_MENU_RENAME), 0);
-		ITEM(MENU_BUTTONS, S(STR_CHEATS_MENU_BUTTONS), 0);
+		if (!cs.emu)
+			ITEM(MENU_BUTTONS, S(STR_CHEATS_MENU_BUTTONS), 0);
 		ITEM(MENU_HEADING, S(STR_CHEATS_MENU_HEADING), 0);
 	} else {
 		snprintf(cs.pop_title, sizeof(cs.pop_title), "%s", cs.heading);
@@ -2309,7 +2318,8 @@ static u32 cs_menu(u32 row)
 	cs.add_head = cs.only ? 0 : cs.place;
 	if (ROW_KIND(cs.cur_value) == ROW_ADD)
 		cs.add_head = 0;
-	ITEM(MENU_ADD, S(STR_CHEATS_MENU_ADD), cs.add_why == CHEATFILE_EDIT_OK ? 0 : UI_POP_DIM);
+	if (!cs.emu)
+		ITEM(MENU_ADD, S(STR_CHEATS_MENU_ADD), cs.add_why == CHEATFILE_EDIT_OK ? 0 : UI_POP_DIM);
 	ITEM(MENU_ALL_OFF, S(STR_CHEATS_MENU_ALL_OFF), cs.picks ? 0 : UI_POP_DIM);
 	ITEM(MENU_ONLY, cs.only ? S(STR_CHEATS_MENU_ALL) : S(STR_CHEATS_MENU_ONLY),
 	     cs.picks || cs.only ? 0 : UI_POP_DIM);
@@ -2439,6 +2449,7 @@ void cheats_run(const char *rom_path, const char *title, u16 icon)
 	}
 	cheatstore_listed();  // decoded: the game popup's count from now on
 	struct cheatstore *s = cheatstore();
+	cs.emu = cheatstore_console() != CHEATEMU_GBA;
 	cs_rows(CHEATFILE_NONE);
 	// The cursor starts on the first row A does something on
 	u32 row = first_actable(0), greyed = 0;
@@ -2454,7 +2465,7 @@ void cheats_run(const char *rom_path, const char *title, u16 icon)
 	     (unsigned long)s->list.count, (unsigned long)greyed, (unsigned long)cs.picks,
 	     (unsigned long)s->file.bytes + s->file.more_bytes, (unsigned long)cs.count,
 	     (unsigned long)(torii_frames - began), opened == CHEATSTORE_NEW ? ", no file yet" : "");
-	if (cs.add_why != CHEATFILE_EDIT_OK)
+	if (!cs.emu && cs.add_why != CHEATFILE_EDIT_OK)
 		tlog("cheats: + Add code greyed: %s", add_reason());
 	int up = cs_show(row);
 	while (up) {
@@ -2524,7 +2535,7 @@ void cheats_run(const char *rom_path, const char *title, u16 icon)
 		ui_pop();
 	if (!saved) {
 		dialog_message(cs.heading, S(STR_CHEATS_SAVE_FAILED), DIALOG_ERROR);
-	} else if (picks && cs.picked && boots_clean(rom_path)) {
+	} else if (picks && cs.picked && !cs.emu && boots_clean(rom_path)) {
 		// Picks that won't run: said once, as the user leaves with them
 		tlog("cheats: %lu picked, and the game boots clean", (unsigned long)picks);
 		SF(cs.ask, sizeof(cs.ask), STR_CHEATS_CLEAN, LN(picks));

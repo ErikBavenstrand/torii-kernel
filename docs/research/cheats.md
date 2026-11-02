@@ -56,7 +56,7 @@ Research for v0.7 (2026-10-25), before the design in `docs/plans/roadmap.md`.
 | GBC | 960 | 9,275 (17,590 empty) | 10,959 | 1,555 nine-digit, 267 six-digit | 6,277 type 01; 1,202 type 91; 235 type 96; 228 type 92; 101 type 93; 56 type 90; 13 type 97; 12 type 94; 11 type 95; 2 each 10 and 11 | 686 Xploder, 305 wildcards, 7 other |
 | NES | 2,262 | 43,687 (817 empty) | 55,647 | 30,723 eight-letter, 4,731 six-letter | 20,044 raw `AAAA:VV` | 149 other or wildcards |
 
-- 🟢 Game Genie is the larger half for GB (45% of lines) and the main half for
+- 🟢 Game Genie is nearly half of GB's lines (44%) and the main half for
   NES (63%); GameShark RAM pokes are about half of GB's lines and raw RAM
   pokes 36% of NES's. Stage 1 (Game Genie only) covers about 44% of GB, 63%
   of NES and 17% of GBC lines (GBC's GameShark codes are mostly types 91 to
