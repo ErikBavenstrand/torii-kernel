@@ -888,10 +888,11 @@ and `tests/sleep.sh` sleeps and wakes hello and Pokémon Emerald. Emerald on
 the real cart (v0.8, 2026-10-27) stayed black and silent after the sleep
 keys, START+SELECT didn't wake it, and only a power cycle did; its sleep
 code is byte for byte the v0.7 hook's and `gba_sleep_patch.s`'s, and the
-emulated cart wakes it, so the cause is still open (the real BIOS, or the
+emulated cart wakes it, so the cause was open (the real BIOS, or the
 cart during Stop). Since then the stub waits for every key to be up after
 waking (the old loop let START and SELECT through to the game) and clears
-KEYCNT's unused bits 10-13.
+KEYCNT's unused bits 10-13. With those changes Emerald sleeps and wakes
+correctly on the real cart (owner, 2026-11-02).
 
 ## 7. Logging and Diagnostics
 

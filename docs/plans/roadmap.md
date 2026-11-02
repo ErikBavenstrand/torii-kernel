@@ -65,12 +65,12 @@ The UX reviews' open proposals (`docs/design/v0.5/ux-review.md`, `settings-ux-re
 
 ### In game
 
-- **Menu speed:** the target is the menu visible within 2 frames; it measures 4 frames to the panel and 5 to the rows (`ingame-menu.md`).
-- **Hook coverage:** the exact-ROM hook patches cover only the EU builds of GTA Advance, Super Monkey Ball Jr., LEGO Star Wars II and Tomb Raider: Legend. Add the other regions (`docs/research/hook-coverage.md`).
+- **Menu speed:** the target is the menu visible within 2 frames; it measures 4 frames to the panel and 5 to the rows (`ingame-menu.md`). It was 2 and 3 before the stub slowed to `0x4017` and read its backups back, a trade made for safety: faster means undoing one of those, so it needs a real-cart check.
+- **Hook coverage:** the exact-ROM hook patches cover only the EU builds of GTA Advance, Super Monkey Ball Jr., LEGO Star Wars II and Tomb Raider: Legend. Add the other regions (`docs/research/hook-coverage.md`); each patch site is found in that region's ROM, and the library holds only the EU dumps.
 - **Sound after LOAD (1.0?):** games on Nintendo's MP2000 engine keep the PCM buffer's position in RAM, which could re-sync DMA1 at LOAD.
 - **Cheat search (shipped in v0.9.7–v0.9.10; [design](../design/v0.9/cheat-search.md)):** what is left of it. Reviewed 2026-10-31 (a code reviewer and an adversarial tester in the emulator); the review's fixes shipped. Open:
   - **Contestable decisions:** it borrows the save-state buffer (no other cart SRAM has 288 KB), so a state not yet on the card blocks it and saving a state ends it; a game whose stack top is the BIOS's default (`0x03007F00`) gets its stack 32 bytes lower for the live block, others none (Street Fighter Alpha 3, top `0x03007EC0`, crashed with it: "on now" sets the value once there); the Cheat search row is on the Cheats page when the game has a cheat list (the menu has room for nine rows); the menu's lines past the seventh draw a frame later, with the footer.
-  - **Not done:** naming a found cheat in game (the overlay has no font or keyboard: rename it on the Cheats page); more than one Undo; pointer chains (one level only); "on now" through a pointer (set once instead); a memory view around a candidate; VRAM, palette and OAM searches.
+  - **Not done:** naming a found cheat in game (the overlay has no font or keyboard: rename it on the Cheats page); more than one Undo (the buffer's 288 KB leaves no room for a second copy: `cheat-search.md`); pointer chains (one level only); "on now" through a pointer (set once instead); a memory view around a candidate; VRAM, palette and OAM searches.
   - **Cart check:** a pointer kept in Pokémon Emerald (money through gSaveBlock1Ptr) across a door.
   - **Untested:** a card write that fails while filing (the records wait for the next boot); a 32-bit search with large values and 16 different addresses kept, in the emulator.
 - **States that survive a power-off (1.0?, research):** point the FPGA's `/RTS` write-back of cart SRAM at a per-game file. Watch out: with a crosslinked FAT the write-back would land in both files.
