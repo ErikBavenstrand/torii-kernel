@@ -1034,6 +1034,7 @@ static int library_step(void)
 	}
 }
 
+// cppcheck-suppress constParameterCallback  // the callback type's signature (engine/jobs.h, ui)
 static int library_job(struct job *job)
 {
 	if (job->state == JOB_CANCEL)

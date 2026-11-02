@@ -1311,6 +1311,7 @@ static int has_work(void)
 	return N.phase == P_DONE && (N.mode != M_NONE || N.dirty || N.wphase != X_IDLE || N.applying);
 }
 
+// cppcheck-suppress constParameterCallback  // the callback type's signature (engine/jobs.h, ui)
 static int names_job(struct job *job)
 {
 	if (job->state == JOB_CANCEL) {

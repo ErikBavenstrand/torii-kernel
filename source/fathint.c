@@ -26,6 +26,7 @@ static int hint_set(const FATFS *fs)
 	return fs->last_clst >= 2 && fs->last_clst < fs->n_fatent;
 }
 
+// cppcheck-suppress constParameterCallback  // the callback type's signature (engine/jobs.h, ui)
 static int step(struct job *job)
 {
 	FATFS *fs = &EZcardFs;

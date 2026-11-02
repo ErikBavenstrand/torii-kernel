@@ -102,6 +102,7 @@ u32 ui_reading_wrap(struct ui_reading *r, const struct torii_font *font, u32 wid
 	return r->count;
 }
 
+// cppcheck-suppress constParameterCallback  // the callback type's signature (engine/jobs.h, ui)
 static u32 reading_count(void *ctx)
 {
 	return ((const struct ui_reading *)ctx)->count;

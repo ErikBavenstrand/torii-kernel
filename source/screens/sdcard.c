@@ -451,6 +451,7 @@ static int count_open(u32 i)
 	return 1;
 }
 
+// cppcheck-suppress constParameterCallback  // the callback type's signature (engine/jobs.h, ui)
 static int count_step(struct job *job)
 {
 	if (job->state == JOB_CANCEL) {

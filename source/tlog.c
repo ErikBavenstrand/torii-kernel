@@ -640,6 +640,7 @@ static void open_stop(void)
 u32 tlog_open_steps_test EWRAM_BSS;
 
 // tlog_flush_soon's job: a step of the open a frame, until it is done
+// cppcheck-suppress constParameterCallback  // the callback type's signature (engine/jobs.h, ui)
 static int open_job(struct job *job)
 {
 	// A cancel gives the open up: tlog_flush starts it again

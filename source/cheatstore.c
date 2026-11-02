@@ -1566,6 +1566,7 @@ static int count_parse(const char *line, struct count_line *out)
 
 static u32 counts_len;
 
+// cppcheck-suppress constParameterCallback  // the callback type's signature (engine/jobs.h, ui)
 static u32 counts_fill(void *ctx, u32 pos, char *buf, u32 max)
 {
 	u32 n = pos < counts_len ? counts_len - pos : 0;

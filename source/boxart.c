@@ -399,6 +399,7 @@ static int ui_busy(void)
 	return top && (top->opening || (top->spec->flags & UI_VIEW_MODAL));
 }
 
+// cppcheck-suppress constParameterCallback  // the callback type's signature (engine/jobs.h, ui)
 static int list_job(struct job *job)
 {
 	// A launch (or Diagnostics) took PSRAM over (cover_cache_invalidate):

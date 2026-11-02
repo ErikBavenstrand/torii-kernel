@@ -4,6 +4,14 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Changed:** the last 8 static-analysis findings (cppcheck's
+  `constParameterCallback` on job steps and text providers, whose parameter
+  types the callback types fix) are marked beside the code with their reason,
+  so the baseline is empty and CI fails on any finding. Comments only; the
+  binary is the same.
+
 ## v0.9.21
 
 - **Changed:** the static analysis's baseline went from 97 findings to 8. The
