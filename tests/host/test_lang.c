@@ -200,6 +200,12 @@ void test_lang_pack_font(void)
 	lang_test_put32(pack + 12, strings_end);
 	lang_test_put32(pack + 56, 0);  // a font offset with no font
 	CHECK_EQ(lang_pack_check_header(pack), LANG_PACK_BAD);
+	lang_test_put32(pack + 52, strings_end);  // a font smaller than its own header
+	lang_test_put32(pack + 56, 8);
+	lang_test_put32(pack + 12, strings_end + 8);
+	CHECK_EQ(lang_pack_check_header(pack), LANG_PACK_BAD);
+	lang_test_put32(pack + 12, strings_end);
+	lang_test_put32(pack + 56, 0);
 	lang_test_put32(pack + 52, 0);
 	CHECK_EQ(lang_pack_check_header(pack), LANG_PACK_OK);
 }

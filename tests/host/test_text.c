@@ -596,6 +596,7 @@ void test_text_script(void)
 		{56 + 12, 2, 0x300},  // a glyph's bitmap past the end
 		{56 + 12 + 4, 1, 40},  // rows
 		{56 + 12 + 5, 1, 20},  // width
+		{56 + 12 + 3, 1, 11},  // top 11 + 2 rows leave the 12 px line
 	};
 	for (u32 i = 0; i < sizeof(spots) / sizeof(spots[0]); i++) {
 		memcpy(bad, blob, sizeof(blob));

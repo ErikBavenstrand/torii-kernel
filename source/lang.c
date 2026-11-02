@@ -49,7 +49,8 @@ static u32 strings_end(const u8 *pack)
 	u32 size = rd32(pack + 12), font = rd32(pack + 52), font_bytes = rd32(pack + 56);
 	if (!font_bytes)
 		return font ? 0 : size;
-	if (font & 3 || font > size || font_bytes != size - font || font_bytes > SCRIPT_MAX)
+	if (font & 3 || font > size || font_bytes != size - font || font_bytes < SCRIPT_HEADER ||
+	    font_bytes > SCRIPT_MAX)
 		return 0;
 	return font;
 }

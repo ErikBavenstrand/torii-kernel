@@ -34,8 +34,9 @@ u32 script_blob_size(const u8 *header)
 	return rd32(header + 12);
 }
 
-// Reads one font's record at blob + at into out; 0 if it is malformed
-static int read_record(const u8 *blob, u32 bytes, u32 at, struct torii_script *out)
+// Reads one font's record at blob + at into out; 0 if it is malformed. Its glyphs
+// must sit inside a line of line_height rows once moved down by dy.
+static int read_record(const u8 *blob, u32 bytes, u32 at, u32 line_height, s32 dy, struct torii_script *out)
 {
 	if (at & 3 || at < SCRIPT_HEADER || bytes - at < 12)
 		return 0;
@@ -62,7 +63,7 @@ static int read_record(const u8 *blob, u32 bytes, u32 at, struct torii_script *o
 	const u8 *g = rec + table;
 	for (u32 i = 0; i < glyphs; i++, g += 6) {
 		u32 rows = g[4], width = g[5];
-		if (width > 16 || rows > 16 || (u32)g[3] + rows > 32)
+		if (width > 16 || rows > 16 || (u32)g[3] + rows + (u32)dy > line_height)
 			return 0;
 		if (rows && rd16(g) * 4u + rows * (width > 8 ? 2u : 1u) > bits_bytes)
 			return 0;
@@ -72,7 +73,7 @@ static int read_record(const u8 *blob, u32 bytes, u32 at, struct torii_script *o
 	out->ranges = rec + 12;
 	out->range_count = ranges;
 	out->glyph_count = glyphs;
-	out->dy = 0;
+	out->dy = dy;
 	return 1;
 }
 
@@ -82,15 +83,15 @@ int script_use(const u8 *blob, u32 bytes)
 		return 0;
 	struct torii_script body, heading;
 	u32 fonts = rd16(blob + 6);
-	if (!read_record(blob, bytes, rd32(blob + 16), &body))
+	if (!read_record(blob, bytes, rd32(blob + 16), font_body.line_height, 0, &body))
 		return 0;
 	u32 heading_at = rd32(blob + 20);
 	if (fonts == 2 && heading_at) {
-		if (!read_record(blob, bytes, heading_at, &heading))
+		if (!read_record(blob, bytes, heading_at, font_heading.line_height, 0, &heading))
 			return 0;
-	} else {
-		heading = body;
-		heading.dy = (s32)font_heading.baseline - (s32)font_body.baseline;
+	} else if (!read_record(blob, bytes, rd32(blob + 16), font_heading.line_height,
+				(s32)font_heading.baseline - (s32)font_body.baseline, &heading)) {
+		return 0;  // the body's glyphs moved down to the heading's baseline leave its line
 	}
 	body_script = body;
 	heading_script = heading;

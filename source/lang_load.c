@@ -156,9 +156,11 @@ static int load_font(u32 i, u32 at, u32 bytes)
 		UINT got = 0;
 		ok = f_read(&f, buf, n, &got) == FR_OK && got == n;
 		if (ok && !done) {
-			ok = script_header_ok(buf) && script_blob_size(buf) == bytes;
-			want = script_blob_crc(buf);
-			crc = crc32(buf + 12, n - 12);
+			ok = n >= SCRIPT_HEADER && script_header_ok(buf) && script_blob_size(buf) == bytes;
+			if (ok) {
+				want = script_blob_crc(buf);
+				crc = crc32(buf + 12, n - 12);
+			}
 		} else if (ok) {
 			crc = crc32_update(crc, buf, n);
 		}

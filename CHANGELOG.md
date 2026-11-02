@@ -4,6 +4,28 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Added:** kerning. A pair such as T and o sits a pixel closer: the font has,
+  for each of 13 left glyphs (A F L P T V W Y f r v w y), a variant a pixel
+  narrower, and one rule in the layouts (`text_layout`, `text_width`, the
+  marquee windows, labels, rename's wrapping, the copy's percentage and the
+  in-game menu's lines) swaps the left glyph when the next one follows it
+  closely. `font.py` picks the pairs by their ink (224 in the body font, 174
+  in the heading): no two inked pixels end up closer than ordinary
+  neighbours. Layout glyph indices are now 16 bits (e922729a).
+- **Added:** a language pack can bring a script font for characters beyond
+  Latin-1 (`font` in its `[meta]`, from a BDF, `tools/lang.py`): the kernel
+  loads it into the 320 KB of PSRAM held for it (`script.h`), and the menu
+  fonts draw those characters where they drew the replacement box, in file
+  names and in the pack's own text. A launch fills PSRAM, so the in-game menu
+  and the launch's dialogs still show the box; the menu loads the font again
+  when a launch comes back. No pack has a font yet (e922729a).
+- **Fixed:** the debug frame-timing figures counted a log flush inside the
+  frame as the screen's time, and their summary lines could push older lines
+  out of a nearly full log buffer; the figures now leave the flush out, and
+  the summary waits for room (e922729a).
+
 ## v0.9.18
 
 - **Fixed:** Ç ç ¡ ¿ µ lost a tail pixel in the 12 px body font: the line was
