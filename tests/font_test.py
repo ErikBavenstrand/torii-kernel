@@ -150,9 +150,7 @@ class Layout(unittest.TestCase):
         for offset, _, _, rows, width in packed.entries:
             if rows and width > 8:
                 self.assertEqual(offset % 2, 0)
-        end = max(
-            o + r * (2 if w > 8 else 1) for o, _, _, r, w in packed.entries if r
-        )
+        end = max(o + r * (2 if w > 8 else 1) for o, _, _, r, w in packed.entries if r)
         self.assertLessEqual(len(packed.bits), end)
 
     def test_short_bitmap_row_fails(self):

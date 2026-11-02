@@ -4,6 +4,22 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## v0.9.18
+
+- **Fixed:** Ç ç ¡ ¿ µ lost a tail pixel in the 12 px body font: the line was
+  one row short of their descender and the row was dropped. `font.py`'s
+  `--squeeze` now closes a blank row inside such a glyph from below, or with
+  none lifts it whole, so each keeps its full shape (390d742c).
+- **Changed:** font bitmaps take 1 byte a row for a glyph 8 px wide or less,
+  2 for a wider one: the fonts' bitmaps shrink from 6.8 KB to 3.7 KB of ROM.
+  The blitter steps by the glyph's width, at the same cycles
+  (`torii_glyph_row_bytes`, 390d742c).
+- **Changed:** Swedish: "Mellanr." for the keypad's space, "Kopiera ny plats"
+  for Copy to new slot, and "1 snabbspar." in the unsaved-footer, the term the
+  rest of the pack uses (390d742c).
+- **Fixed:** the debug frame-timing summary counted names past its table's
+  eight in no line; they now count together under "other" (390d742c).
+
 ## v0.9.17
 
 - **Fixed:** In-game menu Off reaches a game on the NOR. Its hook has the

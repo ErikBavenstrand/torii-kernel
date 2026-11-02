@@ -123,7 +123,7 @@ Measured with another session's tests in the same VM, so the times vary by about
 - **Analyze caches per file.** GCC's `-fanalyzer` and clang-tidy outputs are kept in `dist/analyze/cache` under a hash of the file, every header its `.d` file lists, its command and the analysis's configuration; cppcheck uses its own `--cppcheck-build-dir`, and runs with `-j`. Warm: 31 s to 5 s. A planted null dereference was still reported.
 - **shellcheck ran on one core** (17 s of lint's 18 s). It now runs one file per process with `-x` (following sourced files, as one process did when given them all): lint takes 4 s.
 - **mgba-shot draws only the frames it shows.** mGBA's renderer now runs only for frames a `-s`, `-h` or `-H` reads, and the frame before each (`-R` draws every one). A homebrew GBA ROM ran 39 % faster (20,000 frames: 5.2 to 3.2 s); `tests/all.sh` used about 7 % less user CPU, as the menu's frames are cheap. Every golden hash still matches.
-- Not done: compat could be selected the same way (record which functions its games run, and skip it when none changed), in place of the hand-kept `NO_COMPAT` list.
+- Done in v0.9.18: compat is selected the same way. Each game's runs (`tests/games.py`, `TORII_COMPAT_COVERAGE`) and `cheat_codes` record the functions they run into `dist/.check/testmap-compat.json`; `just check` plays only those whose functions changed (`tools/check.py`'s `CompatJobs`), and `--full` plays all. The hand-kept `NO_COMPAT` list is gone: a menu-only change plays no game.
   Carts on tmpfs failed: 140 jobs' 64 MB NOR files filled it.
 
 ## Update 2026-10-28 (later): cheaper power-cut sweeps, no fsync in the tests

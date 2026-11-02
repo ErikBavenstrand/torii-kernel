@@ -380,7 +380,7 @@ class Packed:
 
 
 def pack(font: Font) -> Packed:
-    font.row_bytes  # checks the widest glyph fits
+    _ = font.row_bytes  # checks the widest glyph fits
     bits = bytearray()
     offsets: dict[int, int] = {}  # id(glyph) -> offset, so shared glyphs share bits
     entries, art = [], []
