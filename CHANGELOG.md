@@ -4,7 +4,7 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
-## Unreleased
+## v0.9.20
 
 - **Changed:** Info's Credits names the kernel's base (EZ-Flash's open source
   kernel 1.06, Apache 2.0), FatFs, libgba and minilzo with their licences, and
