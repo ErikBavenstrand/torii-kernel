@@ -34,6 +34,7 @@ void test_cheatemu_gb_genie(void);
 void test_cheatemu_gb_patch(void);
 void test_cheatemu_nes_patch(void);
 void test_cheatemu_file(void);
+void test_keypad_emu(void);
 void test_cheatemu_table(void);
 void test_cheatkeys_parse(void);
 void test_cheatkeys_derive(void);

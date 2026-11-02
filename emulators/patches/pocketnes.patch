@@ -214,10 +214,10 @@ index 74f8486..6d6eac0 100644
  	.byte 0
 diff --git a/src/torii_cheats.c b/src/torii_cheats.c
 new file mode 100644
-index 0000000..a539379
+index 0000000..36b6d8a
 --- /dev/null
 +++ b/src/torii_cheats.c
-@@ -0,0 +1,45 @@
+@@ -0,0 +1,49 @@
 +#include "includes.h"
 +
 +// Torii: the RAM writes the kernel's cheat screen picked (source/cheatemu.h,
@@ -250,12 +250,16 @@ index 0000000..a539379
 +void torii_cheats_run(void)
 +{
 +	u32 n = torii_cheats.count;
++	if (!n)
++		return;
 +	if (n > 64)
 +		n = 64;
-+	for (u32 i = 0; i < n; i++) {
-+		u32 addr = torii_cheats.e[i].addr;
-+		u8 value = torii_cheats.e[i].value;
-+		if (torii_cheats.e[i].kind != 1)
++	// Two words an entry (the table is in ROM, where every load waits)
++	const volatile u32 *e = (const volatile u32 *)torii_cheats.e;
++	for (u32 i = 0; i < n; i++, e += 2) {
++		u32 w0 = e[0], addr = w0 >> 16;
++		u8 value = (u8)e[1];
++		if ((u8)w0 != 1)
 +			continue;
 +		if (addr < 0x800)
 +			NES_RAM[addr] = value;

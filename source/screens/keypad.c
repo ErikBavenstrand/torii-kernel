@@ -11,6 +11,7 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "../cheatemu.h"
 #include "../cheatstore.h"
 #include "../keypad_edit.h"
 #include "../lang.h"
@@ -110,6 +111,8 @@ static const u8 func_span[FUNCS] = {1, 1, 1, 1, 2, 2};
 static const char hex[] = "0123456789ABCDEF";
 #define SYMBOLS (HEX_ROWS * COLS)
 static const char symbol_keys[SYMBOLS + 1] = "[]+^|&#@=!<>*~{}";
+// A NES game's second set of keys: the Game Genie's letters, in nibble order
+static const char genie_keys[SYMBOLS + 1] = "APZLGITYEOXUKSVN";
 
 static u32 func_at(u32 col)
 {
@@ -135,7 +138,9 @@ static struct {
 	u32 orig;               // the code it started with, and its format: Cancel asks only after a change
 	u8 format;              // enum cheat_format: CHEAT_FMT_AUTO, or SELECT's
 	u8 row, col;            // the selection (on the function row, the column it came down in)
-	u8 symbols;             // the digits' rows show the symbols' one
+	u8 symbols;             // the digits' rows show the symbols' one (a NES game's: the genie letters)
+	u8 console;             // enum cheatemu_console of the game: GB and NES codes are typed as written
+	struct emucheat first_emu;  // the code's first line, once it reads (GB and NES)
 	u8 only;                // the field's next paint: this line alone (0xFF: all of them)
 	u8 keys_later;          // the keys to paint on the next frame (the field took this one)
 	u8 drawn_line, drawn_lines, drawn_top;  // the caret's line, the lines and the top as last painted
@@ -152,6 +157,18 @@ static struct {
 	char msg[48];
 	struct ui_hint hints[4];
 } kp EWRAM_BSS;
+
+// The second set of the digits' rows: the symbols', or a NES game's letters
+static const char *symbol_set(void)
+{
+	return kp.console == CHEATEMU_NES ? genie_keys : symbol_keys;
+}
+
+// 1 for a GB or NES game's keypad
+static int emu(void)
+{
+	return kp.console != CHEATEMU_GBA;
+}
 
 static u8 node(u32 n)
 {
@@ -258,6 +275,23 @@ static void describe_op(const struct cheat_op *op, char *out, u32 size)
 	}
 }
 
+// A GB or NES line as the result line says it
+static void describe_emu(const struct emucheat *e, char *out, u32 size)
+{
+	char at[8], value[4], compare[4];
+	snprintf(at, sizeof(at), "%04X", e->addr);
+	snprintf(value, sizeof(value), "%02X", e->value);
+	snprintf(compare, sizeof(compare), "%02X", e->compare);
+	if (e->kind == CHEATEMU_POKE && e->compare)
+		SF(out, size, STR_KEYPAD_EMU_POKE_BANK, LS(at), LS(value), LN(e->compare));
+	else if (e->kind == CHEATEMU_POKE)
+		SF(out, size, STR_KEYPAD_EMU_POKE, LS(at), LS(value));
+	else if (e->has_compare)
+		SF(out, size, STR_KEYPAD_EMU_PATCH_IF, LS(at), LS(value), LS(compare));
+	else
+		SF(out, size, STR_KEYPAD_EMU_PATCH, LS(at), LS(value));
+}
+
 // The result line, and its ink
 static u32 result_text(char *out, u32 size)
 {
@@ -265,15 +299,21 @@ static u32 result_text(char *out, u32 size)
 	switch (c->status) {
 	case KEYPAD_OK: {
 		char op[56];
-		describe_op(&kp.first, op, sizeof(op));
-		if (c->ops + c->patches > 1)
+		if (emu())
+			describe_emu(&kp.first_emu, op, sizeof(op));
+		else
+			describe_op(&kp.first, op, sizeof(op));
+		if (c->ops + c->patches > 1)  // (a GB or NES code's lines are its patches)
 			SF(out, size, STR_KEYPAD_MORE, LS(op), LN(c->ops + c->patches - 1));
 		else
 			snprintf(out, size, "%s", op);
 		return UI_ROLE_TEXT;
 	}
 	case KEYPAD_SHAPE:
-		SF(out, size, STR_KEYPAD_SHAPE, LN(c->line + 1), LN(kp.e.len[c->line]));
+		if (emu())
+			SF(out, size, STR_KEYPAD_EMU_SHAPE, LN(c->line + 1));
+		else
+			SF(out, size, STR_KEYPAD_SHAPE, LN(c->line + 1), LN(kp.e.len[c->line]));
 		return c->line == kp.e.line ? UI_ROLE_DIM : UI_ROLE_DANGER;  // the line being typed: not done yet
 	case KEYPAD_BLOCK_OPEN:
 	case KEYPAD_BLOCK_EXTRA:
@@ -284,11 +324,18 @@ static u32 result_text(char *out, u32 size)
 		SF(out, size, STR_KEYPAD_FILL_IN, LN(keypad_edit_marks(&kp.e)));
 		return UI_ROLE_DIM;
 	case KEYPAD_WRONG:
+		if (emu()) {
+			snprintf(out, size, "%s", S(STR_KEYPAD_EMU_WRONG));
+			return UI_ROLE_DANGER;
+		}
 		SF(out, size, STR_KEYPAD_WRONG,
 		   LS(S(STR_KEYPAD_FORMAT_NONE + (c->format <= CHEAT_FMT_TORII ? c->format : 0))));
 		return UI_ROLE_DANGER;
 	case KEYPAD_EMPTY:
-		snprintf(out, size, "%s", S(STR_KEYPAD_STATUS_EMPTY));
+		snprintf(out, size, "%s",
+			 S(!emu()                      ? STR_KEYPAD_STATUS_EMPTY
+			   : kp.console == CHEATEMU_GB ? STR_KEYPAD_EMPTY_GB
+						       : STR_KEYPAD_EMPTY_NES));
 		return UI_ROLE_DIM;
 	default:
 		snprintf(out, size, "%s",
@@ -302,6 +349,11 @@ static u32 result_text(char *out, u32 size)
 // The format's line: SELECT's, else as detected
 static void format_text(char *out, u32 size)
 {
+	if (emu()) {
+		snprintf(out, size, "%s",
+			 S(kp.console == CHEATEMU_GB ? STR_KEYPAD_EMU_FORMAT_GB : STR_KEYPAD_EMU_FORMAT_NES));
+		return;
+	}
 	u32 f = kp.check.format <= CHEAT_FMT_TORII ? kp.check.format : 0;
 	if (kp.format != CHEAT_FMT_AUTO)
 		SF(out, size, STR_KEYPAD_SET, LS(S(STR_KEYPAD_FORMAT_NONE + kp.format)));
@@ -328,7 +380,14 @@ static void recheck(void)
 {
 	struct cheatstore *cs = cheatstore();
 	keypad_check(&kp.e, kp.format, kp.ask->ctx, &cs->work, kp.scratch, &kp.check);
-	if (kp.check.status == KEYPAD_OK && kp.check.ops) {
+	if (emu()) {
+		// GB and NES: the code's lines are its patches; the first is told
+		struct emucheat lines[2];
+		u32 n;
+		if (kp.check.status == KEYPAD_OK && cheatemu_decode(kp.console, kp.scratch, (u32)strlen(kp.scratch),
+								    lines, 2, &n) != CHEATEMU_UNREADABLE)
+			kp.first_emu = lines[0];
+	} else if (kp.check.status == KEYPAD_OK && kp.check.ops) {
 		kp.first = cs->work.ops[0];
 	} else if (kp.check.status == KEYPAD_OK && kp.check.patches) {
 		// A code of ROM patches alone: its first, as the op it was typed as
@@ -356,6 +415,15 @@ static void recheck(void)
 // A line's format tag: its shape's
 static const char *line_tag(u32 i)
 {
+	if (emu()) {
+		struct emucheat e;
+		u32 n;
+		if (cheatemu_decode(kp.console, kp.e.text[i], kp.e.len[i], &e, 1, &n) != CHEATEMU_OK || !n)
+			return S(STR_KEYPAD_TAG_NONE);
+		return S(e.kind == CHEATEMU_GENIE    ? STR_KEYPAD_TAG_GENIE
+			 : kp.console == CHEATEMU_GB ? STR_KEYPAD_TAG_SHARK
+						     : STR_KEYPAD_TAG_RAM);
+	}
 	u8 shape = cheat_detect(kp.e.text[i], kp.e.len[i], NULL);
 	return S(STR_KEYPAD_TAG_NONE + (shape <= CHEAT_FMT_TORII ? shape : 0));
 }
@@ -417,8 +485,10 @@ static void paint_line(const struct text_window *win, u32 ox, u32 i, u32 y)
 		paint_label_char(font, (u8)shown[c], &lb);
 		if (x + lb.advance > right)
 			break;
-		int mark = keypad_is_mark(shown[c]);
-		u32 ink = keypad_edit_key(shown[c]) && !is_digit_char(shown[c]) ? UI_ROLE_DIM : UI_ROLE_TEXT;
+		int mark = emu() ? shown[c] == '?' : keypad_is_mark(shown[c]);
+		u32 ink = emu() ? (shown[c] == ':' || shown[c] == '-' ? UI_ROLE_DIM : UI_ROLE_TEXT)
+			  : keypad_edit_key(shown[c]) && !is_digit_char(shown[c]) ? UI_ROLE_DIM
+										  : UI_ROLE_TEXT;
 		if (mark || ink != run_ink || run.count == PAINT_LABEL_MAX) {
 			paint_blit(win, font, run_x, y, run_ink, &run);
 			run.count = 0;
@@ -496,7 +566,7 @@ static void paint_keys(void *ctx, u8 nd, const struct text_window *win, u32 set,
 		text_clear(win, look.grid_x - ox, look.grid_y - oy, COLS * look.col_w, ROWS * look.pitch, 0);
 	for (u32 r = 0; r < HEX_ROWS; r++)
 		for (u32 c = 0; c < COLS; c++) {
-			char ch = (kp.symbols ? symbol_keys : hex)[r * COLS + c];
+			char ch = (kp.symbols ? symbol_set() : hex)[r * COLS + c];
 			if (!ch)
 				continue;
 			u32 x = look.grid_x + c * look.col_w - ox, y = look.grid_y + r * look.pitch - oy;
@@ -524,11 +594,15 @@ static void paint_keys(void *ctx, u8 nd, const struct text_window *win, u32 set,
 				 on ? UI_ROLE_TINT : UI_ROLE_BG);
 		if (k == KEY_COLON) {
 			struct paint_label lb;
-			paint_label_char(heading, ':', &lb);
+			paint_label_char(heading, kp.console == CHEATEMU_GB ? '-' : ':', &lb);
 			paint_blit_centred(win, heading, x, y, w, UI_ROLE_TEXT, &lb);
 		} else if (k == KEY_SYMBOLS) {
-			key_word(win, x, y, w, kp.symbols ? S(STR_KEYPAD_KEY_DIGITS) : S(STR_KEYPAD_KEY_SYMBOLS),
-				 UI_ROLE_TEXT);
+			if (kp.console != CHEATEMU_GB)
+				key_word(win, x, y, w,
+					 kp.symbols ? S(STR_KEYPAD_KEY_DIGITS)
+					 : emu()    ? S(STR_KEYPAD_KEY_GENIE)
+						    : S(STR_KEYPAD_KEY_SYMBOLS),
+					 UI_ROLE_TEXT);
 		} else {
 			key_word(win, x, y, w,
 				 k == KEY_LINE     ? S(STR_KEYPAD_KEY_LINE)
@@ -575,9 +649,12 @@ static void show_hints(void)
 {
 	// A types: the keys say so; four chips don't fit
 	kp.hints[0] = (struct ui_hint){"B", S(STR_KEYPAD_HINT_DELETE)};
-	kp.hints[1] = (struct ui_hint){"SELECT", S(STR_KEYPAD_HINT_FORMAT)};
-	kp.hints[2] = (struct ui_hint){"START", S(STR_KEYPAD_HINT_SAVE)};
-	ui_hints_set(node(N_HINTS), kp.hints, 3);
+	// (a GB or NES code has no format to step)
+	u32 n = 1;
+	if (!emu())
+		kp.hints[n++] = (struct ui_hint){"SELECT", S(STR_KEYPAD_HINT_FORMAT)};
+	kp.hints[n++] = (struct ui_hint){"START", S(STR_KEYPAD_HINT_SAVE)};
+	ui_hints_set(node(N_HINTS), kp.hints, n);
 }
 
 // A refusal in the hint area, in danger ink, for look.message frames
@@ -688,7 +765,7 @@ static void clear_all(void)
 {
 	if (kp.e.lines == 1 && !kp.e.len[0])
 		return;
-	keypad_edit_init(&kp.e, "", 0);
+	keypad_edit_init_for(&kp.e, kp.console, "", 0);
 	tlog_debug("keypad: cleared");
 	code_changed();
 }
@@ -704,8 +781,10 @@ static void step_format(void)
 static void press_key(int fresh)
 {
 	if (kp.row < HEX_ROWS && kp.symbols) {
-		char c = symbol_keys[kp.row * COLS + kp.col];
+		char c = symbol_set()[kp.row * COLS + kp.col];
 		type(c);
+		if (emu())
+			return;  // letters come in a row: the key stays
 		// Digits come after most; ']' and '^' are followed by more symbols as often
 		if (c != ']' && c != '^')
 			show_symbols(0, 1);
@@ -717,10 +796,10 @@ static void press_key(int fresh)
 	}
 	switch (func_at(kp.col)) {
 	case KEY_COLON:
-		type(':');
+		type(kp.console == CHEATEMU_GB ? '-' : ':');
 		break;
 	case KEY_SYMBOLS:
-		if (fresh)
+		if (fresh && kp.console != CHEATEMU_GB)
 			show_symbols(!kp.symbols, 0);
 		break;
 	case KEY_LINE:
@@ -767,7 +846,7 @@ static void act(u16 key, int fresh)
 			code_changed();
 		break;
 	case INPUT_SELECT:
-		if (fresh)
+		if (fresh && !emu())
 			step_format();
 		break;
 	case INPUT_START:
@@ -870,7 +949,8 @@ int keypad_run(const struct keypad_ask *ask, char *out, u8 *format)
 	memset(&kp, 0, sizeof(kp));
 	kp.logged_status = 0xFF;  // the first check is logged
 	kp.ask = ask;
-	if (!keypad_edit_init(&kp.e, ask->code ? ask->code : "", ask->code ? ask->code_len : 0)) {
+	kp.console = ask->console;
+	if (!keypad_edit_init_for(&kp.e, ask->console, ask->code ? ask->code : "", ask->code ? ask->code_len : 0)) {
 		tlog("keypad: the code can't be edited here");
 		return -1;
 	}

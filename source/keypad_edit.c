@@ -3,9 +3,18 @@
 
 #include <string.h>
 
+#include "cheatemu.h"
+
 int keypad_is_mark(char c)
 {
 	return c == '?' || c == 'X' || c == 'x' || c == 'Y' || c == 'y' || c == 'Z' || c == 'z';
+}
+
+// 1 for a stand-in in line text of e: the GBA's (digits to come, X Y Z too),
+// but a GB or NES code's only '?' (X, Y and Z are NES genie letters)
+static int mark(const struct keypad_edit *e, char c)
+{
+	return e->console != CHEATEMU_GBA ? c == '?' : keypad_is_mark(c);
 }
 
 static int is_hex(char c)
@@ -82,7 +91,7 @@ static int caret_to_mark(struct keypad_edit *e, u32 col)
 {
 	u32 l = e->line;
 	for (u32 c = col; c < e->len[l]; c++)
-		if (keypad_is_mark(e->text[l][c])) {
+		if (mark(e, e->text[l][c])) {
 			e->caret = (u8)c;
 			return 1;
 		}
@@ -95,6 +104,35 @@ int keypad_edit_key(char c)
 	return is_hex(c) || c == ':' || c == '+' || is_raw(c);
 }
 
+static int genie_letter(char c)
+{
+	static const char letters[] = "APZLGITYEOXUKSVN";
+	c = upper(c);
+	for (u32 i = 0; i < 16; i++)
+		if (letters[i] == c)
+			return 1;
+	return 0;
+}
+
+int keypad_edit_key_for(u32 console, char c)
+{
+	if (console == CHEATEMU_GB)
+		return is_hex(c) || c == '-' || c == '?';
+	if (console == CHEATEMU_NES)
+		return genie_letter(c) || is_hex(c) || c == ':' || c == '?';
+	return keypad_edit_key(c);
+}
+
+int keypad_edit_typable_for(u32 console, const char *code, u32 len)
+{
+	if (console == CHEATEMU_GBA)
+		return keypad_edit_typable(code, len);
+	for (u32 i = 0; i < len; i++)
+		if (!is_sep(code[i]) && !keypad_edit_key_for(console, code[i]))
+			return 0;
+	return 1;
+}
+
 int keypad_edit_typable(const char *code, u32 len)
 {
 	for (u32 i = 0; i < len; i++)
@@ -105,7 +143,13 @@ int keypad_edit_typable(const char *code, u32 len)
 
 int keypad_edit_init(struct keypad_edit *e, const char *code, u32 len)
 {
+	return keypad_edit_init_for(e, CHEATEMU_GBA, code, len);
+}
+
+int keypad_edit_init_for(struct keypad_edit *e, u32 console, const char *code, u32 len)
+{
 	memset(e, 0, sizeof(*e));
+	e->console = (u8)console;
 	e->lines = 1;
 	u32 pos = 0;
 	while (pos < len) {
@@ -124,15 +168,17 @@ int keypad_edit_init(struct keypad_edit *e, const char *code, u32 len)
 			next++;
 		while (next + vn < len && !is_sep(code[next + vn]))
 			vn++;
-		int pair = n == 8 && all_digits(code + start, 8) && (vn == 4 || vn == 8) && all_digits(code + next, vn);
+		int pair = console == CHEATEMU_GBA && n == 8 && all_digits(code + start, 8) && (vn == 4 || vn == 8) &&
+			   all_digits(code + next, vn);
 		u32 total = n + (pair ? vn : 0);
 		u32 line = e->len[0] ? e->lines : 0;
 		int typable = 1;
 		for (u32 i = start; i < pos; i++)
-			if (!keypad_edit_key(code[i]) && !keypad_is_mark(code[i]))
+			if (!keypad_edit_key_for(console, code[i]) && !mark(e, code[i]))
 				typable = 0;
 		if (!typable || total > KEYPAD_LINE_MAX || line >= KEYPAD_LINES) {
 			memset(e, 0, sizeof(*e));
+			e->console = (u8)console;
 			e->lines = 1;
 			return 0;
 		}
@@ -154,14 +200,14 @@ int keypad_edit_init(struct keypad_edit *e, const char *code, u32 len)
 
 int keypad_edit_type(struct keypad_edit *e, char c)
 {
-	if (!keypad_edit_key(c))
+	if (!keypad_edit_key_for(e->console, c))
 		return 0;
 	c = upper(c);
 	u32 l = e->line;
 	char *t = e->text[l];
 	if (c == '+' && (!e->caret || t[e->caret - 1] != ']'))
 		return 0;  // a '+' in a line is a pointer's offset's; Line starts another
-	if (is_hex(c) && e->caret < e->len[l] && keypad_is_mark(t[e->caret])) {
+	if ((e->console == CHEATEMU_GBA ? is_hex(c) : c != '?') && e->caret < e->len[l] && mark(e, t[e->caret])) {
 		t[e->caret] = c;
 		// On to the next stand-in, on a later line too
 		if (caret_to_mark(e, e->caret + 1u))
@@ -245,7 +291,7 @@ u32 keypad_edit_marks(const struct keypad_edit *e)
 	u32 n = 0;
 	for (u32 i = 0; i < e->lines; i++)
 		for (u32 c = 0; c < e->len[i]; c++)
-			n += (u32)keypad_is_mark(e->text[i][c]);
+			n += (u32)mark(e, e->text[i][c]);
 	return n;
 }
 
@@ -255,7 +301,7 @@ u32 keypad_edit_digits(const struct keypad_edit *e, u32 i, u32 format, u32 *expe
 	if (i >= e->lines)
 		return 0;
 	u32 n = e->len[i];
-	if (is_raw_line(e, i) || format == CHEAT_FMT_TORII)
+	if (e->console != CHEATEMU_GBA || is_raw_line(e, i) || format == CHEAT_FMT_TORII)
 		return n;
 	if (format == CHEAT_FMT_CODEBREAKER)
 		*expect = 12;
@@ -270,7 +316,7 @@ u32 keypad_edit_digits(const struct keypad_edit *e, u32 i, u32 format, u32 *expe
 // two parts
 static int two_parts(const struct keypad_edit *e, u32 i)
 {
-	return (e->len[i] == 12 || e->len[i] == 16) && all_digits(e->text[i], e->len[i]);
+	return e->console == CHEATEMU_GBA && (e->len[i] == 12 || e->len[i] == 16) && all_digits(e->text[i], e->len[i]);
 }
 
 u32 keypad_edit_code(const struct keypad_edit *e, char *out, u32 size)
@@ -309,7 +355,7 @@ u32 keypad_edit_code(const struct keypad_edit *e, char *out, u32 size)
 u32 keypad_edit_show(const struct keypad_edit *e, u32 i, char *out, u32 *caret)
 {
 	u32 n = 0;
-	int spaced = !is_raw_line(e, i);
+	int spaced = e->console == CHEATEMU_GBA && !is_raw_line(e, i);
 	for (u32 c = 0; c <= e->len[i]; c++) {
 		if (c == 8 && spaced && e->len[i] > 8)
 			out[n++] = ' ';
@@ -322,6 +368,50 @@ u32 keypad_edit_show(const struct keypad_edit *e, u32 i, char *out, u32 *caret)
 	return n;
 }
 
+// A GB or NES code: every line must read alone (else the first that doesn't is
+// KEYPAD_SHAPE, as a line still being typed), then the cheat as the cheat file
+// decodes it: its lines, the patches and pokes they make
+static void check_emu(const struct keypad_edit *e, struct cheatfile_work *w, const char *code, u32 len,
+		      struct keypad_check *out)
+{
+	for (u32 i = 0; i < e->lines; i++) {
+		if (!e->len[i])
+			continue;
+		struct emucheat line;
+		u32 n;
+		for (u32 k = 0; k < e->len[i]; k++)
+			if (e->text[i][k] == '?') {
+				out->status = KEYPAD_FILL;
+				return;
+			}
+		if (cheatemu_decode(e->console, e->text[i], e->len[i], &line, 1, &n) == CHEATEMU_UNREADABLE) {
+			out->status = KEYPAD_SHAPE;
+			out->line = (u8)i;
+			return;
+		}
+	}
+	u8 lowered;
+	u8 saved = w->console;
+	w->console = e->console;
+	u8 status = cheatfile_decode(w, NULL, code, len, &out->ops, &lowered);
+	w->console = saved;
+	out->patches = w->n_patches;
+	switch (status) {
+	case CHEATFILE_OK:
+		out->status = KEYPAD_OK;
+		break;
+	case CHEATFILE_BIG:
+		out->status = KEYPAD_BIG;
+		break;
+	case CHEATFILE_CANT_RUN:
+		out->status = KEYPAD_CANT_RUN;
+		break;
+	default:
+		out->status = KEYPAD_WRONG;
+		break;
+	}
+}
+
 void keypad_check(const struct keypad_edit *e, u8 format, const struct cheat_decoder *ctx, struct cheatfile_work *w,
 		  char *scratch, struct keypad_check *out)
 {
@@ -330,6 +420,10 @@ void keypad_check(const struct keypad_edit *e, u8 format, const struct cheat_dec
 	u32 len = keypad_edit_code(e, scratch, KEYPAD_CODE_MAX + 1);
 	if (!len) {
 		out->status = KEYPAD_EMPTY;
+		return;
+	}
+	if (e->console != CHEATEMU_GBA) {
+		check_emu(e, w, scratch, len, out);
 		return;
 	}
 	// Every line a code line's shape first; the first's tells the format

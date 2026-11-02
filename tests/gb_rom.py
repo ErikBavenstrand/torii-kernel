@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Writes a tiny Game Boy ROM for tests/gb_save.sh: usage gb_rom.py OUT.gb [8|cheat|poke|pokegbc]
+"""Writes a tiny Game Boy ROM for tests/gb_save.sh: usage gb_rom.py OUT.gb [8|cheat|cheatgbc|poke|pokegbc]
 
 Written for Torii's tests (no third-party code), so it can live in the
 repo. MBC5 with 32 KB of battery-backed RAM (cart type $1B, RAM size $03),
@@ -51,7 +51,7 @@ def rom(ram_kb: int = 32) -> bytes:
     return bytes(data)
 
 
-def cheat_rom() -> bytes:
+def cheat_rom(gbc: bool = False) -> bytes:
     """tests/emu_cheats.sh's game: MBC5, four 16 KB banks, no RAM.
 
     The program stores what the routine at $4000 returns at $C001 and loops
@@ -63,6 +63,7 @@ def cheat_rom() -> bytes:
     data[0x100:0x104] = bytes([0x00, 0xC3, 0x50, 0x01])
     data[0x104:0x108] = bytes([0xCE, 0xED, 0x66, 0x66])
     data[0x134:0x13C] = b"CHEATTST"
+    data[0x143] = 0x80 if gbc else 0x00  # GBC-compatible (tests/emu_cheats.sh's .gbc)
     data[0x147] = 0x19  # MBC5
     data[0x148] = 0x01  # 64 KB
     data[0x14D] = (-sum(data[0x134:0x14D]) - (0x14D - 0x134)) & 0xFF
@@ -121,9 +122,9 @@ if __name__ == "__main__":
         with open(sys.argv[1], "wb") as f:
             f.write(poke_rom(sys.argv[2] == "pokegbc"))
         sys.exit(0)
-    if len(sys.argv) > 2 and sys.argv[2] == "cheat":
+    if len(sys.argv) > 2 and sys.argv[2] in ("cheat", "cheatgbc"):
         with open(sys.argv[1], "wb") as f:
-            f.write(cheat_rom())
+            f.write(cheat_rom(sys.argv[2] == "cheatgbc"))
         sys.exit(0)
     with open(sys.argv[1], "wb") as f:
         f.write(rom(int(sys.argv[2]) if len(sys.argv) > 2 else 32))

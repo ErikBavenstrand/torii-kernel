@@ -1,0 +1,34 @@
+# A NES game's code keypad over tests/shots/data/cheat-nes.cht: START, Edit code on the
+# first cheat, an eight-letter Game Genie code (edit); the GG key (the function row's
+# third) turns the digits into the genie's 16 letters (letters); a letter typed (typed).
+#! settings 28=1
+#! sd-file /Cheat.nes 0 tests/shots/data/cheat.nes
+#! sd-file /torii/cheats/Cheat.cht 0 tests/shots/data/cheat-nes.cht
+# The tests' hook: lists open on their first row
+-p 30:nav_test_action:2113929225
+-w "nav: test hook 9 "
+-w "nav: home ready"
+-k @8:RIGHT -k @12:-
+-k @16:RIGHT -k @20:- -k @28:A -k @32:-
+-w "nav: page nes ready"
+-k @16:START -k @20:-
+-w "screen ready: game-popup"
+-k @12:DOWN -k @16:- -k @24:DOWN -k @28:-
+-k @48:A -k @52:-
+-w "screen ready: cheats"
+-k @8:START -k @12:-
+-w "screen ready: cheat-menu"
+-k @24:DOWN -k @28:- -k @40:A -k @44:-
+-w "screen ready: keypad"
+-s @8:edit.png
+-k @16:DOWN -k @20:- -k @28:DOWN -k @32:- -k @40:RIGHT -k @44:- -k @52:RIGHT -k @56:- -k @64:A -k @68:-
+-s @84:letters.png
+-k @92:UP -k @96:- -k @104:UP -k @108:- -k @116:A -k @120:-
+-s @136:typed.png
+# Save: its name asked (name), START keeps it, and the list shows the code as typed (saved)
+-k @144:B -k @148:- -k @160:START -k @164:-
+-w "screen ready: rename"
+-s @8:name.png
+-k @16:START -k @20:-
+-w "screen ready: cheats"
+-s @24:saved.png

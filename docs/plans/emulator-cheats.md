@@ -5,6 +5,71 @@ cheats" (`roadmap.md`). Goal: the cheat screen, folders, picks and `/torii/cheat
 work for GB, GBC and NES as for GBA, with the picks applied at launch. Status marks: 🟢 read in
 the code, 🟡 from memory of other sources and to be checked, 🔴 unknown.
 
+## Status (2026-11-02, after stages 0-4)
+
+Everything below stages 0-3 shipped as designed, plus typing codes on the
+cart (stage 4). Where the build differs from the design:
+
+- **Poke table in `.rodata`.** `torii_cheats` is `const volatile` in section
+  `.rodata.torii_cheats` of each emulator (a first build had it in IWRAM, which
+  overflowed). The kernel finds it by its magic once per launch
+  (`cheatemu_find_table`); a kernel test asserts exactly one per image, empty.
+- **The poke budget** is 63, not 64: a poke takes 80 bytes (20 words) of the
+  cheat file's table budget (`CHEATFILE_POKE_WORDS`), so the picks together
+  fit the emulator's 64-entry table.
+- **GB hook** sits inside `newframe_vblank` (lcd.s), which saves every register
+  itself, not after the `bl` in timeout.s. Five games' screens and WRAM were
+  identical with the hook and an empty table, over 700 frames.
+- **GameShark types:** `01` and `90`-`97` to WRAM (C000-DFFF, the echo) and HRAM
+  (FF80-FFFE) run. The type byte follows EnHacklopedia's Game Boy page
+  (`9b`: WRAM bank b, GBC only; `8b`: cart RAM bank b) and gambatte
+  (`applyVblankCheats` applies `01` only, at the VBlank interrupt); mGBA writes
+  any type's address through the bus, ignoring the type.
+- **Left greyed, with the reason:**
+  - *Cart RAM (`01` at A000-BFFF, `8b`).* Jagoomba keeps the cart's RAM as a copy
+    in EWRAM (`XGB_SRAM`) and copies it whole to the cart's SRAM at saves and
+    in save states (`sram.c`: `bytecopy(MEM_SRAM, XGB_SRAM, ...)`, `lzo1x_1_compress(XGB_SRAM...)`):
+    a poke into the copy reaches the save file, and one made through the game's
+    write path (`sram_W2`) writes the cart's SRAM at once. A cheat that must not
+    change the save can't be done by writing there. (A real GameShark does change
+    the battery save; Torii doesn't.) `8b` has one source only (EnHacklopedia;
+    PyBoy's copy of it is commented out), so it isn't implemented either way.
+  - Writes to the ROM, VRAM, OAM, I/O and IE, and types other than `01`, `90`-`97`.
+  - NES: raw writes outside RAM (0000-1FFF) and PRG-RAM (6000-7FFF) are unreadable;
+    the compare form `AAAA?CC:VV` is unread (libretro has none).
+- **GBC Game Genie** (roadmap: "left"): nothing was missing in the code, the GB
+  and GBC paths are one. It is now tested on a `.gbc` test ROM and, from the
+  owned game list, a real GBC game (`tests/emu_cheats.sh`): a code made from the
+  ROM's own bytes changes exactly the banks that hold its compare byte in the
+  game's PSRAM copy.
+- **Typing codes** (`keypad_edit.c`, `screens/keypad.c`): the keypad types GB codes
+  with hex digits and `-` (the `:` key becomes `-`), NES codes with the hex digits
+  and `:`, the GG key swapping the digits for the 16 genie letters. A line must
+  read alone (else "isn't a whole code yet"), then the cheat as cheatemu decodes
+  it; what it does is the result line. Buttons stay hidden.
+
+### Speed of the hooks, measured on the emulated cart (2026-11-02)
+
+TM3 read around the call (1 cycle a tick), 600-700 frames of real games and the
+tiny test ROM, mean cycles per call (a GB frame is 280,896 cycles):
+
+| Hook | Table | Cycles per frame | Share of a frame |
+| --- | --- | --- | --- |
+| Jagoomba, Dr. Mario (GB) | empty | 63 | 0.02% |
+| Jagoomba, Donkey Kong Country (GBC) | empty | 63 | 0.02% |
+| Jagoomba, Dr. Mario | 63 pokes | 9,630 | 3.4% |
+| Jagoomba, Donkey Kong Country | 63 pokes | 9,710 | 3.5% |
+| PocketNES, test ROM | empty | 90 | 0.03% |
+| PocketNES, test ROM | 63 pokes | 3,780 | 1.3% |
+
+About 150 cycles a poke in Jagoomba and 58 in PocketNES: the hook runs from ROM
+(PSRAM, wait states), and IWRAM has no room for it. A typical cheat of 5 pokes
+costs 0.27% of a GB frame. The first version, reading each field of an entry
+separately, cost 88 cycles empty and 9,960 with 63 pokes; two word loads an
+entry brought it to the above. The mean excludes the IRQs that land inside the
+call (the maximum, up to 32,000, is a sound or VBlank IRQ). Not measured on a
+real cart, whose PSRAM timing may differ.
+
 ## What the code does today
 
 - 🟢 Only GBA reaches cheats. `action_launch` reads the picks only `!game.is_emu` (`source/actions.c:188`);

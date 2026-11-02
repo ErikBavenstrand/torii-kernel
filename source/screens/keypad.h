@@ -33,6 +33,10 @@ struct keypad_ask {
 	// The file's decoder as it is before the cheat's place: an AUTO code
 	// decodes as the file will read it (a GameShark version, a key)
 	const struct cheat_decoder *ctx;
+	// The game's console (cheatemu.h's enum cheatemu_console, 0 the GBA's): a GB
+	// game's code is typed with hex digits and '-', a NES game's with the genie
+	// letters or hex digits and ':', and checked by cheatemu's decoders
+	u8 console;
 };
 
 // Runs the keypad in the menu's session (its views popped first) until

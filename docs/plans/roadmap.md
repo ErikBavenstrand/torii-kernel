@@ -82,7 +82,7 @@ The UX reviews' open proposals (`docs/design/v0.5/ux-review.md`, `settings-ux-re
 ### Emulators and cheats
 
 - **(1.0?) Hi-colour GBC:** these games lose mid-frame palette writes (jagoombacolor#20, #53). A per-line palette path in Jagoomba needs about 18 KB and its last DMA channel (`docs/research/gbc-hicolor.md`).
-- **GB, GBC and NES cheats, what is left** (design `docs/plans/emulator-cheats.md`; stages 0-3 are in Unreleased): typing a code on the cart for these games (the keypad hides for them), more GameShark types (cart RAM, `8B`), GBC Game Genie, a real-cart check of all of it, and the speed of the GB frame hook measured (estimated 0.02% empty, 1.4% with 63 pokes).
+- **GB, GBC and NES cheats, what is left** (design and status `docs/plans/emulator-cheats.md`; stages 0-4 are in Unreleased, typing codes on the cart too): a check of all of it on a real cart (nothing here has run on one: PSRAM timing, the emulators' hooks and the patches), cart RAM cheats (greyed: Jagoomba's copy of the RAM reaches the save, so a poke would change it), and `8B` (one source). The hooks cost 0.02% of a GB frame empty and 3.4% with 63 pokes (PocketNES 0.03% and 1.3%), measured on the emulated cart.
 - **(maybe) Live values in game** (owner, 2026-10-30: less useful than the rest): each cheat in the in-game list shows the value now at the address it writes ("Money 3,421"), with digits the kernel draws for the overlay. Encrypted values (Pokémon's money) would read as nonsense.
 - From the trackers: jagoombacolor#42 accuracy tests, #43 a GBC-compatible ROM run as DMG, #34 the default palette; PocketNES#14 multiboot.
 

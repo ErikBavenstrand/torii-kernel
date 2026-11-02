@@ -329,3 +329,91 @@ void test_keypad_raw_ext(void)
 	CHECK_EQ(e.len[0], KEYPAD_LINE_MAX);
 	CHECK(!keypad_edit_type(&e, '0'));
 }
+
+// A GB or NES game's keypad: the codes as written (no spaces, no GBA shapes), '-'
+// for GB, the genie letters for NES, '?' the only stand-in, and cheatemu's
+// decoders say what they read as
+void test_keypad_emu(void)
+{
+	char cs[KEYPAD_CODE_MAX + 1];
+	struct keypad_check c;
+	work.console = CHEATEMU_GB;
+	// GB: hex digits and '-', not letters past F or ':'
+	CHECK(keypad_edit_init_for(&e, CHEATEMU_GB, "", 0));
+	CHECK(keypad_edit_key_for(CHEATEMU_GB, '-'));
+	CHECK(keypad_edit_key_for(CHEATEMU_GB, 'a'));
+	CHECK(!keypad_edit_key_for(CHEATEMU_GB, 'G'));
+	CHECK(!keypad_edit_key_for(CHEATEMU_GB, ':'));
+	CHECK(!keypad_edit_key_for(CHEATEMU_GB, '+'));
+	CHECK(!keypad_edit_type(&e, 'G'));
+	keypad_check(&e, CHEAT_FMT_AUTO, NULL, &work, cs, &c);
+	CHECK_EQ(c.status, KEYPAD_EMPTY);
+	type_s("FA0-99");
+	keypad_check(&e, CHEAT_FMT_AUTO, NULL, &work, cs, &c);
+	CHECK_EQ(c.status, KEYPAD_SHAPE);  // not a whole line yet
+	CHECK(keypad_edit_type(&e, '9'));
+	keypad_check(&e, CHEAT_FMT_AUTO, NULL, &work, cs, &c);
+	CHECK_EQ(c.status, KEYPAD_OK);
+	CHECK_EQ(c.patches, 1);
+	CHECK(!strcmp(cs, "FA0-999"));
+	type_s("-4C1");
+	CHECK(!strcmp(code_of(), "FA0-999-4C1"));  // no space ever
+	keypad_check(&e, CHEAT_FMT_AUTO, NULL, &work, cs, &c);
+	CHECK_EQ(c.status, KEYPAD_OK);
+	// A second line: a GameShark write (8 digits, whole, not a GBA code's 8+4)
+	CHECK(keypad_edit_break(&e));
+	type_s("01995EDB");
+	CHECK(!strcmp(code_of(), "FA0-999-4C1+01995EDB"));
+	keypad_check(&e, CHEAT_FMT_AUTO, NULL, &work, cs, &c);
+	CHECK_EQ(c.status, KEYPAD_OK);
+	CHECK_EQ(c.patches, 2);
+	char shown[KEYPAD_LINE_MAX + 2];
+	CHECK_EQ(keypad_edit_show(&e, 1, shown, NULL), 8);  // not "01995EDB" with a space
+	CHECK(!strcmp(shown, "01995EDB"));
+	// A GameShark write to cart RAM reads but doesn't run
+	CHECK(keypad_edit_init_for(&e, CHEATEMU_GB, "01FF00A1", 8));
+	keypad_check(&e, CHEAT_FMT_AUTO, NULL, &work, cs, &c);
+	CHECK_EQ(c.status, KEYPAD_CANT_RUN);
+	// Wildcards are '?': stand-ins to fill, saved as a code that doesn't read yet
+	CHECK(keypad_edit_init_for(&e, CHEATEMU_GB, "01??DCC4", 8));
+	CHECK_EQ(keypad_edit_marks(&e), 2);
+	CHECK_EQ(e.caret, 2);
+	CHECK(keypad_edit_type(&e, '7'));
+	CHECK(keypad_edit_type(&e, 'F'));
+	CHECK_EQ(keypad_edit_marks(&e), 0);
+	keypad_check(&e, CHEAT_FMT_AUTO, NULL, &work, cs, &c);
+	CHECK_EQ(c.status, KEYPAD_OK);
+	CHECK(!strcmp(cs, "017FDCC4"));
+	// A file's code is typable if its characters are
+	CHECK(keypad_edit_typable_for(CHEATEMU_GB, "FA0-999-4C1+01995EDB", 20));
+	CHECK(!keypad_edit_typable_for(CHEATEMU_GB, "0754:00", 7));
+	CHECK(!keypad_edit_typable_for(CHEATEMU_GB, "SXIOPO", 6));
+
+	// NES: the genie letters, hex digits and ':'; X, Y and Z are letters, not stand-ins
+	work.console = CHEATEMU_NES;
+	CHECK(keypad_edit_init_for(&e, CHEATEMU_NES, "", 0));
+	CHECK(keypad_edit_key_for(CHEATEMU_NES, 'S'));
+	CHECK(keypad_edit_key_for(CHEATEMU_NES, 'x'));
+	CHECK(keypad_edit_key_for(CHEATEMU_NES, ':'));
+	CHECK(keypad_edit_key_for(CHEATEMU_NES, 'B'));  // a hex digit, for raw codes
+	CHECK(!keypad_edit_key_for(CHEATEMU_NES, 'W'));
+	CHECK(!keypad_edit_key_for(CHEATEMU_NES, '-'));
+	CHECK(!keypad_edit_type(&e, 'W'));
+	type_s("SXIOP");
+	CHECK_EQ(keypad_edit_marks(&e), 0);
+	keypad_check(&e, CHEAT_FMT_AUTO, NULL, &work, cs, &c);
+	CHECK_EQ(c.status, KEYPAD_SHAPE);
+	CHECK(keypad_edit_type(&e, 'O'));
+	keypad_check(&e, CHEAT_FMT_AUTO, NULL, &work, cs, &c);
+	CHECK_EQ(c.status, KEYPAD_OK);
+	// A raw RAM write, and one to the ROM (no RAM there)
+	CHECK(keypad_edit_break(&e));
+	type_s("0754:00");
+	keypad_check(&e, CHEAT_FMT_AUTO, NULL, &work, cs, &c);
+	CHECK_EQ(c.status, KEYPAD_OK);
+	CHECK(!strcmp(code_of(), "SXIOPO+0754:00"));
+	CHECK(keypad_edit_init_for(&e, CHEATEMU_NES, "8000:01", 7));
+	keypad_check(&e, CHEAT_FMT_AUTO, NULL, &work, cs, &c);
+	CHECK_EQ(c.status, KEYPAD_SHAPE);  // reads as no line: an address with no RAM
+	work.console = CHEATEMU_GBA;
+}

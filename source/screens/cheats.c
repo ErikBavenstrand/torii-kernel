@@ -164,7 +164,7 @@ static struct {
 	u8 act;      // ACT_*, and its row and entry
 	u8 only;     // only the picked cheats show
 	u8 add_why;  // cheatstore_can_add's: + Add code greyed unless CHEATFILE_EDIT_OK
-	u8 emu;      // a GB, GBC or NES game's file: no + Add code, Edit code or Buttons; Game Genie lines only
+	u8 emu;      // a GB, GBC or NES game's file: no Buttons (its picks run at launch or every frame)
 	u8 picked;   // a cheat was picked on this visit: the boot mode is checked on leaving
 	u8 measure;  // frames left to measure as "cheats-toggle"
 	u8 close;    // B on the Guide page or the Buttons page
@@ -1356,10 +1356,10 @@ static u32 cs_rows(u32 at)
 		}
 		if (!cs.only && run_n > 1)
 			run_done(run_row, run_start, run_n);
-		if (!cs.only && !cs.emu)
+		if (!cs.only)
 			cheatlist_row_put(r++, ROW(ROW_ADD, 0));
 	}
-	cs.has_add = cs.group == CHEATFILE_NONE && !cs.only && !cs.emu;
+	cs.has_add = cs.group == CHEATFILE_NONE && !cs.only;
 	cs.count = r;
 	cs.sel = r - cs.n_heads;
 	cs.picks = cheatstore_picks();
@@ -1638,14 +1638,19 @@ static u32 cs_code(u32 g, int fill)
 	if (g == CHEATFILE_NONE && s->list.count && cs_focus(s->list.count - 1) == CHEATFILE_NONE)
 		return row;
 	const struct cheatfile_cheat *c = at != CHEATFILE_NONE ? &s->cheats[at] : NULL;
-	struct keypad_ask ask = {
-		cs.icon, c ? S(STR_KEYPAD_TITLE_EDIT) : S(STR_KEYPAD_TITLE_ADD), NULL, 0, CHEAT_FMT_AUTO, NULL};
+	struct keypad_ask ask = {cs.icon,
+				 c ? S(STR_KEYPAD_TITLE_EDIT) : S(STR_KEYPAD_TITLE_ADD),
+				 NULL,
+				 0,
+				 CHEAT_FMT_AUTO,
+				 NULL,
+				 (u8)cheatstore_console()};
 	struct cheat_decoder ctx;
 	cheatstore_decoder_before(c ? at : f->count, &ctx);
 	ask.ctx = &ctx;
 	snprintf(cs.name, sizeof(cs.name), "%s", cs.new_name);
 	if (c) {
-		if (!keypad_edit_typable(f->text + c->code, cheatfile_code_len(c))) {
+		if (!keypad_edit_typable_for(cheatstore_console(), f->text + c->code, cheatfile_code_len(c))) {
 			dialog_message(cs.heading, S(STR_CHEATS_UNTYPABLE), DIALOG_INFO);
 			return row;
 		}
@@ -2306,8 +2311,7 @@ static u32 cs_menu(u32 row)
 		const char *name = entry_name(&e, &len);
 		name_copy(cs.pop_title, sizeof(cs.pop_title), name, len);
 		ITEM(MENU_GUIDE, S(STR_CHEATS_MENU_GUIDE), 0);
-		if (!cs.emu)
-			ITEM(MENU_EDIT, S(STR_CHEATS_MENU_EDIT), 0);
+		ITEM(MENU_EDIT, S(STR_CHEATS_MENU_EDIT), 0);
 		ITEM(MENU_RENAME, S(STR_CHEATS_MENU_RENAME), 0);
 		if (!cs.emu)
 			ITEM(MENU_BUTTONS, S(STR_CHEATS_MENU_BUTTONS), 0);
@@ -2319,8 +2323,7 @@ static u32 cs_menu(u32 row)
 	cs.add_head = cs.only ? 0 : cs.place;
 	if (ROW_KIND(cs.cur_value) == ROW_ADD)
 		cs.add_head = 0;
-	if (!cs.emu)
-		ITEM(MENU_ADD, S(STR_CHEATS_MENU_ADD), cs.add_why == CHEATFILE_EDIT_OK ? 0 : UI_POP_DIM);
+	ITEM(MENU_ADD, S(STR_CHEATS_MENU_ADD), cs.add_why == CHEATFILE_EDIT_OK ? 0 : UI_POP_DIM);
 	ITEM(MENU_ALL_OFF, S(STR_CHEATS_MENU_ALL_OFF), cs.picks ? 0 : UI_POP_DIM);
 	ITEM(MENU_ONLY, cs.only ? S(STR_CHEATS_MENU_ALL) : S(STR_CHEATS_MENU_ONLY),
 	     cs.picks || cs.only ? 0 : UI_POP_DIM);
@@ -2466,7 +2469,7 @@ void cheats_run(const char *rom_path, const char *title, u16 icon)
 	     (unsigned long)s->list.count, (unsigned long)greyed, (unsigned long)cs.picks,
 	     (unsigned long)s->file.bytes + s->file.more_bytes, (unsigned long)cs.count,
 	     (unsigned long)(torii_frames - began), opened == CHEATSTORE_NEW ? ", no file yet" : "");
-	if (!cs.emu && cs.add_why != CHEATFILE_EDIT_OK)
+	if (cs.add_why != CHEATFILE_EDIT_OK)
 		tlog("cheats: + Add code greyed: %s", add_reason());
 	int up = cs_show(row);
 	while (up) {

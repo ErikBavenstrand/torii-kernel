@@ -26,7 +26,7 @@ new_cart() {
   local file=$1 cht=${2:-}
   rm -rf "$cart" && mkdir -p "$cart"
   case $file in
-  *.gb) python3 tests/gb_rom.py "$cart/game" "${gbmode:-cheat}" ;;
+  *.gb | *.gbc) python3 tests/gb_rom.py "$cart/game" "${gbmode:-cheat}" ;;
   *.nes) python3 tests/nes_rom.py "$cart/game" "${mode:-cheat}" ;;
   esac
   mkfs.fat -C -F 32 -n EMU "$cart/sd.img" 65536 >/dev/null
@@ -183,6 +183,68 @@ new_cart /Cheat.gb "$(gs 915500D1)"
 play /Cheat.gb
 expect_count "gbc gameshark, bank 1" 00
 gbmode=cheat
+
+# --- GBC: the same codes in a .gbc game (Jagoomba's GBC mode), and a real GBC game
+gbmode=cheatgbc
+new_cart /Cheat.gbc "$(cht Red "$(gb 4001 1F E0)")"
+play /Cheat.gbc
+expect red "gbc genie with its compare" "cheats: 1 lines made 1 patches in the game"
+new_cart /Cheat.gbc "$(cht Red "$(gb 4001 1F)")"
+play /Cheat.gbc
+expect red "gbc 6-digit genie" "cheats: 1 lines made 3 patches in the game"
+new_cart /Cheat.gbc "$(cht Wrong "$(gb 4001 1F 99)")"
+play /Cheat.gbc
+expect plain "gbc genie whose compare matches no bank"
+gbmode=cheat
+
+# A real GBC game, if the card of games is here: a code for an address in the switched banks,
+# made from the ROM's own bytes (its compare is a byte the address holds in some banks only),
+# patches exactly those banks' bytes in the game's copy in PSRAM (the cart's ROM space)
+real="roms/Donkey Kong Country.gbc"
+if [ -f "$real" ]; then
+  emu_size=$(stat -c %s emulators/out/jagoombacolor.gba)
+  mapfile -t plan < <(
+    python3 - "$real" "$emu_size" <<'PY'
+import sys
+sys.path.insert(0, "tests")
+from emu_cheat_codes import gb_genie
+
+rom = open(sys.argv[1], "rb").read()
+emu = int(sys.argv[2])
+banks = len(rom) // 0x4000
+addr = 0x4123
+vals = {b: rom[b * 0x4000 + (addr - 0x4000)] for b in range(1, banks)}
+# the byte held by the fewest banks (at least one, so the code does something)
+compare = min(set(vals.values()), key=lambda v: list(vals.values()).count(v))
+value = compare ^ 0xFF
+hit = [b for b, v in vals.items() if v == compare]
+miss = [b for b, v in vals.items() if v != compare]
+print(gb_genie(addr, value, compare))
+print(f"{value:02X}")
+print(" ".join(f"{0x08000000 + emu + b * 0x4000 + (addr - 0x4000):X}:{value:02X}" for b in hit[:6]))
+print(" ".join(f"{0x08000000 + emu + b * 0x4000 + (addr - 0x4000):X}:{vals[b]:02X}" for b in miss[:3]))
+PY
+  )
+  code=${plan[0]}
+  rm -rf "$cart" && mkdir -p "$cart"
+  mkfs.fat -C -F 32 -n EMU "$cart/sd.img" 65536 >/dev/null
+  mcopy -i "$cart/sd.img" "$real" "::/Real.gbc"
+  mmd -i "$cart/sd.img" ::/torii ::/torii/cheats
+  printf '%b' "$(cht Real "$code")" >"$cart/game.cht"
+  mcopy -i "$cart/sd.img" "$cart/game.cht" "::/torii/cheats/Real.cht"
+  mems=()
+  for pair in ${plan[2]} ${plan[3]}; do mems+=(-m "700:0x${pair%%:*}:1"); done
+  # shellcheck disable=SC2046 # nav.sh's options
+  OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_launch /Real.gbc at=100) \
+    "${mems[@]}" -f 700 >"$cart/out.txt" 2>"$cart/kernel.log" || fail "the emulator failed on $real"
+  grep -q '^crash at frame' "$cart/kernel.log" && fail "the emulator caught a crash on $real"
+  grep -qF "kernel: launch: starting the game" "$cart/kernel.log" || fail "$real wasn't started"
+  grep -qE "kernel: cheats: 1 lines made [1-9][0-9]* patches in the game" "$cart/kernel.log" || fail "$real: the code ($code) patched nothing"
+  for pair in ${plan[2]} ${plan[3]}; do
+    got=$(sed -n "s/^mem frame [0-9]* 0*${pair%%:*}: \([0-9A-F]*\).*/\1/p" "$cart/out.txt" | head -1)
+    [ "$got" = "${pair##*:}" ] || fail "$real: the byte at ${pair%%:*} is $got, wanted ${pair##*:}"
+  done
+fi
 
 # --- NES (NROM): the backdrop's byte is $2A (green)
 kind=nes

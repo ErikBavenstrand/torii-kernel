@@ -23,6 +23,8 @@
 #define KEYPAD_CODE_MAX (KEYPAD_LINES * (KEYPAD_LINE_MAX + 3))
 
 struct keypad_edit {
+	u8 console;  // enum cheatemu_console: GB and NES codes are typed as they are written (no
+		     // GBA shapes, no spaces, '-' for GB, the 16 genie letters for NES)
 	char text[KEYPAD_LINES][KEYPAD_LINE_MAX + 1];  // NUL-terminated
 	u8 len[KEYPAD_LINES];
 	u8 lines;  // 1 or more
@@ -39,6 +41,14 @@ int keypad_is_mark(char c);
 // part longer than KEYPAD_LINE_MAX or a character the keypad can't type (e
 // is then empty)
 int keypad_edit_init(struct keypad_edit *e, const char *code, u32 len);
+// The same for a game of console (enum cheatemu_console): the code's lines
+// are kept as they are, whole, with no GBA shapes
+int keypad_edit_init_for(struct keypad_edit *e, u32 console, const char *code, u32 len);
+// 1 if the keypad of console types c (GB: hex digits, '-', '?'; NES: the
+// genie letters, hex digits, ':' and '?'; the GBA's: keypad_edit_key's)
+int keypad_edit_key_for(u32 console, char c);
+// keypad_edit_typable for console
+int keypad_edit_typable_for(u32 console, const char *code, u32 len);
 
 // Whether the keypad types every character of code: hex digits, stand-ins,
 // ':', AnyGBA's '[', ']', '^' and '|', and separators
