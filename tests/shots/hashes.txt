@@ -478,7 +478,7 @@ keypad-fill/filled 23A078454EF27C8B
 keypad-gb/dash 531DCA72FC69035A
 keypad-gb/edit 2287CD98C1A3AA24
 keypad-gb/name 1A277E8D3A2FBBBC
-keypad-gb/saved 7C3630D1AB24F3E0
+keypad-gb/saved F685BCE1AB00EB3E
 keypad-nes/edit 43AA1F9D7DFDB0A2
 keypad-nes/letters 5C41A01D3E885E5A
 keypad-nes/name D11D31DCB648F193
@@ -934,7 +934,7 @@ sv-keypad/unreadable 4EEEA4E38BEFDD34
 sv-keypad-gb/dash AC5F04251E010CAD
 sv-keypad-gb/edit 9EFFEB0DFB09659A
 sv-keypad-gb/name 1E6D2E13B6BDA586
-sv-keypad-gb/saved BF6AD97672254083
+sv-keypad-gb/saved 670A9AC5ED8DF36D
 sv-keypad-nes/edit D205A1CD166E44D0
 sv-keypad-nes/letters 3005B29A677E0610
 sv-keypad-nes/name A4144E1DE86A2C39

@@ -216,29 +216,25 @@ u32 cheatemu_shape(const char *code, u32 len)
 		lines++;
 		struct emucheat e;
 		int wild = 0;
-		// GB: XXX-YYY[-ZZZ] whatever its address, 8 digits (or '?'), $ and 8 digits
+		// GB: XXX-YYY[-ZZZ] whatever its address, 8 digits (or '?': a wildcard to fill in), $ and 8 digits
 		if (gb_ok) {
 			int genie = (n == 7 || n == 11) && s[3] == '-' && (n == 7 || s[7] == '-');
 			for (u32 k = 0; genie && k < n; k++)
 				genie = k == 3 || k == 7 || hex_digit(s[k]) >= 0;
-			if (genie)
+			int xploder = n == 9 && s[0] == '$' && gb_digits(s + 1, 8, &wild);
+			int digits = n == 8 && gb_digits(s, n, &wild);
+			if (genie || xploder)
 				gb_sure = 1;
-			else if (n == 8 && gb_digits(s, n, &wild))
+			else if (digits)
 				gb_sure |= wild;
-			else if (n == 9 && s[0] == '$' && gb_digits(s + 1, 8, &wild))
-				gb_sure = 1;
 			else
 				gb_ok = 0;
 		}
-		// NES
+		// NES: a genie word or AAAA:VV (1), or one that reads but doesn't run (2)
 		if (nes_ok) {
 			int k = nes_line(s, n, &e);
-			if (k == 1)
-				nes_sure = 1;  // a genie word, or AAAA:VV
-			else if (k == 2)
-				nes_sure = 1;  // AAAA:VV to an address no poke may write, or AAAA?CC:VV
-			else
-				nes_ok = 0;
+			nes_sure |= k != 0;
+			nes_ok = k != 0;
 		}
 	}
 	if (!lines)
