@@ -81,7 +81,7 @@ The UX reviews' open proposals (`docs/design/v0.5/ux-review.md`, `settings-ux-re
 ### Emulators and cheats
 
 - **(1.0?) Hi-colour GBC:** these games lose mid-frame palette writes (jagoombacolor#20, #53). A per-line palette path in Jagoomba needs about 18 KB and its last DMA channel (`docs/research/gbc-hicolor.md`).
-- **(1.0?) GB, GBC and NES cheats** (owner, 2026-10-25): libretro's GameShark and Game Genie files, with the codes passed to Jagoomba and PocketNES (PocketNES has its own cheat finder).
+- **(1.0?) GB, GBC and NES cheats** (owner, 2026-10-25): libretro's GameShark and Game Genie files, with the codes passed to Jagoomba and PocketNES. **Built but not released** (owner, 2026-11-02: the quality can't be guaranteed yet): Game Genie as ROM patches, GameShark `01` and `90`-`97` and NES raw pokes as per-frame writes, typing codes on the cart; emulator-tested, with 84% of GB, 87% of GBC and 99.5% of NES cheats in libretro's files running, and a first real-cart pass (Pokémon Red's HP poke, Crystal's Game Genie). The work stays unpublished until a fuller real-cart check (Zelda II and other NES codes, a banked game, a save left clean, speed and sound with many pokes) passes and the owner says to ship it.
 - **(maybe) Live values in game** (owner, 2026-10-30: less useful than the rest): each cheat in the in-game list shows the value now at the address it writes ("Money 3,421"), with digits the kernel draws for the overlay. Encrypted values (Pokémon's money) would read as nonsense.
 - From the trackers: jagoombacolor#42 accuracy tests, #43 a GBC-compatible ROM run as DMG, #34 the default palette; PocketNES#14 multiboot.
 
