@@ -56,7 +56,8 @@
 @ conditional covers the next count ops (skipped when false) and, with an
 @ ELSE, the else ops after them (skipped when true), with the same index
 @ arithmetic, so even odd layouts run as there; but lt and gt compare
-@ signed at the op's width, as the devices do. A plain cheat runs its ops
+@ signed at the op's width, as the devices do, and a write through a
+@ pointer lands only in EWRAM or IWRAM (in_ram). A plain cheat runs its ops
 @ in order. Loads and stores are the CPU's own at their width, as mGBA's
 @ bus reads and writes are: an odd halfword or word address is the
 @ hardware's (and mGBA's) rotated load and aligned store.
@@ -317,6 +318,22 @@ run32:	run_loop str
 	b	ext_done
 	.endm
 
+@ in_ram REG, TMP, SKIP (v0.9.22): on to SKIP unless REG is in EWRAM or
+@ IWRAM (0x02000000-0x0203FFFF, 0x03000000-0x03007FFF), the RAM a game
+@ keeps its values in; TMP a free register. A write through a pointer goes
+@ nowhere else: a pointer the game has moved or not set yet (a found cheat
+@ kept through one, a typed pointer code) would write over I/O, VRAM or the
+@ ROM's registers.
+	.macro	in_ram reg, tmp, skip
+	sub	\tmp, \reg, #0x02000000
+	cmp	\tmp, #0x40000
+	blo	1001f
+	sub	\tmp, \reg, #0x03000000
+	cmp	\tmp, #0x8000
+	bhs	\skip
+1001:
+	.endm
+
 ext:
 	ldr	r4, [r0], #4		@ the value
 	mov	r5, #0
@@ -348,6 +365,7 @@ gen:	cmp	r3, #1
 	bne	gen_read
 	ldr	r1, [r1]		@ the pointer, plus the step
 	add	r1, r1, r5
+	in_ram	r1, lr, 5f		@ a write through it only into RAM
 	mov	lr, r4
 	b	gen_store
 gen_read:
@@ -447,6 +465,9 @@ cond:	subs	r3, r3, #8
 keyed:	tst	r2, #0x40		@ the target through a pointer
 	ldrne	r1, [r1]
 	add	r1, r1, r5
+	beq	7f
+	in_ram	r1, r3, ext_done	@ written only into RAM
+7:
 	tst	r2, #0x100		@ a key: the value XOR its bytes
 	beq	8f
 	tst	r2, #0x80		@ the key through a pointer

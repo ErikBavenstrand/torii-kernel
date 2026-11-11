@@ -126,7 +126,10 @@ class Case:
         cheats=None,
         slots=None,
         equiv=None,
+        torii_still=False,
     ):
+        # True: Torii's run must change nothing (its snapshots the baseline's)
+        self.torii_still = torii_still
         self.name, self.fmt, self.note, self.twin, self.run = name, fmt, note, twin, run
         self.effect = effect  # False: the code rightly changes nothing (a byte store to OAM, a never-true test)
         self.keys = keys or {}  # checkpoint: keys held from 4 frames after it
@@ -309,6 +312,18 @@ def cases():
     both(f"{g}-ptr16", enc, raw, lambda f: [f.write_ptr(2, P, 0x8282, 4)])
     both(f"{g}-ptr32", enc, raw, lambda f: [f.write_ptr(4, P, 0x84848484)])
     both(f"{g}-ptr-iwram", enc, raw, lambda f: [f.write_ptr(2, P + 4, 0x9292, 2)])
+    # A pointer whose target is out of RAM (v0.9.22): EWRAM's mirror past
+    # 0x02040000, which mGBA writes through to the targets; Torii writes
+    # through a pointer only into EWRAM and IWRAM, so its run is the
+    # baseline's
+    both(
+        f"{g}-ptr-outside",
+        enc,
+        raw,
+        lambda f: [f.write_ptr(1, P, 0x99, 0x40000)],
+        expect="differs: Torii writes through a pointer only into EWRAM and IWRAM; mGBA writes EWRAM's mirror",
+        torii_still=True,
+    )
     both(f"{g}-add8", enc, raw, lambda f: [f.add(1, A + 0x01, 0x10)])
     both(f"{g}-add16", enc, raw, lambda f: [f.add(2, A + 0x10, 0x1234)])
     both(f"{g}-add32", enc, raw, lambda f: [f.add(4, A + 0x20, 0xF0000001)])
@@ -788,6 +803,11 @@ def report(out):
                         "mGBA's run shows no effect: the code does nothing there"
                     )
                 differ = [cp for cp in CHECKPOINTS if mg[cp] != to[cp]]
+                moved = [cp for cp in CHECKPOINTS if to[cp] != base[cp]]
+                if getattr(c, "torii_still", False) and moved:
+                    bad.append(
+                        f"Torii's run changes {diff(base[moved[0]], to[moved[0]])}: it should write nothing"
+                    )
                 left_out = re.search(
                     r"cheats: cheat \d+ \(.*?\): (.*?), left out", torii_log
                 )
@@ -865,6 +885,7 @@ def meta(c):
         "slots": c.slots,
         "cheats": c.cheats,
         "equiv": bool(c.equiv),
+        "torii_still": c.torii_still,
     }
 
 
