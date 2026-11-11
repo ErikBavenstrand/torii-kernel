@@ -126,7 +126,8 @@ static int group_end(const char *s, u32 len, u32 at)
 static u32 step_base(char *out, const char *name, int drop_ext)
 {
 	u32 len = utf8_cut(name, strlen(name), GAMENAME_MAX);
-	memcpy(out, name, len);  // the caller ends it
+	// NOLINTNEXTLINE(bugprone-not-null-terminated-result): the caller ends it
+	memcpy(out, name, len);
 	if (drop_ext) {
 		u32 ext = 0;
 		while (ext < len && ext <= 4 && (is_ascii_letter(name[len - 1 - ext]) || is_digit(name[len - 1 - ext])))

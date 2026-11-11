@@ -275,15 +275,18 @@ void test_lang_korean(void)
 	CHECK(!strcmp(S(STR_ITEM_RECENT), "\xEC\xB5\x9C\xEA\xB7\xBC"));  // 최근
 	CHECK(!strcmp(S(STR_INGAME_RESUME), "Resume"));
 	CHECK(!strcmp(S(STR_LAUNCH_PATCHING), "Patching the game"));
-	// What a launch can show: the formats and months, the questions' keys, the
-	// launch sections ([hint]'s other labels are the menu's only)
-	for (u32 id = 0; id < STR_LAUNCH_END; id++) {
-		if (id >= STR_HINT_OPEN && id <= STR_HINT_FORMAT && id != STR_HINT_OK)
-			continue;
+	CHECK(!strcmp(S(STR_HINT_CANCEL), "\xEC\xB7\xA8\xEC\x86\x8C"));  // 취소, the menu's
+
+	// What a launch keeps (lang_keep_launch): Latin-1 only, so no string draws
+	// as boxes once the script font is gone; [hint]'s Korean labels are English
+	static u32 room[LANG_LAUNCH_MAX / 4];
+	CHECK(lang_keep_launch(room, sizeof(room)));
+	for (u32 id = 0; id < STR_LAUNCH_END; id++)
 		for (const char *c = S(id); *c; c++)
 			CHECK((u8)*c < 0xC4);  // ASCII and two-byte Latin-1 only: no Hangul
-	}
 	CHECK(!strcmp(S(STR_HINT_CANCEL), "cancel"));
+	CHECK(!strcmp(S(STR_HINT_OK), "OK"));
+	CHECK(!strcmp(S(STR_FORMAT_DATE), "{month}.{day}"));  // the pack's, kept
 	lang_use(NULL);
 }
 
@@ -293,9 +296,10 @@ void test_lang_launch(void)
 		{STR_LAUNCH_PATCHING, "Patchar spelet"},
 		{STR_INGAME_RESUME, "Fortsätt"},
 		{STR_ITEM_RECENT, "Senaste"},
+		{STR_INGAME_RESET, "R\xCE\xB5set"},  // Greek: no font draws it in a launch
 	};
 	CHECK(STR_INGAME_RESUME < STR_LAUNCH_END && STR_ITEM_RECENT >= STR_LAUNCH_END);
-	u32 size = lang_test_pack(pack, sizeof(pack_words), "sv", "Svenska", strings, 3);
+	u32 size = lang_test_pack(pack, sizeof(pack_words), "sv", "Svenska", strings, 4);
 	CHECK_EQ(lang_pack_check(pack, size), LANG_PACK_OK);
 	lang_use(pack);
 	static u32 room[LANG_LAUNCH_MAX / 4];
@@ -304,9 +308,10 @@ void test_lang_launch(void)
 	CHECK(!strcmp(S(STR_LAUNCH_PATCHING), "Patchar spelet"));
 	CHECK(!strcmp(S(STR_INGAME_RESUME), "Fortsätt"));
 	CHECK(!strcmp(S(STR_INGAME_SAVE), "Save state"));  // the pack lacks it
+	CHECK(!strcmp(S(STR_INGAME_RESET), "Reset game"));  // beyond Latin-1: English
 	CHECK(!strcmp(S(STR_ITEM_RECENT), "Recent"));  // not a launch's: English
 	// No room: English for all
-	size = lang_test_pack(pack, sizeof(pack_words), "sv", "Svenska", strings, 3);
+	size = lang_test_pack(pack, sizeof(pack_words), "sv", "Svenska", strings, 4);
 	lang_use(pack);
 	CHECK(!lang_keep_launch(room, 2 * STR_LAUNCH_END + 4));
 	CHECK(!lang_using_pack());

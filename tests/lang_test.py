@@ -97,18 +97,19 @@ class Committed(unittest.TestCase):
         missing = lang.check_pack(ko, en)
         # The sections a launch (and the in-game menu) shows draw Hangul as boxes
         # (script_drop): the pack leaves them to English, Latin-1 where it has any
+        # but [hint]'s (lang_keep_launch keeps those in English for a launch)
         left = set(en.meta["launch"].split()) - {"format", "month", "hint"}
         for key in missing:
             self.assertTrue(
                 key.split(".", 1)[0] in left
-                or key in {"hint.cancel", "diag.title"}
+                or key == "diag.title"
                 or key.startswith("boot."),
                 key,
             )
         # [hint]'s other labels are the menu's only, so they may be Hangul
         menu_hints = {
             "hint.open", "hint.turn", "hint.move", "hint.back", "hint.change",
-            "hint.done", "hint.field", "hint.set", "hint.menu", "hint.format",
+            "hint.done", "hint.field", "hint.set", "hint.menu", "hint.format", "hint.cancel",
         }  # fmt: skip
         launch = set(en.meta["launch"].split())
         for key in ko.keys:

@@ -500,24 +500,28 @@ ko-info-read/frames 4-22 47778893E1D42B25
 ko-ingame-cheats/list 89C67CE0303531DF
 ko-ingame-cheats/menu A7F3E512387930EE
 ko-ingame-cheats/second B6B9AF892DA5C532
+ko-launch/dialog 11AB69A7372FBE33
+ko-launch/home A532A771F39A3CA3
+ko-launch/ingame CE403C3D5DC00FF4
+ko-launch/recent 5B100A4FB01D6B44
 ko-sd-root/confirm 1A2B7B398476C835
 ko-sd-root/file-info A1B5835755BD8A5F
 ko-sd-root/popup 0B6EE6AB73DBBFAA
 ko-sd-root/root CFD3CF6A60089F1E
 ko-settings/bottom C3B9A44AB8CBE4B4
 ko-settings/capture 71DAD1985B26A5DE
-ko-settings/edit 505F2B9E2DC174AF
-ko-settings/fields D9845184B6267C1C
+ko-settings/edit CF039513DCEDDCC1
+ko-settings/fields AAE8C156F6CC80B6
 ko-settings/refused C8E8731C7E5B2FF2
-ko-settings/swatch 1A20FA4B08ED86AF
+ko-settings/swatch B213E419E19B2981
 ko-settings/top 69D2CAC8ED3BB744
 ko-settings/frames 0-1 E6140DC4444F1A0C
 ko-settings/frames 2-2 E50F025389C64BE8
-ko-settings/frames 3-3 5540254EE1E4424C
-ko-settings/frames 4-4 C4D201D464879A55
-ko-settings/frames 5-5 0B13BF78EC19A2B4
-ko-settings/frames 6-6 F6F2D4C50B0BA6EF
-ko-settings/frames 7-12 BB66AE354EB0B27B
+ko-settings/frames 3-3 9ED84E97C93E21E6
+ko-settings/frames 4-4 A55296603E60CD77
+ko-settings/frames 5-5 D4EFD42FFC977F5E
+ko-settings/frames 6-6 76D2EF80180CB859
+ko-settings/frames 7-12 BD0478F7C7DF7355
 ko-settings/frames 13-13 69D2CAC8ED3BB744
 ko-settings/frames 14-14 456C1A8133729645
 ko-settings/frames 15-28 0A772566CCDA775A
