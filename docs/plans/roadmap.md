@@ -60,12 +60,6 @@ Each release's details are in `CHANGELOG.md`; the planning, ticket reports and r
 Code fixes that the emulator can test, plus the leftovers from v0.9.
 
 
-### Menus
-
-The UX reviews' open proposals (`docs/design/v0.5/ux-review.md`, `settings-ux-review.md`) and the owner's asks.
-
-- **The SD page's Play « »** stays beside Game info's Boot mode (decided in v0.9.18): its file info is a text dialog, and a Boot mode there needs an editable page. Play names default's way as the lists do.
-
 ### In game
 
 - **Sound after LOAD (1.0?):** games on Nintendo's MP2000 engine keep the PCM buffer's position in RAM, which could re-sync DMA1 at LOAD.
@@ -86,22 +80,6 @@ The UX reviews' open proposals (`docs/design/v0.5/ux-review.md`, `settings-ux-re
 - **(maybe) Live values in game** (owner, 2026-10-30: less useful than the rest): each cheat in the in-game list shows the value now at the address it writes ("Money 3,421"), with digits the kernel draws for the overlay. Encrypted values (Pokémon's money) would read as nonsense.
 - From the trackers (checked 2026-11-02, `docs/research/gba-emulators.md`): jagoombacolor#43 stays open until someone has the issue's ROM (Super Connard, patched): Torii's mode logic is tested and right for `$143 = $80`/`$C0`. #34's remaining part is a taste call: a global default palette for games the GBC table doesn't know (grey today).
 
-### Licences
-
-- **Ask Jaga (jagoombacolor) and Dwedit (Goomba Color, PocketNES) to put a licence in their repositories**, or to say in writing that Torii may build and release their code with our patches. Neither repository has one, and the release's binary includes both (`THIRD_PARTY_NOTICES.md`, "Open points"). Nothing else in the licence audit is open.
-
-### Research (doesn't block 1.0 unless a finding does)
-
-- **Hardware probes** (`docs/research/omega-de-hardware.md`):
-  - Is an SD write right after the FPGA's ROM copy safe?
-  - What does the real BIOS do on an undefined instruction? The crash handler can't catch a crash that turns IRQs off or loops inside the kernel.
-  - Where does a DMA into PSRAM from cart space land?
-  - WAITCNT `0x4018` for control-register writes, SD, NOR and the RTC.
-  - HBlank DMA into palette RAM at the theme wipe's edge, and mid-frame mode switching.
-  - The open register questions: the `0x09E00000` status values, `0x096C0000` auto-save, Mode B's slot, the frames at minor `0x17`, what `0x09700000` changes in the ROM map, and how the unlock sequence is checked.
-  - A blue EZODE-B's raw version word and NOR IDs, if an owner of one can read them.
-- **Unverified:** "chip select high" as mid-read assumes the RTC port reads back its output pins. That holds in mGBA but hasn't been checked on the cart.
-
 ### Known limits (accepted, no work planned)
 
 - **In-game menu:**
@@ -118,6 +96,26 @@ The UX reviews' open proposals (`docs/design/v0.5/ux-review.md`, `settings-ux-re
   - The session record in cart RAM page `0xF0` doesn't survive a power cycle.
   - EZ-Flash's loader installs only the first 3 MB of `ezkernelnew.bin` (`tools/omega_image.py` enforces it).
   - `Save_savefile`'s second half runs frames with SRAM page 0x10 selected, and `FRAM_save_op` runs frames with a file open. Both are safe today and commented.
+
+## After 1.0
+
+Taken off the 1.0 list (owner, 2026-11-11).
+
+### Licences
+
+- **Ask Jaga (jagoombacolor) and Dwedit (Goomba Color, PocketNES) to put a licence in their repositories**, or to say in writing that Torii may build and release their code with our patches. Neither repository has one, and the release's binary includes both (`THIRD_PARTY_NOTICES.md`, "Open points"). Nothing else in the licence audit is open.
+
+### Research
+
+- **Hardware probes** (`docs/research/omega-de-hardware.md`):
+  - Is an SD write right after the FPGA's ROM copy safe?
+  - What does the real BIOS do on an undefined instruction? The crash handler can't catch a crash that turns IRQs off or loops inside the kernel.
+  - Where does a DMA into PSRAM from cart space land?
+  - WAITCNT `0x4018` for control-register writes, SD, NOR and the RTC.
+  - HBlank DMA into palette RAM at the theme wipe's edge, and mid-frame mode switching.
+  - The open register questions: the `0x09E00000` status values, `0x096C0000` auto-save, Mode B's slot, the frames at minor `0x17`, what `0x09700000` changes in the ROM map, and how the unlock sequence is checked.
+  - A blue EZODE-B's raw version word and NOR IDs, if an owner of one can read them.
+- **Unverified:** "chip select high" as mid-read assumes the RTC port reads back its output pins. That holds in mGBA but hasn't been checked on the cart.
 
 ## Process
 
