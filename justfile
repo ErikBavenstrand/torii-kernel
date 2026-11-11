@@ -383,6 +383,11 @@ font:
     uv run -q tools/font.py assets/fonts/galmuri/Galmuri9.bdf --name body --line-height 12 --squeeze --clip -o source/engine/font_body
     uv run -q tools/font.py assets/fonts/galmuri/Galmuri11-Bold.bdf --name heading --line-height 16 --squeeze --clip -o source/engine/font_heading
 
+# Cut the Korean pack's script glyphs (assets/fonts/galmuri/Galmuri9-hangul.bdf) from the pinned
+# Galmuri release (tools/galmuri.py checks its SHA-256; it fetches the zip into dist/galmuri-full)
+galmuri:
+    python3 -I tools/galmuri.py
+
 # Turn lang/en.ini into source/lang_ids.h and source/lang_en.c (committed;
 # tests/lang_test.py checks they match), and every lang/<code>.ini, and the
 # test pseudo-locale, into dist/lang/<code>.lng, and the release's packs into

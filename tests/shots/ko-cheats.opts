@@ -1,0 +1,29 @@
+# cheats-menu.opts in Korean: lang/ko.ini's pack set in Settings (slot 0, its
+# id 0xBB63), so every string the scenario shows is Korean, at its width. The
+# cheat screen (source/screens/cheats.c) on Hello's cheats with Hangul names
+# (tests/shots/data/ko-hello.cht), in the light theme: the list, START's menu
+# and the Guide page. The activation sentences and the buttons are English
+# (the pack leaves [activation] and [button] out: the in-game menu shows them).
+#! settings 0=47971
+#! settings 28=1
+#! sd-file /torii/lang/ko.lng 0 dist/lang/ko.lng
+#! sd-file /torii/cheats/Hello.cht 0 tests/shots/data/ko-hello.cht
+-p 30:nav_test_action:2113929225
+-w "nav: test hook 9 "
+-w "nav: home ready"
+-k @8:RIGHT -k @12:-
+-k @20:A -k @24:-
+-w "nav: page gba ready"
+-k @8:RIGHT -k @12:- -k @20:RIGHT -k @24:- -k @32:RIGHT -k @36:-
+-k @80:START -k @84:-
+-w "screen ready: game-popup"
+-k @12:DOWN -k @16:- -k @24:DOWN -k @28:-
+-k @48:A -k @52:-
+-w "screen ready: cheats"
+-s @52:list.png
+-k @60:START -k @64:-
+-w "screen ready: cheat-menu"
+-s @24:menu.png
+-k @32:A -k @36:-
+-w "screen ready: cheat-guide"
+-s @8:guide.png

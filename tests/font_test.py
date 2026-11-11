@@ -326,9 +326,35 @@ class Output(unittest.TestCase):
             font.read_bdf(extra[: extra.index("STARTCHAR a")] + "ENDFONT\n"),
         )
 
+    def test_subset_keeps_the_code_points_asked_for(self):
+        extra = BDF.replace(
+            "ENDFONT",
+            "STARTCHAR a\nENCODING 12354\nDWIDTH 4 0\nBBX 1 1 0 0\nBITMAP\n80\nENDCHAR\nENDFONT",
+        ).replace("CHARS 5", "CHARS 6")
+        subset = font.subset_bdf(extra, {12354})
+        self.assertIn("ENCODING 12354", subset)
+        self.assertIn("CHARS 1", subset)
+        self.assertIn(12354, font.read_bdf(subset)[0])
+
 
 class Vendored(unittest.TestCase):
     """The fonts in assets/fonts convert as `just font` converts them."""
+
+    def test_hangul_subset(self):
+        """Galmuri9's script glyphs for lang/ko.ini (tools/galmuri.py, from
+        the pinned release): Hangul, jamo and kana, as Galmuri draws them."""
+        raw, ascent = font.read_bdf(
+            (ROOT / "assets/fonts/galmuri/Galmuri9-hangul.bdf").read_text("latin-1")
+        )
+        self.assertEqual(ascent, 11)
+        self.assertTrue(set(range(0xAC00, 0xD7A4)) <= set(raw))
+        self.assertTrue(set(range(0x3131, 0x318F)) <= set(raw))
+        self.assertTrue({0x3042, 0x30AB} <= set(raw))
+        self.assertFalse(any(cp < 0x3000 or 0x4E00 <= cp < 0xAC00 for cp in raw))
+        # Every glyph is 10 px apart and fits the menu line as the pack places it
+        self.assertEqual(
+            {adv for adv, _ in (raw[c] for c in range(0xAC00, 0xD7A4))}, {10}
+        )
 
     def test_menu_fonts(self):
         for name, height in (("Galmuri9", 12), ("Galmuri11-Bold", 16)):

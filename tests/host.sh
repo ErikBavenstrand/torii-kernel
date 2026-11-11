@@ -15,6 +15,9 @@ python3 tools/hostcc.py dist/host/tests \
   source/ui/ui_core.c source/ui/ui_ring.c source/ui/rowcache.c source/ui/ui_theme.c source/ui/palette.c source/ui/keyq.c \
   source/ui/ui_reading.c source/ui/letter.c source/gamelist.c \
   tests/kernel/asset_data.c tests/host/*.c
+# The Korean pack, whose test reads its script font (tests/host/test_lang.c)
+mkdir -p dist/host
+python3 tools/lang.py pack lang/ko.ini -o dist/host/ko.lng 2>/dev/null
 # A hung test (an endless loop in a sort, say) fails after a minute, and
 # output is capped: ASan can loop printing "AddressSanitizer:DEADLYSIGNAL"
 # when the kernel randomises mmap with more bits than it supports (CI's

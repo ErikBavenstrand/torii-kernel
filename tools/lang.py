@@ -6,8 +6,10 @@ usage: lang.py sources [--check]        source/lang_ids.h and source/lang_en.c
        lang.py packs [-o DIR] [--zip Z] every lang/<code>.ini but English, and
                                         the test pseudo-locale (en-XA), to DIR
                                         (default dist/lang); the release's
-                                        packs, without en-XA, to the zip Z
-                                        (default dist/torii-lang.zip)
+                                        packs, without en-XA and without a
+                                        pack whose [meta] has `review =
+                                        pending`, to the zip Z (default
+                                        dist/torii-lang.zip)
        lang.py pseudo -o OUT.ini        the pseudo-locale's text: English with
                                         accented letters and its own formats
 
@@ -31,7 +33,11 @@ The .ini format (UTF-8):
   or .other is a count's forms: .one for 1, .other for any other number.
 
 [meta] isn't strings: code (the file's name, as "sv"), name (as the
-language calls itself, shown in Settings), and in en.ini launch, the
+language calls itself, shown in Settings; Settings lists every pack's name
+before its font is loaded, so a name in a script font should have its Latin
+spelling too), review (`pending`: a translation no native speaker has read:
+`just build` still makes its pack, but the release's zip leaves it out; take
+the line out, or write `done`, once one has), and in en.ini launch, the
 sections a game's launch reads after the game fills PSRAM (lang.h:
 lang_before_launch). Those sections come first in en.ini.
 A language that needs characters beyond Latin-1 also names a script font:
@@ -588,7 +594,7 @@ ZIP_DATE = (1980, 1, 1, 0, 0, 0)
 
 
 def release_zip(packs: dict[str, bytes]) -> bytes:
-    """packs: each code's pack, the pseudo-locale left out."""
+    """packs: each code's pack to ship, the pseudo-locale left out."""
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_STORED) as z:
         for code in sorted(packs):
@@ -667,7 +673,11 @@ def main(argv: list[str]) -> int:
                 if i in ids:
                     raise LangError(f"{lang.path}: its id {i:04X} is {ids[i]}'s too")
                 ids[i] = code
-                data = packs[code] = pack(lang, en)
+                data = pack(
+                    lang, en
+                )  # a card gets every pack, a release's zip the reviewed
+                if lang.meta.get("review") != "pending":
+                    packs[code] = data
                 target = out / f"{code}.lng"
                 if not target.exists() or target.read_bytes() != data:
                     target.write_bytes(data)

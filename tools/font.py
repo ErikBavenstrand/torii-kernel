@@ -191,9 +191,11 @@ def read_bdf(text: str) -> tuple[Raw, int]:
     return glyphs, ascent
 
 
-def subset_bdf(text: str) -> str:
-    """The BDF with only the glyphs font.py reads: U+0020-U+00FF and U+FFFD."""
-    keep = set(range(FIRST, LAST + 1)) | {0xFFFD}
+def subset_bdf(text: str, keep: set[int] | None = None) -> str:
+    """The BDF with only the glyphs font.py reads (U+0020-U+00FF and U+FFFD),
+    or those code points in keep (tools/galmuri.py's script glyphs)."""
+    if keep is None:
+        keep = set(range(FIRST, LAST + 1)) | {0xFFFD}
     head, chars, tail = [], [], []
     block: list[str] | None = None
     for line in text.splitlines():
