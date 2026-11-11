@@ -59,6 +59,23 @@
 // found cheats, to the whole names
 #define INGAME_SRAM_POINTERS 0x2E100
 #define INGAME_SHOTS_END 0xF0000  // their room's end: the cart log's page follows
+// In the cart log's page (source/cartlog.h), past what it keeps for the
+// next boot: its room for a launch's cheat patches is free once the launch
+// has applied them (cheatstore_launch, before ingame_prepare). The image's
+// bytes past image_bytes (the extension and its IWRAM code), which the
+// overlay loads itself: the core image fills its 24 KB at INGAME_SRAM_IMAGE
+#define INGAME_SRAM_EXT 0xF2000
+#define INGAME_EXT_MAX 0x4000
+// The cheat search's Undo (v0.9.22): the values the last pass wrote over in
+// the snapshot, of the candidates before it, one after another in their
+// bits' order, as many as fit
+#define INGAME_SRAM_UNDO_VALUES 0xF6000
+#define INGAME_UNDO_VALUES_BYTES 0x8000
+// The search's lines past the first block's room (INGAME_TEXT_SRAM)
+#define INGAME_SRAM_TEXTS_MORE 0xFE000
+// Found cheats a boot couldn't file (struct ingame_found_wait), kept with
+// their game's path until a boot files them
+#define INGAME_SRAM_FOUND_WAIT 0xF1D00
 
 // The backups, from INGAME_SRAM_BACKUP: all in one 64 KB page window
 #define INGAME_BACKUP_EWRAM 0x20000  // the EWRAM window, window_bytes
@@ -161,6 +178,10 @@ static inline uint32_t ingame_live_check(const uint32_t *pairs)
 // --- The game's memory the overlay borrows
 #define INGAME_EWRAM 0x02000000  // the window's start: the overlay is linked here
 #define INGAME_WINDOW_MAX 0x6000  // 24 KB: image, bss and stack
+// The extension (the overlay's code past the window, which it loads itself:
+// ov.ld's .ext) ends at most this far into EWRAM: the game's bytes under it
+// go to the window's backup, which has 32 KB (INGAME_BACKUP_EWRAM)
+#define INGAME_EXT_END_MAX 0x8000
 #define INGAME_OBJ_VRAM 0x06014000  // OBJ tile 512: valid in every mode, bitmap ones too
 #define INGAME_OBJ_TILE 512
 #define INGAME_OBJ_MAX 0x4000  // tiles 512-1023
@@ -668,9 +689,14 @@ struct ingame_session {
 // struct ingame_glyph[INGAME_GLYPHS]: after the screenshot's IWRAM backup,
 // before the found cheats
 #define INGAME_SRAM_GLYPHS 0x2DA00
+// The first block's lines: from INGAME_SRAM_TEXTS to the state buffer
+#define INGAME_TEXTS_FIRST ((INGAME_SRAM_STATE - INGAME_SRAM_TEXTS) / sizeof(struct ingame_line))
 #define INGAME_TEXT_SRAM(n) \
 	((n) < INGAME_TEXT_SEARCH ? INGAME_SRAM_SESSION + INGAME_SESSION_TEXT(n) \
-				  : INGAME_SRAM_TEXTS + ((n) - INGAME_TEXT_SEARCH) * sizeof(struct ingame_line))
+	 : (n) < INGAME_TEXT_SEARCH + INGAME_TEXTS_FIRST \
+		 ? INGAME_SRAM_TEXTS + ((n) - INGAME_TEXT_SEARCH) * sizeof(struct ingame_line) \
+		 : INGAME_SRAM_TEXTS_MORE + \
+			   ((n) - INGAME_TEXT_SEARCH - INGAME_TEXTS_FIRST) * sizeof(struct ingame_line))
 #define INGAME_SESSION_CHEAT(n) (offsetof(struct ingame_session, cheats) + (n) * sizeof(struct ingame_cheat))
 #define INGAME_SESSION_ACT(n) (offsetof(struct ingame_session, act_text) + (n) * sizeof(struct ingame_line))
 #define INGAME_SESSION_PATH offsetof(struct ingame_session, rom_path)
@@ -737,9 +763,16 @@ _Static_assert(INGAME_SRAM_FOUND >= INGAME_BACKUP_SHOT + INGAME_BACKUP_SHOT_BYTE
 	       "the found cheats after the backups, before the whole names");
 _Static_assert(4 + INGAME_LIVE_PAIRS * 8 <= INGAME_LIVE_BYTES, "the live block's words");
 _Static_assert(INGAME_SRAM_TEXTS >= INGAME_SRAM_WIDE + INGAME_CHEATS * sizeof(struct ingame_wide) &&
-		       INGAME_TEXT_SRAM(INGAME_TEXTS) <= INGAME_SRAM_STATE &&
-		       INGAME_TEXT_SRAM(INGAME_TEXTS) <= (INGAME_SRAM_TEXTS & ~0xFFFFu) + 0x10000,
+		       INGAME_SRAM_TEXTS + INGAME_TEXTS_FIRST * sizeof(struct ingame_line) <= INGAME_SRAM_STATE &&
+		       INGAME_SRAM_STATE <= (INGAME_SRAM_TEXTS & ~0xFFFFu) + 0x10000,
 	       "the search's lines after the whole names, before the state buffer, in their 64 KB page window");
+_Static_assert(INGAME_TEXTS <= INGAME_TEXT_SEARCH + INGAME_TEXTS_FIRST || INGAME_TEXT_SRAM(INGAME_TEXTS) <= 0x100000,
+	       "the search's lines past the first block fit the cart log page's end");
+_Static_assert(INGAME_SRAM_EXT + INGAME_EXT_MAX <= INGAME_SRAM_UNDO_VALUES &&
+		       INGAME_SRAM_UNDO_VALUES + INGAME_UNDO_VALUES_BYTES <= INGAME_SRAM_TEXTS_MORE &&
+		       INGAME_SRAM_EXT >= 0xF2000 && INGAME_SRAM_TEXTS_MORE < 0x100000,
+	       "the extension, Undo's values and the lines past the first block in the cart log page's free room");
+_Static_assert(INGAME_BACKUP_EWRAM + INGAME_EXT_END_MAX <= INGAME_BACKUP_OBJ, "the extension's EWRAM backed up");
 _Static_assert(INGAME_SRAM_GLYPHS >= INGAME_BACKUP_SHOT + INGAME_BACKUP_SHOT_BYTES &&
 		       INGAME_SRAM_GLYPHS + INGAME_GLYPHS * sizeof(struct ingame_glyph) <= INGAME_SRAM_FOUND,
 	       "the glyphs after the screenshot's backup, before the found cheats");

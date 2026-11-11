@@ -56,9 +56,14 @@ SECTIONS {
 	} > iwram
 	__ov_fastext_load = LOADADDR(.fastext);
 
-	ASSERT(__ov_fastext_load + SIZEOF(.fastext) - 0x02000000 <= 0x6000, "the overlay's image passes INGAME_IMAGE_MAX")
+	/* The kernel writes the image to cart SRAM in two parts: the core to
+	 * INGAME_SRAM_IMAGE, the rest (the extension and its IWRAM code) to
+	 * INGAME_SRAM_EXT, where the overlay reads them */
+	ASSERT(__ov_image_end - 0x02000000 <= 0x6000, "the overlay's core image passes INGAME_IMAGE_MAX")
+	ASSERT(__ov_fastext_load + SIZEOF(.fastext) - __ov_image_end <= 0x4000, "the extension's image passes INGAME_EXT_MAX")
 	ASSERT(__ov_fastext_end - 0x03000000 <= 0x1200, "the IWRAM a pass borrows passes INGAME_BACKUP_SHOT_BYTES")
-	ASSERT(__ov_ext_end - 0x02000000 <= 0x6000, "the window and the extension pass INGAME_WINDOW_MAX")
+	ASSERT(__ov_stack_top - 0x02000000 <= 0x6000, "the window passes INGAME_WINDOW_MAX")
+	ASSERT(__ov_ext_end - 0x02000000 <= 0x8000, "the window and the extension pass INGAME_EXT_END_MAX")
 
 	/DISCARD/ : { *(.ARM.exidx*) *(.ARM.extab*) *(.comment) *(.note*) }
 }

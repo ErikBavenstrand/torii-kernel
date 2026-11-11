@@ -385,15 +385,19 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 
 	u32 bad = 0;
 	u32 image = ingame_overlay_size;
-	TLOG_ASSERT(image <= INGAME_IMAGE_MAX && image % 4 == 0);
-	for (u32 at = 0; at < image; at += 0x1000) {
-		u32 n = image - at < 0x1000 ? image - at : 0x1000;
-		bad += sram_put(INGAME_SRAM_IMAGE + at, ingame_overlay + at, n);
-	}
-	// The header again, with the check word the stub verifies the loaded image by
 	struct ingame_image hdr_out;
 	memcpy(&hdr_out, ingame_overlay, sizeof(hdr_out));
-	TLOG_ASSERT(hdr_out.image_bytes <= image && hdr_out.image_bytes >= sizeof(hdr_out));
+	TLOG_ASSERT(hdr_out.image_bytes <= image && hdr_out.image_bytes >= sizeof(hdr_out) && image % 4 == 0);
+	TLOG_ASSERT(hdr_out.image_bytes <= INGAME_IMAGE_MAX && image - hdr_out.image_bytes <= INGAME_EXT_MAX);
+	// The core where the stub loads it from, the extension in the cart log's
+	// page (INGAME_SRAM_EXT): the core's room has no more
+	for (u32 at = 0, n; at < image; at += n) {
+		u32 end = at < hdr_out.image_bytes ? hdr_out.image_bytes : image;
+		n = end - at < 0x1000 ? end - at : 0x1000;
+		u32 to = at < hdr_out.image_bytes ? INGAME_SRAM_IMAGE + at : INGAME_SRAM_EXT + at - hdr_out.image_bytes;
+		bad += sram_put(to, ingame_overlay + at, n);
+	}
+	// The header again, with the check word the stub verifies the loaded image by
 	hdr_out.check = ingame_image_check((const u32 *)(const void *)(ingame_overlay + sizeof(hdr_out)),
 					   (hdr_out.image_bytes - (u32)sizeof(hdr_out)) / 4);
 	bad += sram_put(INGAME_SRAM_IMAGE, (const u8 *)&hdr_out, sizeof(hdr_out));

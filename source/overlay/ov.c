@@ -82,7 +82,7 @@
 #define NOTICE_DEBUG (1u << 8)
 
 extern struct ingame_image ov_header;
-extern uint32_t __ov_bss_start[], __ov_bss_end[];
+extern uint32_t __ov_bss_start[], __ov_bss_end[], __ov_image_end[];
 
 // --- Layout -------------------------------------------------------------------
 
@@ -1775,8 +1775,9 @@ static void iwram_borrow(int on)
 	const uint32_t borrowed = (uint32_t)(uintptr_t)__ov_fastext_end - INGAME_SHOT_IWRAM;
 	if (on) {
 		sram_out(INGAME_BACKUP_SHOT, (const void *)INGAME_SHOT_IWRAM, borrowed);
-		sram_in(INGAME_SRAM_IMAGE + ((uint32_t)(uintptr_t)__ov_fastext_load - INGAME_EWRAM), __ov_fastext_start,
-			(uint32_t)((uintptr_t)__ov_fastext_end - (uintptr_t)__ov_fastext_start));
+		sram_in(INGAME_SRAM_EXT +
+				((uint32_t)(uintptr_t)__ov_fastext_load - (uint32_t)(uintptr_t)__ov_image_end),
+			__ov_fastext_start, (uint32_t)((uintptr_t)__ov_fastext_end - (uintptr_t)__ov_fastext_start));
 		iwram_borrowed = borrowed;
 	} else {
 		sram_in(INGAME_BACKUP_SHOT, (void *)INGAME_SHOT_IWRAM, iwram_borrowed);
@@ -2274,13 +2275,16 @@ static int ext_load(void)
 		return 0;
 	sram_out(INGAME_BACKUP_EWRAM + at, __ov_ext_start, n);
 	m.ext = n;  // the game's bytes there are in the backup from now on
-	sram_in(INGAME_SRAM_IMAGE + ((uint32_t)(uintptr_t)__ov_ext_load - INGAME_EWRAM), __ov_ext_start, n);
+	sram_in(INGAME_SRAM_EXT + ((uint32_t)(uintptr_t)__ov_ext_load - (uint32_t)(uintptr_t)__ov_image_end),
+		__ov_ext_start, n);
 	// The check runs on over the compare's code, which follows in the image
 	uint32_t s = ingame_image_check(__ov_ext_start, n / 4), words[16];
 	const uint32_t code = (uint32_t)((uintptr_t)__ov_fastext_end - (uintptr_t)__ov_fastext_start);
 	for (uint32_t off = 0; off < code; off += sizeof(words)) {
 		uint32_t k = code - off < sizeof(words) ? code - off : sizeof(words);
-		sram_in(INGAME_SRAM_IMAGE + ((uint32_t)(uintptr_t)__ov_fastext_load - INGAME_EWRAM) + off, words, k);
+		sram_in(INGAME_SRAM_EXT +
+				((uint32_t)(uintptr_t)__ov_fastext_load - (uint32_t)(uintptr_t)__ov_image_end) + off,
+			words, k);
 		for (uint32_t i = 0; i < k / 4; i++)
 			s = (s << 5 | s >> 27) + words[i];
 	}
