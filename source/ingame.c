@@ -553,7 +553,7 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 		{STR_INGAME_SEARCH_PTR_PASSED, INGAME_TEXT_SEARCH_PTR_PASSED, 1},
 		{STR_INGAME_SEARCH_ROW, INGAME_TEXT_SEARCH_ROW, 1},
 	};
-	static char split[sizeof(split_ids) / sizeof(split_ids[0]) + 1][3][48] EWRAM_BSS;  // 1 KB: off the stack
+	static char split[sizeof(split_ids) / sizeof(split_ids[0]) + 2][3][48] EWRAM_BSS;  // 1 KB: off the stack
 	for (u32 i = 0; i < sizeof(split_ids) / sizeof(split_ids[0]); i++) {
 		text_split(S(split_ids[i][0]), split[i], sizeof(split[i][0]));
 		text[split_ids[i][1]] = split[i][0];
@@ -563,9 +563,9 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 	}
 	// Show them's footer while too many are left: the list's size in, the
 	// candidates left the overlay's
-	char few[96];
 	const u32 k_few = sizeof(split_ids) / sizeof(split_ids[0]);
-	SF(few, sizeof(few), STR_INGAME_SEARCH_FEW, LS("{1}"), LN(INGAME_SEARCH_LIST));
+	char *few = split[k_few + 1][0];  // (the row after it: the stack has no room to spare)
+	SF(few, sizeof(split[0]), STR_INGAME_SEARCH_FEW, LS("{1}"), LN(INGAME_SEARCH_LIST));
 	text_split(few, split[k_few], sizeof(split[k_few][0]));
 	text[INGAME_TEXT_SEARCH_FEW] = split[k_few][0];
 	text[INGAME_TEXT_SEARCH_FEW_AFTER] = split[k_few][2];
