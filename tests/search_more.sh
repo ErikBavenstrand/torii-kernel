@@ -263,7 +263,7 @@ midgame)
   if ! grep -q '^stop at frame' <<<"$log" || ! grep -q '^wake at frame' <<<"$log"; then
     fail "Sleep didn't sleep and wake"
   fi
-  sed -n '/^wake at frame/,$p' <<<"$log" | grep -q 'searchtest: lives 5' || fail "Reset game didn't start the game again"
+  sed -n '/^wake at frame/,$p' <<<"$log" | grep -q 'searchtest: lives 5' || fail "Reset game didn't start the game again: $(grep -E 'screen ready|search:|^wake|^timed|lives' <<<"$log" | uniq | tail -8 | tr '\n' '|')"
   [ "$(lefts)" = "294400 1 1 1 1 " ] || fail "the search didn't go on after Sleep and Reset game: $(lefts)"
   grep -qE 'found in game, 0300[0-9A-F]{4}:09 off: added' <<<"$log" || fail "not filed off after All off: $(grep 'found in game' <<<"$log")"
   echo "PASS: search_more midgame: All off stopped the lives held at 9 (then $after), the search went on after Sleep and Reset game, filed off"
