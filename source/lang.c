@@ -152,16 +152,6 @@ int lang_using_pack(void)
 	return lang.count != 0;
 }
 
-// 1 if s is ASCII and Latin-1 only (UTF-8 lead bytes 0xC2 and 0xC3): what the
-// menu's own fonts draw with no script font
-static int latin1_only(const char *s)
-{
-	for (; *s; s++)
-		if ((u8)*s >= 0xC4)
-			return 0;
-	return 1;
-}
-
 int lang_keep_launch(void *room, u32 bytes)
 {
 	if (!lang.count || lang.launch)
@@ -179,8 +169,6 @@ int lang_keep_launch(void *room, u32 bytes)
 		offsets[id] = 0;
 		if (!from)
 			continue;
-		if (!latin1_only(lang.pool + from))
-			continue;  // English: a launch has no script font, so it'd be boxes
 		u32 len = (u32)strlen(lang.pool + from) + 1;
 		if (at + len > room_pool || at > 0xFFFF) {
 			lang_use(NULL);

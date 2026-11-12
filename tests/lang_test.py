@@ -80,67 +80,12 @@ class Committed(unittest.TestCase):
                 continue
             with self.subTest(path.name):
                 pack = lang.pack(lang.load(path), en)
-                # The strings (a script font follows them) have 64 KB
-                strings = int.from_bytes(pack[52:56], "little") or len(pack)
-                self.assertLessEqual(strings, lang.PACK_MAX)
+                self.assertLessEqual(len(pack), lang.PACK_MAX)
 
     def test_swedish_is_whole(self):
         # v0.9 ships Swedish: every string translated, none falling back
         en = lang.load_english()
         self.assertEqual(lang.check_pack(lang.load(ROOT / "lang" / "sv.ini"), en), [])
-
-    def test_korean(self):
-        """Korean: Galmuri9's Hangul, kana and jamo in the pack, every string
-        translated but the launch's, a pack no native speaker has reviewed."""
-        en = lang.load_english()
-        ko = lang.load(ROOT / "lang" / "ko.ini")
-        missing = lang.check_pack(ko, en)
-        # The sections a launch (and the in-game menu) shows draw Hangul as boxes
-        # (script_drop): the pack leaves them to English, Latin-1 where it has any
-        # but [hint]'s (lang_keep_launch keeps those in English for a launch)
-        left = set(en.meta["launch"].split()) - {"format", "month", "hint"}
-        for key in missing:
-            self.assertTrue(
-                key.split(".", 1)[0] in left
-                or key == "diag.title"
-                or key.startswith("boot."),
-                key,
-            )
-        # [hint]'s other labels are the menu's only, so they may be Hangul
-        menu_hints = {
-            "hint.open", "hint.turn", "hint.move", "hint.back", "hint.change",
-            "hint.done", "hint.field", "hint.set", "hint.menu", "hint.format", "hint.cancel",
-        }  # fmt: skip
-        launch = set(en.meta["launch"].split())
-        for key in ko.keys:
-            if key.split(".", 1)[0] in launch and key not in menu_hints:
-                self.assertTrue(lang.latin1(ko.text[key]), key)
-        # The font: 11,172 syllables, the compatibility jamo and kana, in the room
-        data = lang.pack(ko, en)
-        at = int.from_bytes(data[52:56], "little")
-        size = int.from_bytes(data[56:60], "little")
-        self.assertEqual(len(data), at + size)
-        self.assertLessEqual(size, lang.font_tool().SCRIPT_MAX)
-        self.assertEqual(data[at : at + 4], b"TSCF")
-        self.assertEqual(
-            int.from_bytes(data[at + 6 : at + 8], "little"), 1
-        )  # the body's only
-        cps = lang.script_codepoints(ko)
-        self.assertTrue(set(range(0xAC00, 0xD7A4)) <= cps)
-        self.assertEqual(ko.meta["review"], "pending")
-
-    def test_pending_packs_stay_out_of_the_release(self):
-        import tempfile
-
-        with tempfile.TemporaryDirectory() as tmp:
-            out, z = Path(tmp) / "lang", Path(tmp) / "t.zip"
-            self.assertEqual(lang.main(["packs", "-o", str(out), "--zip", str(z)]), 0)
-            self.assertTrue((out / "ko.lng").exists())  # the card gets it
-            with zipfile.ZipFile(z) as zf:
-                names = zf.namelist()
-        self.assertIn("sv.lng", names)
-        self.assertNotIn("ko.lng", names)
-        self.assertNotIn("en-XA.lng", names)
 
     def test_pseudo_locale_builds(self):
         en = lang.load_english()

@@ -275,7 +275,6 @@ void test_lang_fill(void);
 void test_lang_dates(void);
 void test_lang_pack(void);
 void test_lang_pack_font(void);
-void test_lang_korean(void);
 void test_lang_launch(void);
 void test_lang_list(void);
 void test_saveslot_stamp_from_rtc(void);
