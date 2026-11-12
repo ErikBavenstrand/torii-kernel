@@ -401,8 +401,18 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 	hdr_out.check = ingame_image_check((const u32 *)(const void *)(ingame_overlay + sizeof(hdr_out)),
 					   (hdr_out.image_bytes - (u32)sizeof(hdr_out)) / 4);
 	bad += sram_put(INGAME_SRAM_IMAGE, (const u8 *)&hdr_out, sizeof(hdr_out));
-	h->ext_check = ingame_image_check((const u32 *)(const void *)(ingame_overlay + hdr_out.image_bytes),
-					  (image - hdr_out.image_bytes) / 4);
+	// The extension's two parts (ov.ld): the first's bytes in its first
+	// word, its check run on over the IWRAM code at the image's end; the
+	// second's from there to the IWRAM code (its bytes in the ELF's
+	// layout: the code is the rest of the image past the second part)
+	const u32 *ext = (const u32 *)(const void *)(ingame_overlay + hdr_out.image_bytes);
+	const u32 part1 = ext[0], ext_bytes = image - hdr_out.image_bytes;
+	TLOG_ASSERT(part1 % 4 == 0 && part1 <= ext_bytes && ext[1] <= ext_bytes);
+	u32 c = ingame_image_check(ext, part1 / 4);
+	for (u32 i = ext[1] / 4; i < ext_bytes / 4; i++)
+		c = (c << 5 | c >> 27) + ext[i];
+	h->ext_check = c;
+	h->ext2_check = ingame_image_check(ext + part1 / 4, (ext[1] - part1) / 4);
 	bad += sram_put(INGAME_SRAM_SESSION, (const u8 *)words, sizeof(words));
 	// The menu's footer: its keys as Settings shows them in A's hint;
 	// without A's word where that doesn't fit
@@ -485,7 +495,6 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 		[INGAME_TEXT_SEARCH_HINT] = STR_INGAME_SEARCH_HINT,
 		[INGAME_TEXT_SEARCH_DROPS] = STR_INGAME_SEARCH_DROPS,
 		[INGAME_TEXT_SEARCH_STATE_FIRST] = STR_INGAME_SEARCH_STATE_FIRST,
-		[INGAME_TEXT_SEARCH_FEW] = STR_INGAME_SEARCH_FEW,
 		[INGAME_TEXT_SEARCH_EDIT] = STR_INGAME_SEARCH_EDIT,
 		[INGAME_TEXT_SEARCH_KEEP] = STR_INGAME_SEARCH_KEEP,
 		[INGAME_TEXT_SEARCH_KEEP_ON] = STR_INGAME_SEARCH_KEEP_ON,
@@ -496,6 +505,24 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 		[INGAME_TEXT_SEARCH_PICK] = STR_INGAME_SEARCH_PICK,
 		[INGAME_TEXT_SEARCH_SAVE_ENDS] = STR_INGAME_SEARCH_SAVE_ENDS,
 		[INGAME_TEXT_UNSAVED_FOUND] = STR_INGAME_UNSAVED_FOUND,
+		[INGAME_TEXT_SEARCH_CONFIRM_NEW] = STR_INGAME_SEARCH_CONFIRM_NEW,
+		[INGAME_TEXT_SEARCH_CONFIRM_FIND] = STR_INGAME_SEARCH_CONFIRM_FIND,
+		[INGAME_TEXT_SEARCH_CONFIRM_SAVE] = STR_INGAME_SEARCH_CONFIRM_SAVE,
+		[INGAME_TEXT_SEARCH_STALE] = STR_INGAME_SEARCH_STALE,
+		[INGAME_TEXT_SEARCH_FAILED] = STR_INGAME_SEARCH_FAILED,
+		[INGAME_TEXT_SEARCH_OWNED] = STR_INGAME_SEARCH_OWNED,
+		[INGAME_TEXT_SEARCH_SET_HINT] = STR_INGAME_SEARCH_SET_HINT,
+		[INGAME_TEXT_SEARCH_PTR_HINT_ON] = STR_INGAME_SEARCH_PTR_HINT_ON,
+		[INGAME_TEXT_SEARCH_PTR_HINT_OFF] = STR_INGAME_SEARCH_PTR_HINT_OFF,
+		[INGAME_TEXT_SEARCH_PTR_FULL] = STR_INGAME_SEARCH_PTR_FULL,
+		[INGAME_TEXT_SEARCH_PTR_ALL] = STR_INGAME_SEARCH_PTR_ALL,
+		[INGAME_TEXT_SEARCH_PTR_ONLY] = STR_INGAME_SEARCH_PTR_ONLY,
+		[INGAME_TEXT_SEARCH_PTR_NONE_PASS] = STR_INGAME_SEARCH_PTR_NONE_PASS,
+		[INGAME_TEXT_SEARCH_PTR_KEPT_OFF] = STR_INGAME_SEARCH_PTR_KEPT_OFF,
+		[INGAME_TEXT_RESET_LIVE] = STR_INGAME_RESET_LIVE,
+		[INGAME_TEXT_UNSAVED_STATE_FOUND] = STR_INGAME_UNSAVED_STATE_FOUND,
+		[INGAME_TEXT_UNSAVED_SHOTS_FOUND] = STR_INGAME_UNSAVED_SHOTS_FOUND,
+		[INGAME_TEXT_UNSAVED_ALL_FOUND] = STR_INGAME_UNSAVED_ALL_FOUND,
 	};
 	const char *text[INGAME_TEXTS];
 	for (u32 i = 0; i < INGAME_TEXTS; i++)
@@ -522,8 +549,10 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 		{STR_INGAME_SEARCH_LEFT, INGAME_TEXT_SEARCH_LEFT, 1},
 		{STR_INGAME_SEARCH_VALUE, INGAME_TEXT_SEARCH_VALUE, 1},
 		{STR_INGAME_SEARCH_PTR_FOUND, INGAME_TEXT_SEARCH_PTR_FOUND, 1},
+		{STR_INGAME_SEARCH_PTR_PASSED, INGAME_TEXT_SEARCH_PTR_PASSED, 1},
+		{STR_INGAME_SEARCH_ROW, INGAME_TEXT_SEARCH_ROW, 1},
 	};
-	static char split[sizeof(split_ids) / sizeof(split_ids[0])][3][48] EWRAM_BSS;  // 1 KB: off the stack
+	static char split[sizeof(split_ids) / sizeof(split_ids[0]) + 1][3][48] EWRAM_BSS;  // 1 KB: off the stack
 	for (u32 i = 0; i < sizeof(split_ids) / sizeof(split_ids[0]); i++) {
 		text_split(S(split_ids[i][0]), split[i], sizeof(split[i][0]));
 		text[split_ids[i][1]] = split[i][0];
@@ -531,6 +560,14 @@ int ingame_prepare(const char *name, u32 rom_bytes, const char *rom_path)
 			text[split_ids[i][1] + 1] = split[i][1];
 		text[split_ids[i][1] + split_ids[i][2]] = split[i][2];
 	}
+	// Show them's footer while too many are left: the list's size in, the
+	// candidates left the overlay's
+	char few[96];
+	const u32 k_few = sizeof(split_ids) / sizeof(split_ids[0]);
+	SF(few, sizeof(few), STR_INGAME_SEARCH_FEW, LS("{1}"), LN(INGAME_SEARCH_LIST));
+	text_split(few, split[k_few], sizeof(split[k_few][0]));
+	text[INGAME_TEXT_SEARCH_FEW] = split[k_few][0];
+	text[INGAME_TEXT_SEARCH_FEW_AFTER] = split[k_few][2];
 	for (u32 i = 0; i < INGAME_TEXTS; i++) {
 		struct ingame_line line;
 		TLOG_ASSERT(text[i]);

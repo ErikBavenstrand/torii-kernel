@@ -146,4 +146,16 @@ void cheatsearch_decimal(uint32_t value, uint8_t *out, uint32_t n);
 // 127 (32767, ...) or 128 negative. BCD's numbers go to 99 (9999, ...).
 uint32_t cheatsearch_edit(uint32_t value, uint32_t size, uint32_t mode, uint32_t place, int step);
 
+// Undo's values (v0.9.22): the elements of values (n bytes) that are
+// candidates in bits, one after another into out; the bytes written. And
+// back: in's bytes into values' candidates; the bytes read.
+uint32_t cheatsearch_pack(uint8_t *out, const uint8_t *values, const uint8_t *bits, uint32_t n, uint32_t size);
+uint32_t cheatsearch_unpack(uint8_t *values, const uint8_t *in, const uint8_t *bits, uint32_t n, uint32_t size);
+
+// A number edited in mode from (enum cheatsearch_mode) as the same number
+// in mode to: signed numbers are two's complement, unsigned and BCD ones
+// the number itself; otherwise if to can't hold it (-5 unsigned, 300 in
+// BCD's two digits, 200 signed at 8 bits)
+uint32_t cheatsearch_convert(uint32_t value, uint32_t size, uint32_t from, uint32_t to, uint32_t otherwise);
+
 #endif

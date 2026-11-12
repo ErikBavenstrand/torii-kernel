@@ -147,20 +147,40 @@ const char *const lang_en[STR_COUNT] = {
 	"None left: start a new search",  // ingame.search_none
 	"Searching...",  // ingame.search_busy
 	"Remembers every value: then play",  // ingame.search_hint
-	"Load state then needs Torii",  // ingame.search_drops
-	"Go back to Torii first",  // ingame.search_state_first
-	"Narrow it down to 32 first",  // ingame.search_few
+	"Drops the state (it's still in Torii)",  // ingame.search_drops
+	"A state waits: Back to Torii first",  // ingame.search_state_first
+	"{1} left: narrow to {2}",  // ingame.search_few
 	"Left/Right, Up/Down, then A",  // ingame.search_edit
 	"Value: {1}",  // ingame.search_value
 	"Keep it",  // ingame.search_keep
 	"Keep it, on now",  // ingame.search_keep_on
-	"Keep it, set it now",  // ingame.search_keep_set
+	"Keep it, set now",  // ingame.search_keep_set
 	"Kept: filed on Back to Torii",  // ingame.search_kept
 	"Three on now at most: just keep it",  // ingame.search_live_full
 	"16 kept: go back to Torii first",  // ingame.search_found_full
 	"A: make it a cheat",  // ingame.search_pick
 	"Saving a state ends the search",  // ingame.search_save_ends
 	"Not on card yet: found cheats",  // ingame.unsaved_found
+	"A again: end this search",  // ingame.search_confirm_new
+	"A again: replace the pointers",  // ingame.search_confirm_find
+	"A again: save, ending the search",  // ingame.search_confirm_save
+	"Undone: compare with a number first",  // ingame.search_stale
+	"Cart memory failed a check: try again",  // ingame.search_failed
+	"Torii uses this address in game",  // ingame.search_owned
+	"May change; held from the next launch",  // ingame.search_set_hint
+	"{1} passed the check",  // ingame.search_ptr_passed
+	"A: keep it on; SELECT: off",  // ingame.search_ptr_hint_on
+	"A keeps it; check it to turn it on",  // ingame.search_ptr_hint_off
+	"The scan was full: it may be missing",  // ingame.search_ptr_full
+	"All found before the check",  // ingame.search_ptr_all
+	"Only those that passed",  // ingame.search_ptr_only
+	"None passed: the list is unchanged",  // ingame.search_ptr_none_pass
+	"Kept, off: check it to turn it on",  // ingame.search_ptr_kept_off
+	"Stops the found cheats on now",  // ingame.reset_live
+	"Cheat search: {1} left",  // ingame.search_row
+	"Not on card yet: state, cheats",  // ingame.unsaved_state_found
+	"Not on card yet: shots, cheats",  // ingame.unsaved_shots_found
+	"Not on card: state, shots, cheats",  // ingame.unsaved_all_found
 	"Always on",  // activation.always
 	"Hold {1}",  // activation.hold
 	"Press {1}",  // activation.press
@@ -545,6 +565,13 @@ const char *const lang_en[STR_COUNT] = {
 	"Showing the first {1} games",  // games.first
 	"pick",  // cheats.hint_pick
 	"Found {1}",  // cheats.found_name
+	"{1} found cheat added to {2}",  // cheats.found_added.one
+	"{1} found cheats added to {2}",  // cheats.found_added.other
+	"{1} found cheat for {2} wasn't saved: {3}",  // cheats.found_failed.one
+	"{1} found cheats for {2} weren't saved: {3}",  // cheats.found_failed.other
+	"the cheat file is full",  // cheats.found_why_full
+	"the card didn't take them",  // cheats.found_why_card
+	"its cheat file couldn't be read",  // cheats.found_why_open
 	"Too much to run beside the picks",  // cheats.why_full
 	"Can't read this code",  // cheats.why_unreadable
 	"Fill in its digits to use it",  // cheats.why_edit

@@ -130,7 +130,7 @@ if [ "$mode" = ptr ]; then
   keys 120 B
   args+=(-k @200:L+R+START -k @206:-)
   to_search
-  keys 10 DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN A
+  keys 10 DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN A A # New search asks first: A again
   wait_for "screen ready: ingame-search"
   keys 10 A
   wait_for "search: started"

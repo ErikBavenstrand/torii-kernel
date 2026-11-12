@@ -65,12 +65,12 @@
 // bytes past image_bytes (the extension and its IWRAM code), which the
 // overlay loads itself: the core image fills its 24 KB at INGAME_SRAM_IMAGE
 #define INGAME_SRAM_EXT 0xF2000
-#define INGAME_EXT_MAX 0x4000
+#define INGAME_EXT_MAX 0x5000
 // The cheat search's Undo (v0.9.22): the values the last pass wrote over in
 // the snapshot, of the candidates before it, one after another in their
 // bits' order, as many as fit
-#define INGAME_SRAM_UNDO_VALUES 0xF6000
-#define INGAME_UNDO_VALUES_BYTES 0x8000
+#define INGAME_SRAM_UNDO_VALUES 0xF7000
+#define INGAME_UNDO_VALUES_BYTES 0x7000
 // The search's lines past the first block's room (INGAME_TEXT_SRAM)
 #define INGAME_SRAM_TEXTS_MORE 0xFE000
 // Found cheats a boot couldn't file (struct ingame_found_wait), kept with
@@ -113,7 +113,13 @@ struct ingame_search {
 	uint8_t first;  // INGAME_FIRST_*
 	uint8_t first_pass;  // the pass that kept it (its undo loses it)
 	uint8_t bcd;  // 1: elements are BCD, two decimal digits a byte (scores)
-	uint8_t reserved;
+	// 1 (v0.9.22): INGAME_SRAM_UNDO_VALUES holds the values the last pass
+	// wrote over, so Undo puts the snapshot back too
+	uint8_t undo_values;
+	// 1: an Undo couldn't put the snapshot back (too many values), so the
+	// filters against the last scan wait for one against a number
+	uint8_t stale;
+	uint8_t reserved[3];
 };
 
 #define INGAME_FOUND_MAGIC 0x31444E46u  // "FND1"
@@ -136,23 +142,30 @@ struct ingame_found_cheat {
 #define INGAME_POINTERS_MAGIC 0x31525450u  // "PTR1"
 #define INGAME_POINTER_REACH 0x1000
 #define INGAME_POINTERS_MAX 960
+// An offset's bit (v0.9.22): the pointer passed every Check made
+#define INGAME_POINTER_PASSED 0x80000000u
 struct ingame_pointer {
 	uint32_t at;  // the pointer's address
-	uint32_t offset;  // below INGAME_POINTER_REACH
+	uint32_t offset;  // below INGAME_POINTER_REACH, with INGAME_POINTER_PASSED
 };
+// Check (v0.9.22) marks the pointers that pass rather than dropping the
+// others: one that passes none leaves the list as it was, and the page can
+// show the list as Find made it
 struct ingame_pointers {
 	uint32_t magic;  // INGAME_POINTERS_MAGIC
 	uint16_t count;  // pointers kept
 	uint16_t full;  // 1: the scan found more than fit
 	uint32_t target;  // the address they point to now
-	uint32_t reserved;
+	uint16_t passed;  // with checks, those with INGAME_POINTER_PASSED
+	uint16_t checks;  // the Checks made since Find
 	struct ingame_pointer p[INGAME_POINTERS_MAX];
 };
 
+#define INGAME_FOUND_LIVE 0x01  // struct ingame_found's flags: one is on now in the live block
 struct ingame_found {
 	uint32_t magic;  // INGAME_FOUND_MAGIC; the overlay writes a record, then this head
 	uint16_t count;  // records filled
-	uint16_t reserved;
+	uint16_t flags;  // INGAME_FOUND_LIVE
 	struct ingame_found_cheat cheat[INGAME_FOUND_MAX];
 };
 
@@ -381,6 +394,16 @@ struct ingame_shot {
 #define INGAME_SAVE_SLOT_BYTES 100  // a save slot's name (SAVESLOT_NAME_BYTES, 97), word-rounded
 #define INGAME_PALETTE 16
 
+// Found cheats a boot couldn't file (v0.9.22), at INGAME_SRAM_FOUND_WAIT:
+// the next launch's session takes the block their game's path is in, so
+// they wait here with it until a boot files them
+#define INGAME_FOUND_WAIT_MAGIC 0x31544157u  // "WAT1"
+struct ingame_found_wait {
+	uint32_t magic;  // INGAME_FOUND_WAIT_MAGIC, written last
+	char rom_path[INGAME_PATH_BYTES];
+	struct ingame_found found;
+};
+
 // The palette's roles the overlay uses (enum ui_role in source/ui/ui.h; source/ingame.c checks)
 #define INGAME_ROLE_TEXT 6
 #define INGAME_ROLE_FAINT 8
@@ -495,7 +518,8 @@ enum ingame_text {
 	INGAME_TEXT_SEARCH_HINT,  // the footer on Start and Size
 	INGAME_TEXT_SEARCH_DROPS,  // on Start, with a kept state in the buffer
 	INGAME_TEXT_SEARCH_STATE_FIRST,  // on Start, with a state not kept yet
-	INGAME_TEXT_SEARCH_FEW,  // on Show them while too many are left
+	INGAME_TEXT_SEARCH_FEW,  // on Show them while too many are left: "{n} left: narrow to 32..."
+	INGAME_TEXT_SEARCH_FEW_AFTER,
 	INGAME_TEXT_SEARCH_EDIT,  // while a number is edited
 	INGAME_TEXT_SEARCH_VALUE,  // a candidate's page: "Value: " before the number
 	INGAME_TEXT_SEARCH_VALUE_AFTER,
@@ -507,7 +531,30 @@ enum ingame_text {
 	INGAME_TEXT_SEARCH_FOUND_FULL,
 	INGAME_TEXT_SEARCH_PICK,  // the list's footer
 	INGAME_TEXT_SEARCH_SAVE_ENDS,  // the Save state row's footer while a search runs
-	INGAME_TEXT_UNSAVED_FOUND,  // the menu's footer while found cheats wait
+	INGAME_TEXT_UNSAVED_FOUND,  // the menu's footer while found cheats wait: alone,
+	INGAME_TEXT_UNSAVED_STATE_FOUND,  // with a state (v0.9.22),
+	INGAME_TEXT_UNSAVED_SHOTS_FOUND,  // with screenshots
+	INGAME_TEXT_UNSAVED_ALL_FOUND,  // or with both
+	// v0.9.22: the confirmations (a second A does it)
+	INGAME_TEXT_SEARCH_CONFIRM_NEW,
+	INGAME_TEXT_SEARCH_CONFIRM_FIND,
+	INGAME_TEXT_SEARCH_CONFIRM_SAVE,
+	INGAME_TEXT_SEARCH_STALE,  // the filters against the last scan greyed after an Undo
+	INGAME_TEXT_SEARCH_FAILED,  // cart SRAM didn't keep the game's memory
+	INGAME_TEXT_SEARCH_OWNED,  // the address is Torii's (the hook's) in game
+	INGAME_TEXT_SEARCH_SET_HINT,  // on Keep it, set now: not held this session
+	INGAME_TEXT_SEARCH_PTR_PASSED,  // the pointers page's title after a Check: "{n} passed"
+	INGAME_TEXT_SEARCH_PTR_PASSED_AFTER,
+	INGAME_TEXT_SEARCH_PTR_HINT_ON,  // the pointers page's footer: checked, A keeps it on
+	INGAME_TEXT_SEARCH_PTR_HINT_OFF,  // not checked: A keeps it off
+	INGAME_TEXT_SEARCH_PTR_FULL,  // a Check of a scan that was full
+	INGAME_TEXT_SEARCH_PTR_ALL,  // the row that shows the list as Find made it
+	INGAME_TEXT_SEARCH_PTR_ONLY,  // and back
+	INGAME_TEXT_SEARCH_PTR_NONE_PASS,
+	INGAME_TEXT_SEARCH_PTR_KEPT_OFF,
+	INGAME_TEXT_RESET_LIVE,  // the Reset game row's footer while found cheats are on now
+	INGAME_TEXT_SEARCH_ROW,  // the menu's row while a search runs: "Cheat search: {n} left"
+	INGAME_TEXT_SEARCH_ROW_AFTER,
 	INGAME_TEXTS
 };
 
@@ -660,9 +707,12 @@ struct ingame_session {
 	// instead)
 	uint32_t live_at;
 	uint32_t launch_id;  // differs at each launch: a search is this launch's only (struct ingame_search)
-	// The check word (ingame_image_check) of the image's bytes past
-	// image_bytes: the search's code, which the overlay loads itself
+	// The check words (ingame_image_check) of the image's bytes past
+	// image_bytes, which the overlay loads itself: the extension's first
+	// part (its first words its bytes and the whole's) and then the IWRAM code at the
+	// image's end, and its second part (the cheat search's)
 	uint32_t ext_check;
+	uint32_t ext2_check;
 	// Each text line's width (struct ingame_line's), so the overlay lays
 	// out the menu without reading the lines from cart SRAM
 	uint16_t text_width[(INGAME_TEXT_SEARCH + 1) & ~1];  // the search's lines' are in their lines
@@ -686,6 +736,9 @@ struct ingame_session {
 // search's (v0.9) on, the block after the whole names, which the session
 // block has no room for
 #define INGAME_SRAM_TEXTS 0x3C100
+// The Cheat search row while a search runs, its count in it (v0.9.22): the
+// overlay's extension writes it, the menu (without the extension) reads it
+#define INGAME_SRAM_SEARCH_ROW INGAME_TEXT_SRAM(INGAME_TEXTS)
 // struct ingame_glyph[INGAME_GLYPHS]: after the screenshot's IWRAM backup,
 // before the found cheats
 #define INGAME_SRAM_GLYPHS 0x2DA00
@@ -766,7 +819,8 @@ _Static_assert(INGAME_SRAM_TEXTS >= INGAME_SRAM_WIDE + INGAME_CHEATS * sizeof(st
 		       INGAME_SRAM_TEXTS + INGAME_TEXTS_FIRST * sizeof(struct ingame_line) <= INGAME_SRAM_STATE &&
 		       INGAME_SRAM_STATE <= (INGAME_SRAM_TEXTS & ~0xFFFFu) + 0x10000,
 	       "the search's lines after the whole names, before the state buffer, in their 64 KB page window");
-_Static_assert(INGAME_TEXTS <= INGAME_TEXT_SEARCH + INGAME_TEXTS_FIRST || INGAME_TEXT_SRAM(INGAME_TEXTS) <= 0x100000,
+_Static_assert(INGAME_TEXTS + 1 <= INGAME_TEXT_SEARCH + INGAME_TEXTS_FIRST ||
+		       INGAME_TEXT_SRAM(INGAME_TEXTS + 1) <= 0x100000,
 	       "the search's lines past the first block fit the cart log page's end");
 _Static_assert(INGAME_SRAM_EXT + INGAME_EXT_MAX <= INGAME_SRAM_UNDO_VALUES &&
 		       INGAME_SRAM_UNDO_VALUES + INGAME_UNDO_VALUES_BYTES <= INGAME_SRAM_TEXTS_MORE &&
@@ -776,6 +830,10 @@ _Static_assert(INGAME_BACKUP_EWRAM + INGAME_EXT_END_MAX <= INGAME_BACKUP_OBJ, "t
 _Static_assert(INGAME_SRAM_GLYPHS >= INGAME_BACKUP_SHOT + INGAME_BACKUP_SHOT_BYTES &&
 		       INGAME_SRAM_GLYPHS + INGAME_GLYPHS * sizeof(struct ingame_glyph) <= INGAME_SRAM_FOUND,
 	       "the glyphs after the screenshot's backup, before the found cheats");
+_Static_assert(INGAME_SRAM_FOUND_WAIT >= 0xF1C20 &&
+		       INGAME_SRAM_FOUND_WAIT + sizeof(struct ingame_found_wait) <= INGAME_SRAM_EXT &&
+		       sizeof(struct ingame_found_wait) % 4 == 0,
+	       "the found cheats that wait: after the cart log's refusal record, before the extension");
 _Static_assert(INGAME_SRAM_POINTERS >= INGAME_SRAM_FOUND + sizeof(struct ingame_found) &&
 		       INGAME_SRAM_POINTERS + sizeof(struct ingame_pointers) <= INGAME_SRAM_WIDE &&
 		       sizeof(struct ingame_pointers) % 4 == 0,
