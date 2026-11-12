@@ -328,7 +328,7 @@ filefail)
   grep -q "the found cheats weren't written" <<<"$log" || fail "the read-only file took them: $(grep 'cheats:' <<<"$log" | tail -3)"
   # The next boot, the file writable: the wait area's cheat filed
   mattrib -i "$cart/sd.img" -r ::/torii/cheats/searchtest.cht
-  args=(-w "found in game")  # a boot as after a soft reset: cart SRAM kept (OMEGA_SOFT_RESET)
+  args=(-w "found in game") # a boot as after a soft reset: cart SRAM kept (OMEGA_SOFT_RESET)
   OMEGA_SOFT_RESET=1 run -f 3000
   addr=$(sed -n 's/^kernel: cheats: .*found in game, \([0-9A-F]*\):05 off: added$/\1/p' <<<"$log")
   [ -n "$addr" ] || fail "the next boot didn't file the waiting cheat: $(grep 'cheats:' <<<"$log" | tail -3)"
