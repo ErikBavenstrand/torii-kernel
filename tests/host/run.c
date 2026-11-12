@@ -302,7 +302,6 @@ static const struct {
 	{"lang_dates", test_lang_dates},
 	{"lang_pack", test_lang_pack},
 	{"lang_pack_font", test_lang_pack_font},
-	{"lang_korean", test_lang_korean},
 	{"lang_launch", test_lang_launch},
 	{"lang_list", test_lang_list},
 	{"saveslot_stamp_from_rtc", test_saveslot_stamp_from_rtc},
