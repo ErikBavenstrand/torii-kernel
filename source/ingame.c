@@ -925,24 +925,28 @@ static const char *found_game(const char *path)
 	return slash ? slash + 1 : path;
 }
 
+// The found cheats being filed, with their game's path (struct
+// ingame_found_wait): 500 bytes, off the stack, for both callers below
+static struct ingame_found_wait found_waiting EWRAM_BSS;
+
 // Found cheats an earlier boot couldn't file (struct ingame_found_wait),
 // filed now; they go once filed, or once they can't ever be (refused)
 static void found_wait_file(void)
 {
-	static struct ingame_found_wait w EWRAM_BSS;  // 500 bytes: off the stack
-	sram_get(INGAME_SRAM_FOUND_WAIT, (u8 *)&w, sizeof(w));
+	struct ingame_found_wait *const w = &found_waiting;
+	sram_get(INGAME_SRAM_FOUND_WAIT, (u8 *)w, sizeof(*w));
 	SetRampage(0);
-	if (w.magic != INGAME_FOUND_WAIT_MAGIC || w.found.magic != INGAME_FOUND_MAGIC || !w.found.count ||
-	    w.rom_path[0] != '/' || !memchr(w.rom_path, 0, sizeof(w.rom_path)))
+	if (w->magic != INGAME_FOUND_WAIT_MAGIC || w->found.magic != INGAME_FOUND_MAGIC || !w->found.count ||
+	    w->rom_path[0] != '/' || !memchr(w->rom_path, 0, sizeof(w->rom_path)))
 		return;
 	struct found_done done;
-	found_file(w.rom_path, &w.found, &done);
+	found_file(w->rom_path, &w->found, &done);
 	if (!done.waits) {
 		u32 none = 0;
 		sram_put(INGAME_SRAM_FOUND_WAIT, (const u8 *)&none, sizeof(none));
 		SetRampage(0);
 	}
-	found_notice(found_game(w.rom_path), &done);
+	found_notice(found_game(w->rom_path), &done);
 }
 
 // The cheats the in-game search found (struct ingame_found), filed into the
@@ -952,25 +956,25 @@ static void found_wait_file(void)
 // cleared after.
 static void found_after_game(const char *path, const char *name)
 {
-	static struct ingame_found_wait w EWRAM_BSS;
-	sram_get(INGAME_SRAM_FOUND, (u8 *)&w.found, sizeof(w.found));
+	struct ingame_found_wait *const w = &found_waiting;
+	sram_get(INGAME_SRAM_FOUND, (u8 *)&w->found, sizeof(w->found));
 	SetRampage(0);
-	if (w.found.magic != INGAME_FOUND_MAGIC || !w.found.count)
+	if (w->found.magic != INGAME_FOUND_MAGIC || !w->found.count)
 		return;
 	struct found_done done;
-	found_file(path, &w.found, &done);
+	found_file(path, &w->found, &done);
 	if (done.waits) {
 		u32 head = 0;
 		sram_get(INGAME_SRAM_FOUND_WAIT, (u8 *)&head, sizeof(head));
 		if (head == INGAME_FOUND_WAIT_MAGIC) {
 			tlog_error("cheats: %s: an earlier game's found cheats wait already: these are lost", path);
 		} else {  // the records and the path, then the magic
-			memset(w.rom_path, 0, sizeof(w.rom_path));
-			strncpy(w.rom_path, path, sizeof(w.rom_path) - 1);
-			w.magic = 0;
-			sram_put(INGAME_SRAM_FOUND_WAIT, (const u8 *)&w, sizeof(w));
-			w.magic = INGAME_FOUND_WAIT_MAGIC;
-			sram_put(INGAME_SRAM_FOUND_WAIT, (const u8 *)&w, sizeof(w.magic));
+			memset(w->rom_path, 0, sizeof(w->rom_path));
+			strncpy(w->rom_path, path, sizeof(w->rom_path) - 1);
+			w->magic = 0;
+			sram_put(INGAME_SRAM_FOUND_WAIT, (const u8 *)w, sizeof(*w));
+			w->magic = INGAME_FOUND_WAIT_MAGIC;
+			sram_put(INGAME_SRAM_FOUND_WAIT, (const u8 *)w, sizeof(w->magic));
 		}
 		SetRampage(0);
 	}
