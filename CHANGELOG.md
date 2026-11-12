@@ -4,7 +4,7 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
-## Unreleased
+## v0.9.22
 
 - **Fixed:** a found cheat kept through a pointer, or a typed pointer code,
   could write anywhere its pointer's word pointed (I/O, VRAM). The
