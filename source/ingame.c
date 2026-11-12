@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 
 #include "Ezcard_OP.h"
 #include "cartlog.h"
@@ -779,31 +780,56 @@ static void cheats_keep(const struct ingame_session *h, const char *path, const 
 		tlog_error("cheats: %s: the in-game picks weren't written", path);
 }
 
-// The cheats the in-game search found (struct ingame_found), added to the
-// game's cheat file as codes of the user's ("Found 02030100", VBA raw), the
-// ones turned on in game picked; written power-cut safe, once. Kept in cart
-// SRAM if the card didn't take them: 1 then, for the next boot to try again
-static int found_after_game(const char *path)
+// Whether the read cheat file (its window read now) has a cheat whose code
+// is code, as the text has it (a found cheat filed before: the same cheat
+// kept in two sessions, or filed again after a power cut before its
+// records were cleared)
+static int found_have(const char *code)
 {
-	struct ingame_found found;
-	sram_get(INGAME_SRAM_FOUND, (u8 *)&found, sizeof(found));
-	SetRampage(0);
-	if (found.magic != INGAME_FOUND_MAGIC || !found.count)
-		return 0;
-	u32 n = found.count <= INGAME_FOUND_MAX ? found.count : INGAME_FOUND_MAX;
+	const struct cheatstore *cs = cheatstore();
+	const u32 len = (u32)strlen(code);
+	for (u32 i = 0; i < cs->file.count; i++) {
+		const struct cheatfile_cheat *c = &cs->cheats[i];
+		if (cheatfile_code_len(c) == len && c->code != CHEATFILE_NONE && c->code + len <= cs->file.len &&
+		    strncasecmp(cs->file.text + c->code, code, len) == 0)
+			return (int)i + 1;
+	}
+	return 0;
+}
+
+// What filing found cheats did, for the boot's notice
+struct found_done {
+	u32 added;  // new in the file
+	u32 lost;  // refused (the file full, its text too long): gone
+	u32 waits;  // the card didn't take them: they wait for the next boot
+	u16 why;  // the lost's or the waiting's reason (STR_CHEATS_FOUND_WHY_*), 0 none
+};
+
+// found's cheats (struct ingame_found), added to path's cheat file as codes
+// of the user's ("Found 02030100", VBA raw), the ones turned on in game
+// picked; a code the file has already is picked if it was on, not added
+// again. Written power-cut safe, once.
+static void found_file(const char *path, const struct ingame_found *found, struct found_done *done)
+{
+	u32 n = found->count <= INGAME_FOUND_MAX ? found->count : INGAME_FOUND_MAX;
+	memset(done, 0, sizeof(*done));
 	int r = cheatstore_open(path);
 	if (r != CHEATSTORE_READ && r != CHEATSTORE_NEW) {
 		tlog_error("cheats: %s: the cheat file can't take the %lu found in game (%d): they wait", path,
 			   (unsigned long)n, r);
-		return 1;
+		done->waits = n;
+		done->why = STR_CHEATS_FOUND_WHY_OPEN;
+		return;
 	}
 	if (cheatstore_windows() && !cheatstore_window_go(cheatstore_windows() - 1)) {
 		tlog_error("cheats: %s: its last window didn't read: the found cheats wait", path);
-		return 1;
+		done->waits = n;
+		done->why = STR_CHEATS_FOUND_WHY_OPEN;
+		return;
 	}
-	u32 added = 0, idx[INGAME_FOUND_MAX], on[INGAME_FOUND_MAX];
+	u32 changed = 0, idx[INGAME_FOUND_MAX], on[INGAME_FOUND_MAX];
 	for (u32 i = 0; i < n; i++) {
-		const struct ingame_found_cheat *c = &found.cheat[i];
+		const struct ingame_found_cheat *c = &found->cheat[i];
 		idx[i] = CHEATFILE_NONE;
 		// One cheat an address: the last kept of it (the same code twice
 		// would be greyed as doing what the first does), picked if any
@@ -811,11 +837,11 @@ static int found_after_game(const char *path)
 		u32 later = 0;
 		on[i] = 0;
 		for (u32 j = 0; j < n; j++)
-			if (found.cheat[j].address == c->address && found.cheat[j].size == c->size &&
-			    ((found.cheat[j].flags ^ c->flags) & INGAME_FOUND_POINTER) == 0 &&
-			    found.cheat[j].reserved == c->reserved) {
+			if (found->cheat[j].address == c->address && found->cheat[j].size == c->size &&
+			    ((found->cheat[j].flags ^ c->flags) & INGAME_FOUND_POINTER) == 0 &&
+			    found->cheat[j].reserved == c->reserved) {
 				later |= j > i;
-				on[i] |= found.cheat[j].flags & INGAME_FOUND_ON;
+				on[i] |= found->cheat[j].flags & INGAME_FOUND_ON;
 			}
 		if (later)
 			continue;
@@ -832,31 +858,126 @@ static int found_after_game(const char *path)
 			snprintf(code, sizeof(code), "%s:%04lX", addr, (unsigned long)(c->value & 0xFFFF));
 		else
 			snprintf(code, sizeof(code), "%s:%08lX", addr, (unsigned long)c->value);
+		int have = found_have(code);
+		if (have) {  // (a larger file's earlier windows aren't looked in)
+			idx[i] = (u32)have - 1;
+			tlog("cheats: %s: found in game, %s %s: in the file already", path, code, on[i] ? "on" : "off");
+			changed += on[i] != 0;
+			continue;
+		}
 		u32 e = cheatstore_add(name, code, CHEAT_FMT_TORII, &idx[i]);
 		tlog("cheats: %s: found in game, %s %s: %s", path, code, on[i] ? "on" : "off",
 		     e == CHEATFILE_EDIT_OK ? "added" : "refused");
-		added += e == CHEATFILE_EDIT_OK;
-		if (e != CHEATFILE_EDIT_OK)
+		if (e == CHEATFILE_EDIT_OK) {
+			done->added++;
+			changed++;
+		} else {
 			idx[i] = CHEATFILE_NONE;
+			done->lost++;
+			done->why = STR_CHEATS_FOUND_WHY_FULL;
+		}
 	}
-	if (!added)  // all refused (the file full): trying again won't help
-		n = 0;
-	if (added) {
-		cheatstore_begin();
-		cheatstore_decode(0);
-	}
-	for (u32 i = 0; i < n && added; i++)
+	if (!changed)  // nothing to write (all there already, or all refused: trying again won't help)
+		return;
+	cheatstore_begin();
+	cheatstore_decode(0);
+	for (u32 i = 0; i < n; i++)
 		if (on[i] && idx[i] != CHEATFILE_NONE && idx[i] < cheatstore()->file.count &&
 		    !cheatstore()->cheats[idx[i]].picked)
 			cheatstore_toggle(idx[i]);
-	if (added && !cheatstore_write()) {
+	if (!cheatstore_write()) {
 		tlog_error("cheats: %s: the found cheats weren't written: they wait for the next boot", path);
-		return 1;
+		done->waits = done->added;
+		done->added = 0;
+		done->why = STR_CHEATS_FOUND_WHY_CARD;
+	}
+}
+
+// The boot's word on filing found cheats for name: how many it added, or
+// how many it couldn't and why
+static void found_notice(const char *name, const struct found_done *done)
+{
+	char msg[160];
+	u32 lost = done->lost + done->waits;
+	if (lost)
+		SF(msg, sizeof(msg), STR_N(STR_CHEATS_FOUND_FAILED, lost), LN(lost), LCUT(name, 24), LS(S(done->why)));
+	else if (done->added)
+		SF(msg, sizeof(msg), STR_N(STR_CHEATS_FOUND_ADDED, done->added), LN(done->added), LCUT(name, 24));
+	else
+		return;
+	dialog_open();  // dialog_message logs it
+	if (lost) {
+		dialog_message(NULL, msg, DIALOG_ERROR);
+	} else {  // a notice for a moment: nothing to answer
+		tlog("cheats: %s", msg);
+		dialog_notice(NULL, msg, DIALOG_INFO);
+		for (u32 start = torii_frames; torii_frames - start < 90;)
+			ui_frame();
+		dialog_notice_end();
+	}
+	dialog_close();
+}
+
+// The game's name for a notice: the file's, from its path
+static const char *found_game(const char *path)
+{
+	const char *slash = strrchr(path, '/');
+	return slash ? slash + 1 : path;
+}
+
+// Found cheats an earlier boot couldn't file (struct ingame_found_wait),
+// filed now; they go once filed, or once they can't ever be (refused)
+static void found_wait_file(void)
+{
+	static struct ingame_found_wait w EWRAM_BSS;  // 500 bytes: off the stack
+	sram_get(INGAME_SRAM_FOUND_WAIT, (u8 *)&w, sizeof(w));
+	SetRampage(0);
+	if (w.magic != INGAME_FOUND_WAIT_MAGIC || w.found.magic != INGAME_FOUND_MAGIC || !w.found.count ||
+	    w.rom_path[0] != '/' || !memchr(w.rom_path, 0, sizeof(w.rom_path)))
+		return;
+	struct found_done done;
+	found_file(w.rom_path, &w.found, &done);
+	found_notice(found_game(w.rom_path), &done);
+	if (done.waits)
+		return;
+	u32 none = 0;
+	sram_put(INGAME_SRAM_FOUND_WAIT, (const u8 *)&none, sizeof(none));
+	SetRampage(0);
+}
+
+// The cheats the in-game search found (struct ingame_found), filed into the
+// game's cheat file (found_file), with a notice. Those the card didn't take
+// move to INGAME_SRAM_FOUND_WAIT with the game's path, which the next
+// launch's session block takes, for the next boot to file; the records are
+// cleared after.
+static void found_after_game(const char *path, const char *name)
+{
+	static struct ingame_found_wait w EWRAM_BSS;
+	sram_get(INGAME_SRAM_FOUND, (u8 *)&w.found, sizeof(w.found));
+	SetRampage(0);
+	if (w.found.magic != INGAME_FOUND_MAGIC || !w.found.count)
+		return;
+	struct found_done done;
+	found_file(path, &w.found, &done);
+	found_notice(name[0] ? name : found_game(path), &done);
+	if (done.waits) {
+		u32 head = 0;
+		sram_get(INGAME_SRAM_FOUND_WAIT, (u8 *)&head, sizeof(head));
+		if (head == INGAME_FOUND_WAIT_MAGIC) {
+			tlog_error("cheats: %s: an earlier game's found cheats wait already: these are lost", path);
+		} else {  // the records and the path, then the magic
+			memset(w.rom_path, 0, sizeof(w.rom_path));
+			strncpy(w.rom_path, path, sizeof(w.rom_path) - 1);
+			w.magic = 0;
+			sram_put(INGAME_SRAM_FOUND_WAIT, (const u8 *)&w, sizeof(w));
+			w.magic = INGAME_FOUND_WAIT_MAGIC;
+			sram_put(INGAME_SRAM_FOUND_WAIT, (const u8 *)&w, sizeof(w.magic));
+		}
+		SetRampage(0);
 	}
 	u32 none[2] = {0, 0};
 	sram_put(INGAME_SRAM_FOUND, (const u8 *)none, sizeof(none));
 	SetRampage(0);
-	return 0;
 }
 
 void ingame_refused_notice(void)
@@ -896,20 +1017,21 @@ void ingame_after_game(void)
 	const struct ingame_session *h = (const struct ingame_session *)(void *)words;
 	struct ingame_out out;
 	char path[INGAME_PATH_BYTES];
+	found_wait_file();  // an earlier boot's, which waited for the card
 	if (!session_read((struct ingame_session *)(void *)words, path, &out))
 		return;
 	tlog("in-game: back from %s, the menu's last %u", path, out.action);
 	states_after_game(h, path);
 	if (out.cheats_changed && h->cheat_count)
 		cheats_keep(h, path, &out);
-	u32 found_left = found_after_game(path);
+	found_after_game(path, h->name);
 	// Screenshots the card didn't take wait for the next boot (and are
 	// filed then even if the menu took none this time)
 	u32 shot_left = !shotstore_file(h->name, h->launch_clock);
 	// Done with: the answer goes, so the next boot does nothing again
 	memset(&out, 0, sizeof(out));
-	// Screenshots or found cheats the card didn't take: the next boot again
-	if (shot_left || found_left) {
+	// Screenshots the card didn't take: the next boot again
+	if (shot_left) {
 		out.magic = INGAME_OUT_MAGIC;
 		out.pending_state = 0xFFFF;
 		out.screenshot = (u16)shot_left;
