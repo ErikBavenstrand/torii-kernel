@@ -1573,6 +1573,7 @@ EXS_DATA static char log_pass[] = "search: pass in ", log_frames[] = " frames",
 		     log_undone[] = "search: undone, ", log_ptr_found[] = "search: pointers found: ",
 		     log_ptr_checked[] = "search: pointers checked: ", log_ptrs[] = "",
 		     log_kept_ptr[] = "search: kept a cheat through a pointer",
+		     log_kept_ptr_off[] = "search: kept a cheat through a pointer, off",
 		     log_undo_values[] = "search: undo: snapshot back",
 		     log_undo_stale[] = "search: undo: snapshot stale", log_failed[] = "search: IWRAM backup failed",
 		     log_ptr_none_pass[] = "search: none passed";
@@ -2473,7 +2474,7 @@ EXS static void search_keep_ptr(uint32_t r, int on)
 	if (now && in_ram(to, size) && !owned(to, size))
 		value_write(to, size, value);
 	m.notice = on && !passed ? INGAME_TEXT_SEARCH_PTR_KEPT_OFF : INGAME_TEXT_SEARCH_KEPT;
-	debug_print(log_kept_ptr);
+	debug_print(now ? log_kept_ptr : log_kept_ptr_off);
 	slots_update();
 }
 

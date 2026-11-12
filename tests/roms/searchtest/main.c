@@ -10,6 +10,11 @@
 // SELECT adds 25; B moves the block 0x100 bytes on (its old copy left
 // behind), as games that shuffle their save in memory do. The log line
 // also says "coins N" (the BCD's digits).
+//
+// v0.9.22: twenty words of 1,000,000 (marks), for a 32-bit search that
+// keeps 16 finds; and L points the block's pointer at VRAM, as a game that
+// reuses a pointer's word does: a cheat kept through it must not write
+// there (tests/search_more.sh).
 #include <stdint.h>
 
 #define REG_DISPCNT (*(volatile uint16_t *)0x04000000)
@@ -28,6 +33,7 @@
 #define KEY_A 1
 #define KEY_B 2
 #define KEY_SELECT 4
+#define KEY_L 0x200
 
 static volatile unsigned frames;
 static volatile uint8_t lives;
@@ -35,6 +41,8 @@ static volatile uint8_t lives;
 #define BLOCK_BASE 0x02010000u
 #define COINS_AT 0x24  // the coins' offset in the block
 static volatile uint8_t *volatile block;
+#define MARKS 20
+static volatile uint32_t marks[MARKS];
 
 __attribute__((target("arm"))) static void on_irq(void)
 {
@@ -105,6 +113,8 @@ int main(void)
 	for (int i = 0; i < 240 * 160; i++)
 		VRAM[i] = RGB(2, 6, 20);
 	lives = 5;
+	for (unsigned k = 0; k < MARKS; k++)
+		marks[k] = 1000000;
 	block = (volatile uint8_t *)BLOCK_BASE;
 	set_coins(0x0150);
 	IRQ_HANDLER = on_irq;
@@ -124,6 +134,8 @@ int main(void)
 			lives = n ? n - 1 : 5;
 		if ((keys & KEY_SELECT) && !(held & KEY_SELECT))
 			set_coins(bcd_add(coins(), 0x0025));
+		if ((keys & KEY_L) && !(held & KEY_L))  // the pointer's word now points at VRAM's first pixel
+			block = (volatile uint8_t *)(0x06000000 - COINS_AT);
 		if ((keys & KEY_B) && !(held & KEY_B)) {  // the block moves on, its old copy left
 			volatile uint8_t *to = block + 0x100;
 			for (unsigned k = 0; k < 0x40; k++)

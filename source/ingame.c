@@ -937,12 +937,12 @@ static void found_wait_file(void)
 		return;
 	struct found_done done;
 	found_file(w.rom_path, &w.found, &done);
+	if (!done.waits) {
+		u32 none = 0;
+		sram_put(INGAME_SRAM_FOUND_WAIT, (const u8 *)&none, sizeof(none));
+		SetRampage(0);
+	}
 	found_notice(found_game(w.rom_path), &done);
-	if (done.waits)
-		return;
-	u32 none = 0;
-	sram_put(INGAME_SRAM_FOUND_WAIT, (const u8 *)&none, sizeof(none));
-	SetRampage(0);
 }
 
 // The cheats the in-game search found (struct ingame_found), filed into the
@@ -959,7 +959,6 @@ static void found_after_game(const char *path, const char *name)
 		return;
 	struct found_done done;
 	found_file(path, &w.found, &done);
-	found_notice(name[0] ? name : found_game(path), &done);
 	if (done.waits) {
 		u32 head = 0;
 		sram_get(INGAME_SRAM_FOUND_WAIT, (u8 *)&head, sizeof(head));
@@ -978,6 +977,7 @@ static void found_after_game(const char *path, const char *name)
 	u32 none[2] = {0, 0};
 	sram_put(INGAME_SRAM_FOUND, (const u8 *)none, sizeof(none));
 	SetRampage(0);
+	found_notice(name[0] ? name : found_game(path), &done);  // (the records safe first: it may wait for a key)
 }
 
 void ingame_refused_notice(void)
