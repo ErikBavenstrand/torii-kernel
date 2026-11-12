@@ -340,21 +340,48 @@ class Output(unittest.TestCase):
 class Vendored(unittest.TestCase):
     """The fonts in assets/fonts convert as `just font` converts them."""
 
-    def test_hangul_subset(self):
-        """Galmuri9's script glyphs for lang/ko.ini (tools/galmuri.py, from
-        the pinned release): Hangul, jamo and kana, as Galmuri draws them."""
+    def test_extra_subset(self):
+        """Galmuri9's (and Galmuri11's, for headings) glyphs beyond Latin-1 (tools/galmuri.py, from the pinned
+        release): what EXTRA_RANGES names and Galmuri draws, nothing else."""
         raw, ascent = font.read_bdf(
-            (ROOT / "assets/fonts/galmuri/Galmuri9-hangul.bdf").read_text("latin-1")
+            (ROOT / "assets/fonts/galmuri/Galmuri9-extra.bdf").read_text("latin-1")
         )
         self.assertEqual(ascent, 11)
-        self.assertTrue(set(range(0xAC00, 0xD7A4)) <= set(raw))
-        self.assertTrue(set(range(0x3131, 0x318F)) <= set(raw))
-        self.assertTrue({0x3042, 0x30AB} <= set(raw))
-        self.assertFalse(any(cp < 0x3000 or 0x4E00 <= cp < 0xAC00 for cp in raw))
-        # Every glyph is 10 px apart and fits the menu line as the pack places it
-        self.assertEqual(
-            {adv for adv, _ in (raw[c] for c in range(0xAC00, 0xD7A4))}, {10}
-        )
+        ranges = font.parse_ranges(font.EXTRA_RANGES)
+        self.assertTrue(all(any(a <= cp <= b for a, b in ranges) for cp in raw))
+        # Latin Extended-A whole, Russian and Greek capitals, Vietnamese, the
+        # punctuation file names have
+        self.assertTrue(set(range(0x100, 0x180)) <= set(raw))
+        self.assertTrue(set(range(0x410, 0x450)) <= set(raw))
+        self.assertTrue({0x391, 0x3A9, 0x3B1, 0x3C9} <= set(raw))
+        self.assertTrue({0x1EA1, 0x1EBF, 0x1EF9} <= set(raw))
+        self.assertTrue({0x2013, 0x2014, 0x2018, 0x2019, 0x201C, 0x201D} <= set(raw))
+        self.assertTrue({0x2026, 0x20AC, 0x2122, 0x2605, 0x266A} <= set(raw))
+
+    def test_extra_fits_the_lines(self):
+        """Every extra glyph keeps its ink inside its menu font's line
+        (script_glyphs squeezes and clips as the menu fonts are), the
+        heading's made bold."""
+        for name, bdf in (("body", "Galmuri9"), ("heading", "Galmuri11")):
+            path = ROOT / "assets/fonts/galmuri" / f"{bdf}-extra.bdf"
+            raw, _ = font.read_bdf(path.read_text("latin-1"))
+            if name == "heading":
+                raw = font.embolden(raw)
+            height, baseline = font.builtin_baseline(ROOT, name)
+            glyphs = font.script_glyphs(raw, None, height, baseline)
+            self.assertEqual(len(glyphs), len(raw))
+            for cp, g in glyphs.items():
+                inside = all(0 <= y < height for _, y in g.pixels)
+                self.assertTrue(inside, f"{name} U+{cp:04X}")
+            # Clipped at the top: only Vietnamese capitals with two marks
+            # stacked (and Ǻ) are too tall for the line, and lose a row or two
+            lost = {cp for cp in glyphs if len(glyphs[cp].pixels) < len(raw[cp][1])}
+            self.assertLessEqual(lost, set(map(ord, "ǺṌṸẤẦẨẪẮẰẲẴẾỀỂỄỐỒỔỖỞ")), name)
+
+    def test_embolden(self):
+        bold = font.embolden({0x141: (5, {(0, 0), (0, 1)}), 0x20: (3, set())})
+        self.assertEqual(bold[0x141], (6, {(0, 0), (0, 1), (1, 0), (1, 1)}))
+        self.assertEqual(bold[0x20], (4, set()))
 
     def test_menu_fonts(self):
         for name, height in (("Galmuri9", 12), ("Galmuri11-Bold", 16)):
@@ -379,6 +406,17 @@ class Vendored(unittest.TestCase):
             src = ROOT / "assets/fonts/galmuri" / bdf
             f = font.load(font.parse_args([str(src), "--name", name, *options]))
             self.assertEqual(font.emit(f), committed, f"{path.name}: run `just font`")
+        # The extra glyphs' blob
+        path = ROOT / "source/engine/font_extra.c"
+        src = ROOT / "assets/fonts/galmuri/Galmuri9-extra.bdf"
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "font_extra"
+            heading = ROOT / "assets/fonts/galmuri/Galmuri11-extra.bdf"
+            args = [str(src), "--name", "body", "--extra", "-o", str(out)]
+            args += ["--extra-heading", str(heading)]
+            self.assertEqual(font.main(args), 0)
+            made = out.with_suffix(".c").read_text()
+        self.assertEqual(made, path.read_text(), "run `just font`")
 
     @unittest.skipUnless(
         shutil.which("arm-none-eabi-gcc") or shutil.which("cc"), "no C compiler"

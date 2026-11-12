@@ -377,13 +377,14 @@ cheat-corpus-fetch:
 palette:
     uv run -q tools/palette.py
 
-# Convert the menu fonts in assets/fonts to C: source/engine/font_body.c and font_heading.c
-# (committed; tests/font_test.py checks they match)
+# Convert the menu fonts in assets/fonts to C: source/engine/font_body.c and font_heading.c, and
+# their glyphs beyond Latin-1, font_extra.c (committed; tests/font_test.py checks they match)
 font:
     uv run -q tools/font.py assets/fonts/galmuri/Galmuri9.bdf --name body --line-height 12 --squeeze --clip -o source/engine/font_body
     uv run -q tools/font.py assets/fonts/galmuri/Galmuri11-Bold.bdf --name heading --line-height 16 --squeeze --clip -o source/engine/font_heading
+    uv run -q tools/font.py assets/fonts/galmuri/Galmuri9-extra.bdf --name body --extra --extra-heading assets/fonts/galmuri/Galmuri11-extra.bdf -o source/engine/font_extra
 
-# Cut the Korean pack's script glyphs (assets/fonts/galmuri/Galmuri9-hangul.bdf) from the pinned
+# Cut the kernel's glyphs beyond Latin-1 (assets/fonts/galmuri/Galmuri9-extra.bdf) from the pinned
 # Galmuri release (tools/galmuri.py checks its SHA-256; it fetches the zip into dist/galmuri-full)
 galmuri:
     python3 -I tools/galmuri.py

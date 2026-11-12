@@ -21,7 +21,7 @@ texts as `torii-licenses.zip`.
 | libgba | © 2003-2004 Dave Murphy | LGPL 2 or later, linked; `just build` allows a relink | `licenses/LGPL-2.0-libgba.txt` |
 | minilzo, in both emulators | © 1996-2000 Markus F.X.J. Oberhumer | GPL 2 or later | `licenses/GPL-2.0.txt` |
 | Cheat decoders, ported from mGBA | © 2013-2016 Jeffrey Pfau | MPL 2.0, file level | `source/cheatcode.c`, `licenses/MPL-2.0.txt` |
-| Galmuri9, Galmuri11 Bold (U+0020-U+00FF); Galmuri9's Hangul, jamo and kana (U+3041-U+30FF, U+3131-U+318E, U+AC00-U+D7A3), in the Korean pack | © 2019-2025 Lee Minseo | SIL OFL 1.1 | `assets/fonts/galmuri/`, `licenses/OFL-1.1-Galmuri.txt` |
+| Galmuri9, Galmuri11 Bold (U+0020-U+00FF); Galmuri9 and Galmuri11 beyond Latin-1 (extended Latin, Greek, Cyrillic, punctuation, symbols) | © 2019-2025 Lee Minseo | SIL OFL 1.1 | `assets/fonts/galmuri/`, `licenses/OFL-1.1-Galmuri.txt` |
 | Console pictures, redrawn on KyleBing's icons | © KyleBing | CC BY 4.0 | `assets/ui/README.md` |
 | Jagoomba Color (GB, GBC), after Goomba Color and Goomba | EvilJagaGenius, after Dwedit and FluBBa; no notice in the source | none stated (Open points) | `emulators/`: a pinned commit and our patch |
 | PocketNES (NES), after Loopy and FluBBa | Dwedit; no notice in the source | none stated (Open points) | `emulators/`: a pinned commit and our patch |

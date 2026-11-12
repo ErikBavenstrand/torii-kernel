@@ -126,6 +126,12 @@ diag-turn/frames 4-7 C230B72F2FDF7BF4
 dialog-fragmented/dialog DF9AAC285CD0CD2A
 dialog-overflow/dialog BC5E2D524865D709
 dialog-overflow/home 818B02E74B016B0D
+extra-launch/dialog 0C5F81B0B9924DC0
+extra-launch/ingame CE403C3D5DC00FF4
+extra-launch/recent 854A53EAB9783CC8
+extra-names/file-info 26F2BBA85921EF3B
+extra-names/popup 5751A3E8CA1EC305
+extra-names/root DECCE08807A07B47
 game-saves/backups AE9D90587586F622
 game-saves/new 8B807B7D5783DC5E
 game-saves/options 11086025BAC0D54B

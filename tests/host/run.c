@@ -143,6 +143,7 @@ static const struct {
 	{"text_kern", test_text_kern},
 	{"text_kern_cuts", test_text_kern_cuts},
 	{"text_script", test_text_script},
+	{"script_extra", test_script_extra},
 	{"charset_raw", test_charset_raw},
 	{"progress_permille", test_progress_permille},
 	{"progress_estimate", test_progress_estimate},
