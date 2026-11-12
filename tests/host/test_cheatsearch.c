@@ -237,8 +237,102 @@ static void test_bcd(void)
 	CHECK_EQ(t_pass(1, CHEATSEARCH_EQUALS, CHEATSEARCH_BCD, 100, 0), 1);  // past 99: 99
 }
 
+// Undo (v0.9.22), as the overlay makes it: a pass keeps the snapshot's
+// values it writes over, of the candidates before it (cheatsearch_pack),
+// and Undo puts them back (cheatsearch_unpack). Lives at element 3 went
+// 5 to 4; Went up by mistake drops them; Undo; Went down must keep them.
+static void test_undo(void)
+{
+	for (uint32_t size = 1; size <= 4; size *= 2) {
+		uint8_t snap[T_BYTES] __attribute__((aligned(4))), pre[T_BYTES / 8], kept[T_BYTES] = {0};
+		memset(t_before, 0, sizeof(t_before));
+		memset(t_now, 0, sizeof(t_now));
+		t_put(t_before, 3 * size, size, 5);  // the snapshot Start took
+		t_put(t_before, 5 * size, size, 7);
+		t_put(t_now, 3 * size, size, 4);  // a life lost
+		t_put(t_now, 5 * size, size, 9);  // something else went up
+		memset(t_bits, 0xFF, sizeof(t_bits));
+		memcpy(pre, t_bits, sizeof(pre));
+		memcpy(snap, t_before, sizeof(snap));
+		// Went up: element 5 left, the lives gone; the snapshot written over
+		CHECK_EQ(cheatsearch_chunk(t_now, snap, t_work, t_bits, T_BYTES, size, CHEATSEARCH_UP, 0, 0, 0), 1);
+		CHECK(!t_bit(3) && t_bit(5));
+		uint32_t n = cheatsearch_pack(kept, snap, pre, T_BYTES, size);
+		CHECK_EQ(n, T_BYTES);  // every element was a candidate
+		memcpy(snap, t_now, sizeof(snap));
+		// Undo: the candidates and the snapshot back
+		memcpy(t_bits, pre, sizeof(pre));
+		CHECK_EQ(cheatsearch_unpack(snap, kept, pre, T_BYTES, size), n);
+		CHECK(memcmp(snap, t_before, sizeof(snap)) == 0);
+		// Went down keeps the lives (5 then, 4 now); without the snapshot
+		// back it would compare 4 with 4 and drop them
+		CHECK_EQ(cheatsearch_chunk(t_now, snap, t_work, t_bits, T_BYTES, size, CHEATSEARCH_DOWN, 0, 0, 0), 1);
+		CHECK(t_bit(3));
+		memcpy(t_bits, pre, sizeof(pre));
+		CHECK_EQ(cheatsearch_chunk(t_now, t_now, t_work, t_bits, T_BYTES, size, CHEATSEARCH_DOWN, 0, 0, 0), 0);
+	}
+	// Only the candidates' values are kept, in order
+	uint8_t vals[8] = {1, 2, 3, 4, 5, 6, 7, 8}, bits[1] = {0x85}, out[8] = {0}, back[8] = {0};
+	CHECK_EQ(cheatsearch_pack(out, vals, bits, 8, 1), 3);
+	CHECK(out[0] == 1 && out[1] == 3 && out[2] == 8);
+	CHECK_EQ(cheatsearch_unpack(back, out, bits, 8, 1), 3);
+	CHECK(back[0] == 1 && back[1] == 0 && back[2] == 3 && back[7] == 8);
+	CHECK_EQ(cheatsearch_pack(out, vals, bits, 8, 2), 4);  // elements 0 and 2 of 16 bits
+	CHECK(out[0] == 1 && out[1] == 2 && out[2] == 5 && out[3] == 6);
+}
+
+// Negative numbers and Stored as toggled (v0.9.22): a number kept where the
+// new way holds it, else the fallback
+static void test_convert(void)
+{
+	const uint32_t U = CHEATSEARCH_UNSIGNED, S = CHEATSEARCH_SIGNED, B = CHEATSEARCH_BCD;
+	CHECK_EQ(cheatsearch_convert(100, 1, U, S, 0), 100);
+	CHECK_EQ(cheatsearch_convert(200, 1, U, S, 0), 0);  // 8-bit signed tops at 127
+	CHECK_EQ(cheatsearch_convert(127, 1, U, S, 0), 127);
+	CHECK_EQ(cheatsearch_convert(128, 1, U, S, 7), 7);
+	CHECK_EQ(cheatsearch_convert(0xFB, 1, S, U, 0), 0);  // -5 isn't unsigned
+	CHECK_EQ(cheatsearch_convert(0xFB, 1, S, S, 0), 0xFB);
+	CHECK_EQ(cheatsearch_convert(0x80, 1, S, S, 0), 0x80);  // -128
+	CHECK_EQ(cheatsearch_convert(5, 1, S, U, 0), 5);
+	CHECK_EQ(cheatsearch_convert(99, 1, U, B, 0), 99);
+	CHECK_EQ(cheatsearch_convert(150, 1, U, B, 1), 1);  // two digits a byte
+	CHECK_EQ(cheatsearch_convert(9999, 2, U, B, 0), 9999);
+	CHECK_EQ(cheatsearch_convert(10000, 2, U, B, 0), 0);
+	CHECK_EQ(cheatsearch_convert(0xFFFF, 2, S, B, 0), 0);  // -1
+	CHECK_EQ(cheatsearch_convert(42, 2, B, S, 0), 42);
+	CHECK_EQ(cheatsearch_convert(4000000000u, 4, U, S, 0), 0);
+	CHECK_EQ(cheatsearch_convert(0x80000000u, 4, S, S, 0), 0x80000000u);
+	CHECK_EQ(cheatsearch_convert(99999999, 4, U, B, 0), 99999999);
+	CHECK_EQ(cheatsearch_convert(100000000, 4, U, B, 3), 3);
+}
+
+// 16 and 32 bits, signed and BCD, through a pass each
+static void test_wide(void)
+{
+	memset(t_now, 0, sizeof(t_now));
+	memset(t_before, 0, sizeof(t_before));
+	t_put(t_now, 2 * 2, 2, 0xFFFE);  // -2 at 16 bits
+	t_put(t_now, 5 * 2, 2, 0x1234);  // 1234 in BCD
+	CHECK_EQ(t_pass(2, CHEATSEARCH_EQUALS, CHEATSEARCH_SIGNED, 0xFFFE, 0), 1);
+	CHECK(t_bit(2));
+	CHECK_EQ(t_pass(2, CHEATSEARCH_LESS, CHEATSEARCH_SIGNED, 0, 0), 1);  // only -2 is below 0
+	CHECK_EQ(t_pass(2, CHEATSEARCH_EQUALS, CHEATSEARCH_BCD, 1234, 0), 1);
+	CHECK(t_bit(5));
+	memset(t_now, 0, sizeof(t_now));
+	t_put(t_now, 1 * 4, 4, 0x87654321u);
+	t_put(t_now, 3 * 4, 4, 0x00999999u);
+	CHECK_EQ(t_pass(4, CHEATSEARCH_EQUALS, CHEATSEARCH_UNSIGNED, 0x87654321u, 0), 1);
+	CHECK_EQ(t_pass(4, CHEATSEARCH_LESS, CHEATSEARCH_SIGNED, 0, 0), 1);  // 0x87654321 is negative
+	CHECK(t_bit(1));
+	CHECK_EQ(t_pass(4, CHEATSEARCH_EQUALS, CHEATSEARCH_BCD, 999999, 0), 1);
+	CHECK(t_bit(3));
+}
+
 void test_cheatsearch(void)
 {
+	test_undo();
+	test_convert();
+	test_wide();
 	test_bcd();
 	test_filters();
 	test_narrowing();

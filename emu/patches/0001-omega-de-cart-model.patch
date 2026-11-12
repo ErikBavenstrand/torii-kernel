@@ -448,10 +448,10 @@ index 1d0c0dd..80e46af 100644
  		return;
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
-index 0000000..86a5562
+index 0000000..cd973c9
 --- /dev/null
 +++ b/src/gba/cart/omega.c
-@@ -0,0 +1,1911 @@
+@@ -0,0 +1,1931 @@
 +/* Copyright (c) 2026 Torii contributors
 + *
 + * This Source Code Form is subject to the terms of the Mozilla Public
@@ -2240,12 +2240,18 @@ index 0000000..86a5562
 +// lost (as a flash chip ignores plain writes); "flip-image": a byte of the
 +// overlay image (page 0xB0's window offset 0x400) reads with bit 0 flipped;
 +// "chip" (GBAOmegaOwnsSRAM): a flash or EEPROM game's save chip on every page.
++// Torii (v0.9.22): "drop:FIRST-LAST" loses only the writes to cart SRAM
++// offsets FIRST to LAST (hex), so a test can fail one of the overlay's own
++// backups (the cheat search's IWRAM, the extension's EWRAM) but not the
++// stub's.
 +enum {
 +	GAME_SRAM_FAULT_NONE,
 +	GAME_SRAM_FAULT_DROP,
 +	GAME_SRAM_FAULT_FLIP_IMAGE,
++	GAME_SRAM_FAULT_DROP_RANGE,
 +};
 +static int _gameSramFault = -1;
++static uint32_t _gameSramDropFirst, _gameSramDropLast;
 +
 +static int _gameSramFaultFor(const struct GBAOmega* omega) {
 +	if (_gameSramFault < 0) {
@@ -2254,6 +2260,16 @@ index 0000000..86a5562
 +		    : !strcmp(fault, "drop")                  ? GAME_SRAM_FAULT_DROP
 +		    : !strcmp(fault, "flip-image")            ? GAME_SRAM_FAULT_FLIP_IMAGE
 +		                                              : GAME_SRAM_FAULT_NONE;
++		if (fault && !strncmp(fault, "drop:", 5)) {
++			char* end;
++			_gameSramDropFirst = strtoul(fault + 5, &end, 16);
++			_gameSramDropLast = *end == '-' ? strtoul(end + 1, &end, 16) : _gameSramDropFirst;
++			if (*end || _gameSramDropLast < _gameSramDropFirst) {
++				fprintf(stderr, "omega: bad OMEGA_GAME_SRAM %s (drop:FIRST-LAST, hex)\n", fault);
++				exit(2);
++			}
++			_gameSramFault = GAME_SRAM_FAULT_DROP_RANGE;
++		}
 +	}
 +	if (_isKernelMode(omega) || !omega->gameBooted || omega->ramPage < OMEGA_SAVE_PAGES) {
 +		return GAME_SRAM_FAULT_NONE;
@@ -2299,6 +2315,10 @@ index 0000000..86a5562
 +		break;
 +	}
 +	if (_gameSramFaultFor(omega) == GAME_SRAM_FAULT_DROP) {
++		return;
++	}
++	if (_gameSramFaultFor(omega) == GAME_SRAM_FAULT_DROP_RANGE && _sramOffset(omega, address) >= _gameSramDropFirst &&
++	    _sramOffset(omega, address) <= _gameSramDropLast) {
 +		return;
 +	}
 +	omega->sram[_sramOffset(omega, address)] = value;
