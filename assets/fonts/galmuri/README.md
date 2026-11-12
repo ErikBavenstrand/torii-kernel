@@ -9,12 +9,12 @@ The BDF files are cut to the glyphs Torii uses, U+0020–U+00FF and U+FFFD, with
 `tools/font.py --subset-bdf`; the glyphs themselves are unchanged. `just font` converts them
 to C. `docs/research/fonts.md` explains the choice.
 
-`Galmuri9-hangul.bdf` holds the script glyphs of the Korean pack (`lang/ko.ini`) from the same
-release: Galmuri9's 11,172 Hangul syllables (U+AC00-U+D7A3), compatibility jamo
-(U+3131-U+318E) and kana (U+3041-U+30FF), unchanged. `tools/galmuri.py` cuts it from the
-release zip after checking its SHA-256 (`just galmuri`; it fetches the zip into the git-ignored
-`dist/galmuri-full/` if it isn't there, reads three members of it as bytes and runs nothing from
-it). The full release (20 MB, with Hanja and the other sizes) is not vendored. The pack uses
-Galmuri9's glyphs for both menu lines: Galmuri11 Bold has Hangul but no kana, and the syllables of
-both fonts would take about 520 KB, over the 320 KB a pack's font has. The same licence
-covers it (`LICENSE.txt`).
+`Galmuri9-extra.bdf` and `Galmuri11-extra.bdf` hold the kernel's glyphs beyond Latin-1, from the
+same release: the code points `EXTRA_RANGES` in `tools/font.py` names (extended Latin, Greek,
+Cyrillic, Vietnamese, punctuation and symbols), unchanged. `tools/galmuri.py` cuts them from
+the release zip after checking its SHA-256 (`just galmuri`; it fetches the zip into the
+git-ignored `dist/galmuri-full/` if it isn't there, reads the two members as bytes and runs
+nothing from it). The full release (20 MB, with Hangul, Hanja and the other sizes) is not
+vendored. `just font` turns them into `source/engine/font_extra.c`: Galmuri9's for the body
+line, and Galmuri11's made bold (each glyph smeared a pixel right) for headings, as Galmuri11
+Bold has none of them. The same licence covers them (`LICENSE.txt`).

@@ -49,7 +49,7 @@ Each release's details are in `CHANGELOG.md`; the planning, ticket reports and r
 - **v0.9.21 Analysis and slots (2026-11-02):** the static-analysis baseline from 97 findings to none (fixed in the code, or a false alarm marked beside it with its reason); Settings, Saves, Ask for a slot (off plays the active slot; SELECT with A still asks); a test for it.
 - **Tracker items (2026-11-02):** `just gb-accuracy` runs Blargg's tests and the acid2 ROMs through Jagoomba (15 of 54 pass, all `cpu_instrs`; the rest is Jagoomba's accuracy, not fixed), `tests/gb_mode.sh` checks GBC/SGB/DMG mode and the default palette (jagoombacolor#42, #34); PocketNES#14 multiboot closed as nothing to do.
 - **Cheat search's 1.0 review (2026-11-12):** pointer finds picked only after a Check, which marks rather than drops (the list kept when none pass, the list before the Check shown again, Find asks before it replaces one); the interpreter writes through a pointer only into EWRAM and IWRAM; Undo puts the snapshot's values back; the IWRAM a pass borrows and the EWRAM under the search's code read back from cart SRAM first; the hook's words out of the searched run (a stack top in EWRAM); New search and Save state ask first; a found code filed once, the boot says what it filed or why it couldn't, and records the card refused wait with their game; the numbers converted with Negative numbers and BCD, From A to B in order; All off stops the found cheats on now; the menu's row counts the candidates; `tests/search_more.sh` (Undo, 16 finds at 32 bits, the live block's three, Sleep and Reset mid-search, cart SRAM and card faults, a stack in EWRAM, a pointer to VRAM, a cut mid-pass). The overlay's extension is in two parts in cart SRAM page `0xF0`, so the menu still opens in 4 frames.
-- **v0.9.22 Korean (2026-11-11):** the first real script font: `lang/ko.ini` with Galmuri9's 11,172 Hangul syllables, compatibility jamo and kana (273 KB of the pack's 320 KB in PSRAM; `tools/galmuri.py` cuts them from the pinned release), drafted and marked `review = pending`, so `dist/lang/ko.lng` builds but the release's `torii-lang.zip` leaves it out until a native speaker has read it; a launch keeps any of its strings beyond Latin-1 in English, so the in-game menu and a launch's dialogs never draw a replacement box for the pack's own text (a cheat's or game's Hangul name still does); goldens in Korean, with Hangul file names listed, launched, saved under and back to Torii.
+- **v0.9.22 Extended Latin (2026-11-12):** the kernel draws file names beyond Latin-1 itself, with no language pack: Galmuri9's and Galmuri11's extended Latin (Polish, Czech, Turkish, Romanian, Vietnamese...), Greek, Cyrillic, punctuation and symbols, 1,675 glyphs in 33 KB of ROM (`font_extra.c`; headings get Galmuri11's made bold), in every screen and a launch's dialogs; the in-game menu folds them to Latin-1. Translations stay English and Swedish (a Korean pack was drafted and dropped: the owner wants none for now).
 
 ## Open work, before 1.0
 
@@ -67,10 +67,6 @@ Code fixes that the emulator can test, plus the leftovers from v0.9.
 - **Sound after LOAD (1.0?):** games on Nintendo's MP2000 engine keep the PCM buffer's position in RAM, which could re-sync DMA1 at LOAD.
 - **Cheat search (shipped in v0.9.7–v0.9.10; [design](../design/v0.9/cheat-search.md)):** the 1.0 review's fixes are done (Done); what stays is a cart check, and the rest is in Known limits.
   - **Cart check:** a pointer kept in Pokémon Emerald (money through gSaveBlock1Ptr) across a door; the menu's opening and the search pages on the real cart with the two-part extension in cart SRAM page `0xF0`.
-
-### Languages
-
-- **Korean review:** `lang/ko.ini` was drafted by Claude and no native speaker has read it, so the release's `torii-lang.zip` leaves it out (only a build from source makes `ko.lng`). After a review, set `review = done` in its `[meta]` and the next release ships it.
 
 ### Emulators and cheats
 

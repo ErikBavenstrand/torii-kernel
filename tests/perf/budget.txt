@@ -8,14 +8,14 @@ confirm-draw 162017
 confirm-motion 185148
 confirm-move 92764
 cover-load 144204
-diag-cover-decode 45302
+diag-cover-decode 51552
 diag-cover-upload 3162
 diag-glyph 416
-diag-page 142456
+diag-page 143938
 diag-psram-menu 21018
 diag-psram-slow 25429
 diag-row38 10001
-diag-scroll 149683
+diag-scroll 151068
 fields-move 60681
 games-artlist 128273
 games-move 105368

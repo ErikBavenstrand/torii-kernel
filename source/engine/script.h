@@ -1,9 +1,12 @@
-// Script fonts: the glyphs a language pack brings for characters beyond
-// Latin-1 (tools/lang.py's `font`, tools/font.py's format). The pack holds one
-// per menu font, a blob the loader (lang_load.c) puts in PSRAM
-// (PSRAM_LANG_FONT_BASE); the menu fonts then draw those characters instead
-// of the replacement box. A game launch fills PSRAM, so script_drop runs
-// first and what the launch draws after that shows the box again.
+// Script fonts: glyphs for characters beyond Latin-1, in tools/font.py's
+// format. The kernel has its own in ROM, font_body_extra (font_extra.c, made
+// by `just font` from Galmuri9: extended Latin, Greek, Cyrillic, punctuation
+// and symbols), which the menu fonts draw whenever no pack's font is in use;
+// the heading font borrows the body's. A language pack can bring a blob of its
+// own (tools/lang.py's `font`), which the loader (lang_load.c) puts in PSRAM
+// (PSRAM_LANG_FONT_BASE) and which then replaces the kernel's: a character it
+// lacks shows the box or folds to Latin-1. A game launch fills PSRAM, so
+// script_drop runs first and goes back to the kernel's glyphs.
 //
 // A script glyph has an index from TORII_FONT_SCRIPT (font.h) on, in the
 // lines text_layout makes and the blitter draws. Its table entry is a
@@ -57,17 +60,29 @@ u32 script_blob_crc(const u8 *header);
 u32 script_blob_size(const u8 *header);
 // The blob's header says it is one (a loader reads this much first)
 int script_header_ok(const u8 *header);
-// No script fonts: every character past Latin-1 draws the replacement box
+// Drops a pack's script font: the kernel's own glyphs (font_body_extra) from now on
 void script_drop(void);
 
-// 1 while script fonts are in use (script_use, script_drop)
+// The kernel's own script glyphs, in ROM (font_extra.c)
+extern const u32 font_body_extra[];
+extern const u32 font_body_extra_bytes;
+
+// 1 while a pack's script font is in use (script_use, script_drop)
 extern u8 script_active;
+// The script glyphs in use for font_body and font_heading (NULL until the
+// first script_find reads the kernel's own)
+extern const struct torii_script *script_body, *script_heading;
+// font's script glyphs: the pack's, else the kernel's own; NULL for a font
+// other than font_body and font_heading
 const struct torii_script *script_find(const struct torii_font *font);
-// font's script glyphs, or NULL if none are in use (font is font_body or
-// font_heading; any other font has none). With none in use, a byte read.
+// script_find, a compare and a load once the kernel's glyphs are read (every layout asks)
 static inline const struct torii_script *script_of(const struct torii_font *font)
 {
-	return script_active ? script_find(font) : NULL;
+	if (font == &font_body && script_body)
+		return script_body;
+	if (font == &font_heading && script_heading)
+		return script_heading;
+	return script_find(font);
 }
 
 // The glyph index for code point cp (U+0100 and up) in script sc, or -1 if it has none

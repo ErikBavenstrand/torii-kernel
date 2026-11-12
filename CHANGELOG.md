@@ -33,14 +33,15 @@ git log, not here.
 
 ## v0.9.22
 
-- **Added:** a Korean pack, `lang/ko.ini`, with Galmuri9's Hangul, jamo and
-  kana as its script font (273 KB of the 320 KB). It is a draft no native
-  speaker has read (`review = pending`), so `torii-lang.zip` leaves it out;
-  `just build` makes `dist/lang/ko.lng`. (78796807)
-- **Changed:** a launch keeps any of its strings beyond Latin-1 in English, as
-  it would draw them as boxes once the script font is dropped, so packs can
-  translate the menu's hints (Korean's 취소). (ebd51129)
-
+- **Added:** file names in extended Latin (Polish, Czech, Turkish, Romanian,
+  Vietnamese...), Greek and Cyrillic, and the common punctuation and symbols
+  (– — “ ” … € ™ ★ ♪), draw as themselves instead of a box or a plain letter:
+  the kernel's fonts carry 1,675 more Galmuri glyphs (33 KB of ROM), headings
+  in a bold made from Galmuri11. No language pack is needed; a launch's
+  dialogs show them too, and the in-game menu still writes them as Latin-1.
+  (3ef2b982)
+- **Fixed:** a clang-tidy false alarm in `gamename.c` (a copy its caller ends)
+  is marked beside the code. (ebd51129)
 - **Changed:** the last 8 static-analysis findings (cppcheck's
   `constParameterCallback` on job steps and text providers, whose parameter
   types the callback types fix) are marked beside the code with their reason,

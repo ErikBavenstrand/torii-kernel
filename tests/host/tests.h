@@ -104,6 +104,7 @@ void test_charset_cut(void);
 void test_text_kern(void);
 void test_text_kern_cuts(void);
 void test_text_script(void);
+void test_script_extra(void);
 void test_charset_raw(void);
 void test_ease_lut_reproducible(void);
 void test_ease_endpoints(void);

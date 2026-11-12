@@ -29,6 +29,16 @@ options:
   --clip              drop ink rows still outside the line instead of failing
                       (the bottom of a cedilla too deep for the line)
   --subset-bdf FILE   also write SRC (a BDF) cut to the glyphs read, to vendor
+  --extra [RANGES]    instead, the glyphs beyond Latin-1 in RANGES (hex, as
+                      "0100-024F, 0370-03FF"; default EXTRA_RANGES), placed on the line of the
+                      built-in font NAME (body: assets/fonts/galmuri/Galmuri9.bdf
+                      on 12 px) and written to OUT.c as a script blob
+                      (source/engine/script.h) in ROM, `font_NAME_extra`:
+                      the kernel's own glyphs beyond Latin-1, drawn
+                      whenever no language pack's script font is in use
+  --extra-heading F   with --extra: the heading font's glyphs from BDF F, a
+                      regular font made bold (each glyph smeared a pixel
+                      right); without it, headings draw the body's glyphs
   --png-cell WxH      PNG only: cell size; cells run left to right, top down
   --png-first CP      PNG only: code point of the first cell (default 0x20)
   --png-baseline B    PNG only: rows above the baseline in a cell
@@ -407,6 +417,14 @@ def builtin_baseline(root: Path, name: str) -> tuple[int, int]:
 
 SCRIPT_MAX = 0x50000  # bytes of blob the kernel has room for in PSRAM
 SCRIPT_FIRST = 0x100  # code points below are the menu font's own
+# The kernel's own glyphs beyond Latin-1 (--extra, assets/fonts/galmuri/
+# Galmuri9-extra.bdf, tools/galmuri.py): Latin Extended-A and -B, the spacing
+# accents, Greek, Cyrillic, Latin Extended Additional (Vietnamese), general
+# punctuation, currency, letterlike symbols, arrows, stars and card suits
+EXTRA_RANGES = (
+    "0100-024F, 02C7, 02D0, 02D8-02DD, 0370-03FF, 0400-045F, 0490-0491, "
+    "1E00-1EFF, 2010-205F, 20A0-20CF, 2100-214F, 2190-2193, 2605-2606, 2660-266F"
+)
 
 
 def parse_ranges(text: str) -> list[tuple[int, int]]:
@@ -719,6 +737,60 @@ def emit(font: Font) -> str:
     return source
 
 
+def emit_extra(name: str, blob: bytes, source: str, glyphs: int) -> str:
+    """The .c text of a script blob in ROM (--extra)."""
+    words = struct.unpack(f"<{len(blob) // 4}I", blob)
+    data = [
+        "\t" + " ".join(f"0x{w:08X}," for w in words[start : start + 6])
+        for start in range(0, len(words), 6)
+    ]
+    return (
+        f"/* Made by tools/font.py from {source}. Do not edit.\n"
+        f" * {glyphs} glyphs beyond Latin-1, a script blob (script.h) of {len(blob)} bytes. */\n"
+        '#include "script.h"\n\n'
+        f"const u32 font_{name}_extra[{len(words)}] = {{\n" + "\n".join(data) + "\n};\n"
+        f"const u32 font_{name}_extra_bytes = {len(blob)};\n"
+    )
+
+
+def embolden(raw: Raw) -> Raw:
+    """A regular font made bold: each glyph's ink smeared a pixel right, its
+    advance a pixel wider (the heading's extra glyphs, which Galmuri11 Bold lacks)."""
+    return {
+        cp: (advance + 1, set(pixels) | {(x + 1, y) for x, y in pixels})
+        for cp, (advance, pixels) in raw.items()
+    }
+
+
+def extra(args: argparse.Namespace) -> int:
+    """--extra: the built-in glyphs beyond Latin-1 as a blob in ROM."""
+    data = args.src.read_bytes()
+    raw, _ = read_bdf(data.decode("latin-1"))
+    ranges = parse_ranges(args.extra)
+    root = Path(__file__).resolve().parent.parent
+    height, baseline = builtin_baseline(root, args.name)
+    glyphs = script_glyphs(raw, ranges, height, baseline)
+    records = [script_record(glyphs)]
+    count = len(glyphs)
+    digest = hashlib.sha256(data).hexdigest()[:16]
+    source = f"{args.src.name} (sha256 {digest}), --extra {args.extra}"
+    if args.extra_heading:
+        hdata = args.extra_heading.read_bytes()
+        hraw, _ = read_bdf(hdata.decode("latin-1"))
+        height, baseline = builtin_baseline(root, "heading")
+        hglyphs = script_glyphs(embolden(hraw), ranges, height, baseline)
+        records.append(script_record(hglyphs))
+        count += len(hglyphs)
+        hdigest = hashlib.sha256(hdata).hexdigest()[:16]
+        source += f", --extra-heading {args.extra_heading.name} (sha256 {hdigest})"
+    blob = script_blob(records)
+    if args.out:
+        args.out.parent.mkdir(parents=True, exist_ok=True)
+        text = emit_extra(args.name, blob, source, count)
+        args.out.with_suffix(".c").write_text(text, newline="\n")
+    return 0
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description="Convert a pixel font (see the module docstring)."
@@ -726,7 +798,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     p.add_argument("src", type=Path)
     p.add_argument("-o", "--out", type=Path, help="write OUT.c; omit to only check")
     p.add_argument("--name", required=True)
-    p.add_argument("--line-height", type=int, required=True)
+    p.add_argument("--line-height", type=int)
     p.add_argument("--baseline", type=int)
     p.add_argument("--proportional", action="store_true")
     p.add_argument("--spacing", type=int, default=1)
@@ -734,6 +806,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     p.add_argument("--squeeze", action="store_true")
     p.add_argument("--clip", action="store_true")
     p.add_argument("--subset-bdf", type=Path)
+    p.add_argument("--extra", nargs="?", const=EXTRA_RANGES)
+    p.add_argument("--extra-heading", type=Path)
     p.add_argument("--png-cell")
     p.add_argument("--png-first", type=lambda s: int(s, 0), default=FIRST)
     p.add_argument("--png-baseline", type=int)
@@ -741,6 +815,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     args = p.parse_args(argv)
     if not args.name.isidentifier():
         p.error("--name must be a C identifier")
+    if args.extra is not None and args.name not in BUILTIN:
+        p.error(
+            f"--extra places glyphs on a built-in font's line: {', '.join(BUILTIN)}"
+        )
+    if args.extra is None and args.line_height is None:
+        p.error("--line-height is required")
     return args
 
 
@@ -777,6 +857,12 @@ def load(args: argparse.Namespace) -> Font:
 
 def main(argv: list[str]) -> int:
     args = parse_args(argv)
+    if args.extra is not None:
+        try:
+            return extra(args)
+        except ValueError as e:
+            print(f"font.py: {args.src}: {e}", file=sys.stderr)
+            return 1
     try:
         font = load(args)
     except ValueError as e:
