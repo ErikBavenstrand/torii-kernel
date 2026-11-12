@@ -48,7 +48,7 @@ Each release's details are in `CHANGELOG.md`; the planning, ticket reports and r
 - **v0.9.20 Licences (2026-11-02):** `THIRD_PARTY_NOTICES.md` (each part's copyright and licence) and `licenses/`, attached to each release as `torii-licenses.zip`; the release binary is under the GNU GPL 3 or later (it contains minilzo); Info's Credits names the kernel base, FatFs, libgba and minilzo; the roadmap's baseline, slot and power-off items closed; Emerald's sleep confirmed on the real cart.
 - **v0.9.21 Analysis and slots (2026-11-02):** the static-analysis baseline from 97 findings to none (fixed in the code, or a false alarm marked beside it with its reason); Settings, Saves, Ask for a slot (off plays the active slot; SELECT with A still asks); a test for it.
 - **Tracker items (2026-11-02):** `just gb-accuracy` runs Blargg's tests and the acid2 ROMs through Jagoomba (15 of 54 pass, all `cpu_instrs`; the rest is Jagoomba's accuracy, not fixed), `tests/gb_mode.sh` checks GBC/SGB/DMG mode and the default palette (jagoombacolor#42, #34); PocketNES#14 multiboot closed as nothing to do.
-- **v0.9.22 Korean (2026-11-11):** the first real script font: `lang/ko.ini` with Galmuri9's 11,172 Hangul syllables, compatibility jamo and kana (273 KB of the pack's 320 KB in PSRAM; `tools/galmuri.py` cuts them from the pinned release), drafted and marked `review = pending`, so `dist/lang/ko.lng` builds but the release's `torii-lang.zip` leaves it out until a native speaker has read it; a launch keeps any of its strings beyond Latin-1 in English, so the in-game menu and a launch's dialogs never draw a replacement box for the pack's own text (a cheat's or game's Hangul name still does); goldens in Korean, with Hangul file names listed, launched, saved under and back to Torii.
+- **v0.9.22 Extended Latin (2026-11-12):** the kernel draws file names beyond Latin-1 itself, with no language pack: Galmuri9's and Galmuri11's extended Latin (Polish, Czech, Turkish, Romanian, Vietnamese...), Greek, Cyrillic, punctuation and symbols, 1,675 glyphs in 33 KB of ROM (`font_extra.c`; headings get Galmuri11's made bold), in every screen and a launch's dialogs; the in-game menu folds them to Latin-1. Translations stay English and Swedish (a Korean pack was drafted and dropped: the owner wants none for now).
 
 ## Open work, before 1.0
 
@@ -69,10 +69,6 @@ Code fixes that the emulator can test, plus the leftovers from v0.9.
   - **Not done:** naming a found cheat in game (the overlay has no font or keyboard: rename it on the Cheats page); more than one Undo (the buffer's 288 KB leaves no room for a second copy: `cheat-search.md`); pointer chains (one level only); "on now" through a pointer (set once instead); a memory view around a candidate; VRAM, palette and OAM searches.
   - **Cart check:** a pointer kept in Pokémon Emerald (money through gSaveBlock1Ptr) across a door.
   - **Untested:** a card write that fails while filing (the records wait for the next boot); a 32-bit search with large values and 16 different addresses kept, in the emulator.
-
-### Languages
-
-- **Korean review:** `lang/ko.ini` was drafted by Claude and no native speaker has read it, so the release's `torii-lang.zip` leaves it out (only a build from source makes `ko.lng`). After a review, set `review = done` in its `[meta]` and the next release ships it.
 
 ### Emulators and cheats
 
