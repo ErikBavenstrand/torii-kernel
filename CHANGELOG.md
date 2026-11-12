@@ -20,7 +20,8 @@ git log, not here.
   convert the numbers typed, From A to B searches in order, and B on its
   second number cancels both. All off stops the found cheats on now; the
   menu's row counts what is left; greyed rows say why. The extension is
-  now two parts in cart SRAM page 0xF0, so the menu opens as fast. (7c468dba)
+  now two parts in cart SRAM page 0xF0, so the menu opens as fast.
+  (7c468dba, 63e21de8)
 - **Fixed:** found cheats were added again when the cheat file had them (a
   power cut before the records were cleared), and refused or unsaved ones
   only made log lines; the next launch wiped those that waited. A known
