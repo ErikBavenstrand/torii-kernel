@@ -32,6 +32,8 @@
 #
 # Runs inside the torii-emu container after `just build`, `just emu-headless`.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
 # shellcheck source=tests/nav.sh
@@ -121,7 +123,7 @@ start() {
 run() {
   boot "${args[@]}" "$@" >"$cart/out" 2>"$cart/log" || true
   log=$(cat "$cart/log")
-  grep -q '^crash at frame' <<<"$log" && fail "crashed: $(grep -A3 '^crash' <<<"$log" | head -4)"
+  grep -q '^crash at frame' <<<"$log" && fail "crashed: $(grep -A3 '^crash' <<<"$log" | drain_head -4)"
   return 0
 }
 lefts() { grep -E '^kernel: search: [0-9]+ left' <<<"$log" | awk '{ print $3 }' | tr '\n' ' '; }
@@ -258,12 +260,12 @@ midgame)
   to_torii 60
   wait_for "found in game"
   run -f 16000
-  after=$(sed -n '/search: kept a cheat, on/,/stop at frame/p' <<<"$log" | sed -n 's/^kernel: searchtest: lives \([0-9]*\).*/\1/p' | uniq | head -3 | tr '\n' ' ')
+  after=$(sed -n '/search: kept a cheat, on/,/stop at frame/p' <<<"$log" | sed -n 's/^kernel: searchtest: lives \([0-9]*\).*/\1/p' | uniq | drain_head -3 | tr '\n' ' ')
   [ "$after" = "9 8 7 " ] || fail "the lives after All off: $after (9 then 8 and 7: no longer held)"
   if ! grep -q '^stop at frame' <<<"$log" || ! grep -q '^wake at frame' <<<"$log"; then
     fail "Sleep didn't sleep and wake"
   fi
-  sed -n '/^wake at frame/,$p' <<<"$log" | grep -q 'searchtest: lives 5' || fail "Reset game didn't start the game again: $(grep -E 'screen ready|search:|^wake|^timed|lives' <<<"$log" | uniq | tail -8 | tr '\n' '|')"
+  sed -n '/^wake at frame/,$p' <<<"$log" | drain_grep -q 'searchtest: lives 5' || fail "Reset game didn't start the game again: $(grep -E 'screen ready|search:|^wake|^timed|lives' <<<"$log" | uniq | tail -8 | tr '\n' '|')"
   [ "$(lefts)" = "294400 1 1 1 1 " ] || fail "the search didn't go on after Sleep and Reset game: $(lefts)"
   grep -qE 'found in game, 0300[0-9A-F]{4}:09 off: added' <<<"$log" || fail "not filed off after All off: $(grep 'found in game' <<<"$log")"
   echo "PASS: search_more midgame: All off stopped the lives held at 9 (then $after), the search went on after Sleep and Reset game, filed off"
@@ -278,7 +280,7 @@ sramfault)
   OMEGA_GAME_SRAM=drop:2C800-2C8FF run
   grep -q 'search: IWRAM backup failed' <<<"$log" || fail "a pass ran without its IWRAM backup: $(grep 'search' <<<"$log" | tail -3)"
   grep -q 'search: started' <<<"$log" && fail "the search started without its IWRAM backup"
-  tail -n 40 <<<"$log" | grep -q 'searchtest: lives 4' || fail "the game didn't go on: $(grep lives <<<"$log" | tail -1)"
+  tail -n 40 <<<"$log" | drain_grep -q 'searchtest: lives 4' || fail "the game didn't go on: $(grep lives <<<"$log" | tail -1)"
   # The search's code: the game's EWRAM under it doesn't read back
   start
   wait_for "screen ready: ingame"
@@ -289,7 +291,7 @@ sramfault)
   OMEGA_GAME_SRAM=drop:25000-25003 run
   grep -q "the extension didn't load" <<<"$log" || fail "the search's code loaded over EWRAM that didn't back up"
   grep -q 'screen ready: ingame-search' <<<"$log" && fail "the search opened without its EWRAM backup"
-  tail -n 40 <<<"$log" | grep -q 'searchtest: lives 4' || fail "the game didn't go on after the refused search"
+  tail -n 40 <<<"$log" | drain_grep -q 'searchtest: lives 4' || fail "the game didn't go on after the refused search"
   echo "PASS: search_more sramfault: a pass and the search's code refused when cart SRAM didn't keep the game's memory; the game went on"
   ;;
 ewram)
@@ -302,7 +304,7 @@ ewram)
   run -f 3000
   grep -q 'stack literal 0203FF7C' <<<"$log" || fail "the stack top isn't EWRAM's: $(grep 'stack literal' <<<"$log")"
   [ "$(lefts)" = "294272 " ] || fail "Start left $(lefts)(294,400 less the spend area's 128 expected)"
-  tail -n 40 <<<"$log" | grep -q 'searchtest: lives 4' || fail "the game didn't go on"
+  tail -n 40 <<<"$log" | drain_grep -q 'searchtest: lives 4' || fail "the game didn't go on"
   echo "PASS: search_more ewram: with the stack top in EWRAM, the hook's spend area isn't searched"
   ;;
 filefail)
@@ -332,7 +334,7 @@ filefail)
   OMEGA_SOFT_RESET=1 run -f 3000
   addr=$(sed -n 's/^kernel: cheats: .*found in game, \([0-9A-F]*\):05 off: added$/\1/p' <<<"$log")
   [ -n "$addr" ] || fail "the next boot didn't file the waiting cheat: $(grep 'cheats:' <<<"$log" | tail -3)"
-  mtype -i "$cart/sd.img" ::/torii/cheats/searchtest.cht | tr -d '\r' | grep -q "\"$addr:05\"" || fail "the file hasn't $addr:05"
+  mtype -i "$cart/sd.img" ::/torii/cheats/searchtest.cht | tr -d '\r' | drain_grep -q "\"$addr:05\"" || fail "the file hasn't $addr:05"
   echo "PASS: search_more filefail: the card refused the found cheat; it waited and the next boot filed $addr:05"
   ;;
 ptrclamp)
@@ -382,7 +384,7 @@ passcut)
   grep -q 'screen ready: ingame-search' <<<"$log" || fail "the search page didn't open after the cut"
   grep -q 'search: [0-9]* left' <<<"$log" && fail "a search survived the cut"
   [ "$(od -A n -t x1 -N 65536 "$cart/sram.bin" | md5sum)" = "$save" ] || fail "the game's save changed"
-  tail -n 40 <<<"$log" | grep -q 'searchtest: lives 5' || fail "the game didn't run after the cut"
+  tail -n 40 <<<"$log" | drain_grep -q 'searchtest: lives 5' || fail "the game didn't run after the cut"
   echo "PASS: search_more passcut: a cut during a pass left the game, its save and a new search's page as they should be"
   ;;
 *) fail "no such mode" ;;

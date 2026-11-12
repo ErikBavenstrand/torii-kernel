@@ -22,6 +22,8 @@
 # Runs inside the torii-emu container after `just build`, `just emu-headless`
 # and `just test-roms`.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
@@ -66,7 +68,7 @@ irq)
     boot $(nav_launch /CI.gba addon) -w "launch: starting the game" -u "cheatirq: frame 0600" -f 3000 \
       >"$cart/run.txt" 2>&1 || true
     grep -q "cheats: .*CI.cht: 2 picked, 2 run in game" "$cart/run.txt" ||
-      fail "$rom: the launch read: $(grep -a 'cheats:' "$cart/run.txt" | head -3)"
+      fail "$rom: the launch read: $(grep -a 'cheats:' "$cart/run.txt" | drain_head -3)"
     last=$(grep -a "cheatirq: frame" "$cart/run.txt" | tail -1)
     case $last in
     *"frame 0600 bad 0000"*) ;;
@@ -100,7 +102,7 @@ files)
     fail "no too-big dialog: $(grep -a '^kernel' "$cart/popup.txt" | tail -3)"
   grep -q "cheats: popup: -1 listed" "$cart/popup.txt" || fail "the popup had no Cheats for the big file"
   grep -q "cheats: /torii/cheats/Hello.cht is 196613 bytes, over 196608: too big, left alone" "$cart/popup.txt" ||
-    fail "the big file wasn't refused: $(grep -a 'cheats:' "$cart/popup.txt" | head -3)"
+    fail "the big file wasn't refused: $(grep -a 'cheats:' "$cart/popup.txt" | drain_head -3)"
   grep -q "dialog: Hello: Its cheat file is too big to read." "$cart/popup.txt" ||
     fail "the screen's dialog: $(grep -a 'dialog:' "$cart/popup.txt" | tail -2)"
   ! grep -q "kernel error: cheats" "$cart/popup.txt" || fail "the big file was taken for a card error"
@@ -121,7 +123,7 @@ files)
   boot $(nav_launch /Hello.gba addon) -w "launch: starting the game" -m @120:0x0203F000:2 -f 3000 \
     >"$cart/launch.txt" 2>&1 || true
   grep -q "cheats: .*Hello.cht: 1 picked, 1 run in game" "$cart/launch.txt" ||
-    fail "enable = 1 isn't a pick: $(grep -a 'cheats:' "$cart/launch.txt" | head -3)"
+    fail "enable = 1 isn't a pick: $(grep -a 'cheats:' "$cart/launch.txt" | drain_head -3)"
   grep -qi "mem frame [0-9]* 0203F000: ef be" "$cart/launch.txt" || fail "the cheat picked by enable = 1 didn't run"
   echo "PASS: cheat_safety: cheatN_enable = 1 is a pick"
 
@@ -177,7 +179,7 @@ files)
   ;;
 rom)
   mkdir -p "$carts"
-  mem() { sed -n "s/^mem frame [0-9]* $1: //p" "$cart/run.txt" | head -1 | tr -d ' \n' | tr A-F a-f; }
+  mem() { sed -n "s/^mem frame [0-9]* $1: //p" "$cart/run.txt" | drain_head -1 | tr -d ' \n' | tr A-F a-f; }
   # Hello padded with 0xFF to 64 KB puts the patch area at ROM 0xD000: a
   # cheat whose ROM writes cover it and the entry branch (VBA raw words)
   # gets those left out, its other patch and its RAM write kept

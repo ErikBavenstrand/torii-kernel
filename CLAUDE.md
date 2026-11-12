@@ -56,6 +56,7 @@ Reviews: one round of at most two agents. Use a code reviewer, plus an adversari
 
 1. `just test` (run by `just check`): every line should start with `PASS`.
    Test scripts keep their carts on the container's disk: source `tests/carts.sh` and call `local_carts dist/cart-NAME` (on `dist/`, each power-on costs 0.5 s more).
+   Test scripts run under `pipefail`, so a pipeline never ends in `grep -q` or `head`: they exit early, the writer can die of SIGPIPE, and the test fails now and then under load. Use `drain_grep` and `drain_head` from `tests/pipes.sh`; `just lint` (`tools/pipe_check.py`) refuses the bare forms.
    Unit-test kernel functions in `tests/kernel/` (`CHECK`, `CHECK_EQ` from `torii_test.h`; declare each test in `tests.h` and list it in `run.c`). They run inside a test build of the kernel, so they can call any kernel function.
    Test hardware-free code in `tests/host/` too: it builds for the host under ASan and UBSan (`just test-host`), with `tests/host/gba_base.h` standing in for libgba's. Keep such code in its own file, as `source/sort.c` and `source/cheat.c` are.
    For changes to launching, saves or the cart model, also run `just compat` (games you own, listed in `roms/games.toml`; missing ones are skipped).

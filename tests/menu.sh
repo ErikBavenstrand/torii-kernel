@@ -11,6 +11,8 @@
 # a state saved and loaded, the cheats turned off, Reset game, Sleep and Back
 # to Torii. Runs inside the torii-emu container.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
 # shellcheck source=tests/nav.sh
@@ -38,7 +40,7 @@ fail() {
 # shellcheck disable=SC2046 # nav.sh's options
 boot $(nav_launch /Hello.gba at=160) -f 400 >/dev/null 2>&1
 boot -k 100:A -k 106:- -f 300 >/dev/null 2>&1
-[ "$(mtype -i "$cart/sd.img" ::/torii/saves/Hello.gba/Main.sav | head -c 5 | od -A n -t x1 | tr -d ' \n')" = 4f4d525801 ] ||
+[ "$(mtype -i "$cart/sd.img" ::/torii/saves/Hello.gba/Main.sav | drain_head -c 5 | od -A n -t x1 | tr -d ' \n')" = 4f4d525801 ] ||
   fail "no first save to start from"
 
 # Settings slots (source/ez_define.h) in the kernel NOR (tests/setnor.py): English,
@@ -79,8 +81,8 @@ log=$(cat "$cart/log")
 
 grep -q '^crash at frame' <<<"$log" && fail "crashed"
 grep -q '^script: hook [0-9]* patch ' <<<"$log" || fail "the kernel did not hook the game"
-key=$(sed -n 's/^script: hook \([0-9]*\) key L+R+START$/\1/p' <<<"$log" | head -1)
-opened=$(sed -n 's/^script: hook \([0-9]*\) menu open$/\1/p' <<<"$log" | head -1)
+key=$(sed -n 's/^script: hook \([0-9]*\) key L+R+START$/\1/p' <<<"$log" | drain_head -1)
+opened=$(sed -n 's/^script: hook \([0-9]*\) menu open$/\1/p' <<<"$log" | drain_head -1)
 [ -n "$opened" ] || fail "the menu did not open"
 closed=$(awk -v o="$opened" '$1 == "script:" && $4 == "menu" && $5 == "closed" && $3 > o { print $3; exit }' <<<"$log")
 [ -n "$closed" ] || fail "B did not close the menu"
@@ -115,7 +117,7 @@ screens=$(awk -v c="$closed" '$1 == "hash" && $3 + 0 > c + 10 { print $4 }' <<<"
 # (0x20000), past the save memory, not in the game's save chip.
 window=$(sed -n 's/^kernel: launch: in-game menu in cart SRAM: .* into a \([0-9]*\)-byte EWRAM window;.*$/\1/p' <<<"$log")
 [ -n "$window" ] || fail "the kernel didn't put the menu in cart SRAM"
-cmp -s <(head -c "$window" "$dumps/before-EWRAM.bin") <(tail -c +$((0x20000 + 1)) "$cart/sram.bin" | head -c "$window") ||
+cmp -s <(head -c "$window" "$dumps/before-EWRAM.bin") <(tail -c +$((0x20000 + 1)) "$cart/sram.bin" | drain_head -c "$window") ||
   fail "the game's EWRAM isn't in cart SRAM page 0x20"
 
 # The save came back intact through the save-state buffer load. (The flash
@@ -223,7 +225,7 @@ run cheats DOWN DOWN A A B B -- -m $((key + 120)):0x03007FE8:4 -k $((key + 200))
   $(keys $((key + 240)) DOWN DOWN A A B B) -m $((key + 320)):0x03007FE8:4 -f $((key + 320))
 grep -q 'screen ready: ingame-cheats' <<<"$log" || fail "the Cheats row didn't open the cheat list"
 [ "$(awk '$1 == "mem" && $3 == '$((key + 120))' { print $5 $6 $7 $8 }' <<<"$out")" = 01000000 ] ||
-  fail "the cheat list didn't turn the cheat off ($(grep '^mem' <<<"$out" | head -1))"
+  fail "the cheat list didn't turn the cheat off ($(grep '^mem' <<<"$out" | drain_head -1))"
 [ "$(awk '$1 == "mem" && $3 == '$((key + 320))' { print $5 $6 $7 $8 }' <<<"$out")" = 00000000 ] ||
   fail "the cheat list didn't turn the cheat on again"
 

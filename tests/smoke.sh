@@ -4,6 +4,8 @@
 # again to check the save came back. Runs inside the torii-emu container
 # after `just build` and `just emu-headless`.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
 # shellcheck source=tests/nav.sh
@@ -28,7 +30,7 @@ fail() {
 }
 
 save_bytes() {
-  mtype -i "$cart/sd.img" ::/torii/saves/Hello.gba/Main.sav 2>/dev/null | head -c 5 | od -A n -t x1 | tr -d ' \n'
+  mtype -i "$cart/sd.img" ::/torii/saves/Hello.gba/Main.sav 2>/dev/null | drain_head -c 5 | od -A n -t x1 | tr -d ' \n'
 }
 
 # Power-on 0: the boot goes to home with no notice before it (v0.3.2:

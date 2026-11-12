@@ -212,6 +212,7 @@ _test-run:
 # Check that text files are UTF-8 with LF, and lint and format-check the C, Python, shell scripts and CI workflows (pinned versions)
 lint:
     python3 tools/text_check.py
+    python3 tools/pipe_check.py
     git ls-files -z '*.c' '*.h' | xargs -0 uvx clang-format@{{clang_format}} --dry-run -Werror
     uvx ruff@0.17.1 check tools tests
     uvx ruff@0.17.1 format --check tools tests

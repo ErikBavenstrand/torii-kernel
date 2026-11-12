@@ -5,6 +5,8 @@
 # screen means PocketNES runs it. Runs inside the torii-emu container after
 # `just build` and `just emu-headless`.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
 # shellcheck source=tests/nav.sh
@@ -30,7 +32,7 @@ mcopy -i "$cart/sd.img" "$cart/Red.nes" ::/Red.nes
 OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_launch /Red.nes at=100) \
   -s 700:"$cart/game.png" -f 700 >/dev/null 2>"$cart/kernel.log" || fail "the emulator failed"
 grep -q '^crash at frame' "$cart/kernel.log" && fail "the emulator caught a crash"
-grep -q '^kernel error:' "$cart/kernel.log" && fail "errors: $(grep '^kernel error:' "$cart/kernel.log" | head -3)"
+grep -q '^kernel error:' "$cart/kernel.log" && fail "errors: $(grep '^kernel error:' "$cart/kernel.log" | drain_head -3)"
 grep -qF "kernel: launch: loading Red.nes with PocketNES" "$cart/kernel.log" || fail "Red.nes wasn't loaded with PocketNES"
 grep -qF "kernel: launch: starting the game" "$cart/kernel.log" || fail "the game wasn't started"
 

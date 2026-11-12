@@ -12,6 +12,8 @@
 # Runs inside the torii-emu container after `just build`, `just emu-headless`
 # and building tests/roms/savetest.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
 # shellcheck source=tests/nav.sh
@@ -74,7 +76,7 @@ logged "save: made a blank $savep, 131072 bytes"
 clean_card "after the first launch"
 # Every folder under /torii reads as only its own entries: no 0xA5 junk
 junk=$(mdir -i "$cart/sd.img" -/ -a ::/torii 2>&1 | grep -c $'\xa5' || true)
-[ "$junk" = 0 ] || fail "junk entries in a new folder: $(mdir -i "$cart/sd.img" -/ -a ::/torii | grep -a $'\xa5' | head -3)"
+[ "$junk" = 0 ] || fail "junk entries in a new folder: $(mdir -i "$cart/sd.img" -/ -a ::/torii | grep -a $'\xa5' | drain_head -3)"
 names=$(mdir -i "$cart/sd.img" -b ::/torii/saves/Test.gba | sed 's|.*/||' | sort | tr '\n' ' ')
 [ "$names" = "Main.sav game.ini " ] || fail "/torii/saves/Test.gba holds: $names"
 [ "$(od -A n -t x1 -N 4 -j 0 <(mtype -i "$cart/sd.img" ::$savep) | tr -d ' ')" = ffffffff ] || fail "the blank save isn't 0xFF"

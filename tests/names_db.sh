@@ -16,6 +16,8 @@
 #   tests/names_db.sh bench    Identify library's time for 1,000 games of
 #                              32 KB, on the test kernel (SELECT+B)
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
 local_carts "dist/cart-names-db${1:+-$1}"
@@ -41,7 +43,7 @@ not_logged() { # log text
 }
 
 no_errors() { # log
-  if grep -q '^kernel error:' "$1"; then fail "errors in $1: $(grep '^kernel error:' "$1" | head -3)"; fi
+  if grep -q '^kernel error:' "$1"; then fail "errors in $1: $(grep '^kernel error:' "$1" | drain_head -3)"; fi
 }
 
 new_card() { # cart [sectors]
@@ -110,8 +112,8 @@ logged "$cart/1.log" "names: 8 files' CRCs from /torii/crc.txt"
 logged "$cart/1.log" "library: new index: 8 games (GBA 4, GBC 1, GB 2, NES 1)"
 no_errors "$cart/1.log"
 # crc.txt is read before names.db, so covers (by CRC) needn't wait for it
-crc_at=$(grep -n "names: 8 files' CRCs from /torii/crc.txt" "$cart/1.log" | head -1 | cut -d: -f1)
-db_at=$(grep -n "names: /torii/names.db v2" "$cart/1.log" | head -1 | cut -d: -f1)
+crc_at=$(grep -n "names: 8 files' CRCs from /torii/crc.txt" "$cart/1.log" | drain_head -1 | cut -d: -f1)
+db_at=$(grep -n "names: /torii/names.db v2" "$cart/1.log" | drain_head -1 | cut -d: -f1)
 [ "$crc_at" -lt "$db_at" ] || fail "names.db was read before crc.txt"
 # Without names, file-name order: Hack of Minish, Homebrew, Wars, zz Minish.
 # Hack of Minish, a romhack with the Minish Cap's code, keeps its file name
@@ -205,11 +207,11 @@ logged "$cart/1.log" "library: 6 database names put in the index in place"
   fail "the names weren't put in place before the walk"
 logged "$cart/1.log" "library: the card changed: building a new index"
 logged "$cart/1.log" "library: wrote /torii/library.bak (generation 2)"
-[ "$(grep -oE '^kernel: names: /[^ ]+ is [0-9A-F]{8}' "$cart/1.log" | head -2 | cut -d' ' -f3 | tr '\n' ' ')" = \
+[ "$(grep -oE '^kernel: names: /[^ ]+ is [0-9A-F]{8}' "$cart/1.log" | drain_head -2 | cut -d' ' -f3 | tr '\n' ' ')" = \
   "/GBA/Wars.gba /NES/Famicom.nes " ] || fail "Recent's games weren't first: $(grep -E '^kernel: names: /' "$cart/1.log")"
 [ "$(crc_lines "$cart" | wc -l)" = 8 ] || fail "crc.txt holds $(crc_lines "$cart")"
 crc_lines "$cart" | grep '/GBA/Hack of Minish.gba' >/dev/null || fail "crc.txt has no record of the romhack"
-[ "$(gba_order "$cart" | head -1)" = /GBA/Wars.gba ] || fail "Wars isn't first: $(gba_order "$cart")"
+[ "$(gba_order "$cart" | drain_head -1)" = /GBA/Wars.gba ] || fail "Wars isn't first: $(gba_order "$cart")"
 no_errors "$cart/1.log"
 boot "$cart" "$cart/2.log" -f 900 -u "library: unchanged"
 logged "$cart/2.log" "library: unchanged"

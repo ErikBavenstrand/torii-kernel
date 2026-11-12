@@ -21,6 +21,8 @@
 #   screen  a screen with a loop of its own (Rename) writes the log too
 # Every part checks the card with fsck.fat. Runs inside the torii-emu container.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
 # shellcheck source=tests/nav.sh
@@ -124,7 +126,7 @@ launch)
   boot -f 260        # the auto save's progress dialog holds "Done" a moment
   [ "$(mdir -b -i "$cart/sd.img" ::/torii/logs)" = "::/torii/logs/torii-0.log" ] || fail "not one log file"
   [ "$(mtype -i "$cart/sd.img" ::/torii/logs/torii-0.log | wc -c)" = 65536 ] || fail "the log file isn't 64 KB"
-  [ "$(log 0 | head -1)" = "torii log 00000001     " ] || fail "header: $(log 0 | head -1)"
+  [ "$(log 0 | drain_head -1)" = "torii log 00000001     " ] || fail "header: $(log 0 | drain_head -1)"
   has "logging info, build main"
   has "previous session: nothing in cart RAM"
 
@@ -221,7 +223,7 @@ debug)
   has "; the snapshot is in /torii/logs/debug"
   log 0 >"$cart/log.txt"
   ! grep -qF "debug info: IE " "$cart/log.txt" || fail "the snapshot's lines went to the log"
-  snap=$(mdir -b -i "$cart/sd.img" ::/torii/logs | grep '/debug[^/]*\.txt$' | head -1)
+  snap=$(mdir -b -i "$cart/sd.img" ::/torii/logs | grep '/debug[^/]*\.txt$' | drain_head -1)
   [ -n "$snap" ] || fail "no /torii/logs/debug-*.txt"
   mtype -i "$cart/sd.img" "$snap" >"$cart/debug.txt"
   grep -qF "(the hook is in place)" "$cart/debug.txt" || fail "the snapshot's file doesn't say the hook is in place"
@@ -343,7 +345,7 @@ EOF
   boot -f 200
   # Whole lines only: what didn't fit in file 2 starts file 3.
   [ "$(log 2 | tail -c 1 | od -A n -t x1 | tr -d ' ')" = 0a ] || fail "file 2 ends in the middle of a line"
-  [ "$(log 3 | head -1)" = "torii log 00000008     " ] || fail "file 3 wasn't started as sequence 8: $(log 3 | head -1)"
+  [ "$(log 3 | drain_head -1)" = "torii log 00000008     " ] || fail "file 3 wasn't started as sequence 8: $(log 3 | drain_head -1)"
   has "Torii kernel boot" 3
   log 3 >"$cart/log.txt"
   ! grep -q "filler line" "$cart/log.txt" || fail "file 3 kept the old text"
@@ -372,7 +374,7 @@ EOF
   mcopy -o -i "$cart/sd.img" "$cart/torii-0.log" ::/torii/logs/
   boot -f 200
   mtype -i "$cart/sd.img" ::/torii/logs/torii-0.log | cmp -s - "$cart/torii-0.log" || fail "the junk file was changed"
-  [ "$(log 1 | head -1)" = "torii log 00000006     " ] || fail "file 1 wasn't started as sequence 6: $(log 1 | head -1)"
+  [ "$(log 1 | drain_head -1)" = "torii log 00000006     " ] || fail "file 1 wasn't started as sequence 6: $(log 1 | drain_head -1)"
   has "log: torii-0.log has junk after its text; going on in the next file" 1
   has "Torii kernel boot" 1
   boot -f 200 # the next boot goes on in file 1
@@ -387,7 +389,7 @@ open(sys.argv[1], "wb").write(data[:end] + b"\xff" * (len(data) - end))
 EOF
   mcopy -o -i "$cart/sd.img" "$cart/torii-1.log" ::/torii/logs/
   boot -f 200
-  [ "$(log 2 | head -1)" = "torii log 00000007     " ] || fail "file 2 wasn't started as sequence 7: $(log 2 | head -1)"
+  [ "$(log 2 | drain_head -1)" = "torii log 00000007     " ] || fail "file 2 wasn't started as sequence 7: $(log 2 | drain_head -1)"
   has "log: torii-1.log has junk after its text; going on in the next file" 2
   mtype -i "$cart/sd.img" ::/torii/logs/torii-1.log | cmp -s - "$cart/torii-1.log" || fail "the 0xFF junk file was changed"
   card_ok
@@ -468,15 +470,15 @@ settings)
   # B tapped inside the settings write, which blocks frames: the IRQ's key
   # latch keeps the tap (it was lost before v0.5.3)
   boot $(nav_setting logging) $(nav_press A RIGHT RIGHT A) -k @40:B -k @44:- -w "nav: home ready" -k @8:LEFT -k @12:- -k @420:-
-  back=$(grep -n 'nav: back from settings' "$cart/kernel.log" | head -1 | cut -d: -f1)
+  back=$(grep -n 'nav: back from settings' "$cart/kernel.log" | drain_head -1 | cut -d: -f1)
   ready=$(grep -n 'nav: home ready' "$cart/kernel.log" | tail -1 | cut -d: -f1)
-  opened=$(grep -n 'log: opened in the background' "$cart/kernel.log" | head -1 | cut -d: -f1)
+  opened=$(grep -n 'log: opened in the background' "$cart/kernel.log" | drain_head -1 | cut -d: -f1)
   turned=$(tail -n +"${ready:-1}" "$cart/kernel.log" | grep -c 'frame-cycles: carousel-step' || true)
   [ -n "$back" ] && [ -n "$opened" ] || fail "LOGGING wasn't saved, or the log wasn't opened in the background"
   [ "$opened" -gt "$back" ] || fail "the log was opened before Settings was left"
   [ "$turned" -gt 0 ] || fail "LEFT didn't turn the carousel after Settings was left"
   [ "$(mtype -i "$cart/sd.img" ::/torii/logs/torii-0.log | wc -c)" = 65536 ] || fail "the log file isn't 64 KB"
-  [ "$(log 0 | head -1)" = "torii log 00000001     " ] || fail "header: $(log 0 | head -1)"
+  [ "$(log 0 | drain_head -1)" = "torii log 00000001     " ] || fail "header: $(log 0 | drain_head -1)"
   has "settings: LOGGING is info"
   card_ok
   lines_ok
@@ -504,7 +506,7 @@ open)
   grep -q 'log: opened at once' "$cart/kernel.log" || fail "the delete didn't finish the open first"
   ! grep -q 'log: opened in the background' "$cart/kernel.log" || fail "the hook didn't hold the open"
   ! mtype -i "$cart/sd.img" ::/Hello.gba >/dev/null 2>&1 || fail "Hello.gba wasn't deleted"
-  [ "$(log 0 | head -1)" = "torii log 00000001     " ] || fail "header: $(log 0 | head -1)"
+  [ "$(log 0 | drain_head -1)" = "torii log 00000001     " ] || fail "header: $(log 0 | drain_head -1)"
   has "settings: LOGGING is info"
   card_ok
   lines_ok
@@ -515,10 +517,10 @@ open)
   rm -rf "$cart" && mkdir -p "$cart" && new_card 65536 32
   eval boot "$(to_info $hold)" -k @60:-
   ! grep -q 'log: opened' "$cart/kernel.log" || fail "the hook didn't hold the open"
-  [ -z "$(log 0 2>/dev/null)" ] || fail "the file cut off has text: $(log 0 | head -1)"
+  [ -z "$(log 0 2>/dev/null)" ] || fail "the file cut off has text: $(log 0 | drain_head -1)"
   card_ok
   boot -f 260
-  [ "$(log 0 | head -1)" = "torii log 00000001     " ] || fail "after the cut, header: $(log 0 | head -1)"
+  [ "$(log 0 | drain_head -1)" = "torii log 00000001     " ] || fail "after the cut, header: $(log 0 | drain_head -1)"
   has "logging info, build main"
   card_ok
   lines_ok

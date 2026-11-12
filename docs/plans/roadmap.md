@@ -61,7 +61,6 @@ Each release's details are in `CHANGELOG.md`; the planning, ticket reports and r
 
 Code fixes that the emulator can test, plus the leftovers from v0.9.
 
-- **Flaky test:** `tests/search_more.sh midgame` failed twice under `just check`'s parallel load (2026-11-12) with "Reset game didn't start the game again", and passes alone (6 of 6). The emulator is deterministic, so suspect the harness (a wall-clock timeout or a cut log), not Reset game; find it and fix the test.
 
 ### In game
 

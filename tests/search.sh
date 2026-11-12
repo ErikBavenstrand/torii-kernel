@@ -35,6 +35,8 @@
 #
 # Runs inside the torii-emu container after `just build`, `just emu-headless`.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
 # shellcheck source=tests/nav.sh
@@ -256,10 +258,10 @@ if [ "$mode" = cut ]; then
     # shellcheck disable=SC2046 # option lists
     cut_run $(nav_launch /searchtest.gba addon) -f 3000 -u "launch: starting"
     grep -q '^crash at frame' "$cart/run.log" && fail "cut at $n ($name): the next power-on crashed"
-    picks=$(sed -n 's/^kernel: cheats: .*searchtest.cht: \([0-9]*\) picked.*/\1/p' "$cart/run.log" | head -1)
+    picks=$(sed -n 's/^kernel: cheats: .*searchtest.cht: \([0-9]*\) picked.*/\1/p' "$cart/run.log" | drain_head -1)
     case $n:$picks in
     0:1 | [1-9]*:1 | [1-9]*:0 | [1-9]*:) ;;
-    *) fail "cut at $n ($name): the next launch read ${picks:-no} picks: $(grep 'cheats:' "$cart/run.log" | head -3)" ;;
+    *) fail "cut at $n ($name): the next launch read ${picks:-no} picks: $(grep 'cheats:' "$cart/run.log" | drain_head -3)" ;;
     esac
     return 0
   }

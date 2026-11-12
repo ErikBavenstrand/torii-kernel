@@ -20,6 +20,8 @@
 # (tests/slotstore_tree.py). Runs inside the torii-emu container after
 # `just build` and `just emu-headless`, with the test kernel built.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
 # shellcheck source=tests/cutsweep.sh
@@ -230,7 +232,7 @@ check() {
     # The scenario run again finishes it
     scenario
     l=$(list)
-    ! grep -qP '^torii/trash/' <<<"$l" || fail "$where: the trash is not empty after a second run: $(grep -P '^torii/trash/' <<<"$l" | head -3)"
+    ! grep -qP '^torii/trash/' <<<"$l" || fail "$where: the trash is not empty after a second run: $(grep -P '^torii/trash/' <<<"$l" | drain_head -3)"
   fi
   [ "$n" != 0 ] || end_state "$l"
 }

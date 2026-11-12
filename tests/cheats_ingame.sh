@@ -23,6 +23,8 @@
 #
 # Runs inside the torii-emu container after `just build`, `just emu-headless`.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
 # shellcheck source=tests/nav.sh
@@ -104,12 +106,12 @@ toggle)
   toggle_run -f 3000
   grep -q '^crash at frame' <<<"$log" && fail "crashed"
   grep -q 'cheats: /torii/cheats/Hello.cht: 4 picked, 2 run in game' <<<"$log" ||
-    fail "the launch: $(grep 'cheats:' <<<"$log" | head -3)"
+    fail "the launch: $(grep 'cheats:' <<<"$log" | drain_head -3)"
   grep -q '1 ROM patches; 4 listed in game' <<<"$log" || fail "the list: $(grep 'listed' <<<"$log")"
   grep -q 'screen ready: ingame-cheats' <<<"$log" || fail "the cheat list didn't open"
   # Frame by frame: the counter moved while the menu was closing, and not
   # from the first frame after it on
-  base=$(awk '$1 == "mem" && $4 == "0203F000:" { print $3 }' <<<"$out" | head -1)
+  base=$(awk '$1 == "mem" && $4 == "0203F000:" { print $3 }' <<<"$out" | drain_head -1)
   [ -n "$base" ] || fail "no counter dumps: $(head -c 300 <<<"$out")"
   for at in 0203F000 0203F010; do
     first=$(halfword $((base + 4)) $at)
@@ -141,7 +143,7 @@ toggle)
   out=$(boot $(nav_launch /Hello.gba addon) -w "launch: starting the game" -m @200:0x0203F010:2 \
     -m @200:0x0203F000:2 -m @260:0x0203F000:2 -m @260:0x0203F010:2 -f 3000 -u "hook never" 2>"$cart/log")
   log=$(cat "$cart/log")
-  grep -q 'Hello.cht: 2 picked, 0 run in game' <<<"$log" || fail "the next launch: $(grep 'cheats:' <<<"$log" | head -3)"
+  grep -q 'Hello.cht: 2 picked, 0 run in game' <<<"$log" || fail "the next launch: $(grep 'cheats:' <<<"$log" | drain_head -3)"
   [ "$(awk '$1 == "mem" && $4 == "0203F000:" { print $6 $5 }' <<<"$out" | sort -u | wc -l)" = 1 ] ||
     fail "Count frames ran next launch"
   [ "$(awk '$1 == "mem" && $4 == "0203F010:" { print $6 $5 }' <<<"$out" | sort -u | wc -l)" = 1 ] ||
@@ -192,7 +194,7 @@ cut)
     picks=$(sed -n 's/^kernel: cheats: .*Hello.cht: \([0-9]\) picked, .*/\1/p' "$cart/run.log")
     case $n:$picks in
     0:2 | [1-9]*:4 | [1-9]*:2) ;;
-    *) fail "cut at $n ($name): the next launch read ${picks:-no} picks: $(grep 'cheats:' "$cart/run.log" | head -3)" ;;
+    *) fail "cut at $n ($name): the next launch read ${picks:-no} picks: $(grep 'cheats:' "$cart/run.log" | drain_head -3)" ;;
     esac
     return 0
   }

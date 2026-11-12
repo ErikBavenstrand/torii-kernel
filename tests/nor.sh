@@ -6,6 +6,8 @@
 # window. Both games must run and keep their saves. Runs inside the torii-emu
 # container after `just build`, `just emu-headless` and the test ROMs.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 
 shots=dist/shots/nor
 # shellcheck source=tests/carts.sh
@@ -100,7 +102,7 @@ grep -q 'mode game from NOR offset 000000$' "$cart/2-hello.log" || fail "Hello d
 # to NOR after Hello with SAVE TYPE FLASH 128K.
 # shellcheck disable=SC2046
 boot 3-write -k 100:A -k 104:- $(nav_launch /World.gba nor save=5 at=400) -s 3800:$shots/3-nor-list.png -f 3800
-[ "$(mtype -i "$cart/sd.img" ::/torii/saves/torii/nor/Hello.gba/Main.sav | head -c 5 | od -A n -t x1 | tr -d ' \n')" = 4f4d525801 ] ||
+[ "$(mtype -i "$cart/sd.img" ::/torii/saves/torii/nor/Hello.gba/Main.sav | drain_head -c 5 | od -A n -t x1 | tr -d ' \n')" = 4f4d525801 ] ||
   fail "Hello's NOR save was not written back to SD"
 nor_holds 0x20000 "$world" || fail "World.gba was not written to NOR at 0x20000"
 nor_holds 0 "$hello" || fail "writing World.gba changed Hello.gba"

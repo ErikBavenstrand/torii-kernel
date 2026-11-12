@@ -10,6 +10,8 @@
 # when roms/ has it. Runs inside the torii-emu container after `just build`
 # and `just emu-headless`.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
 # shellcheck source=tests/nav.sh
@@ -77,7 +79,7 @@ check "plain ROM titled ZELDA (the table's palette 89)" "$cart.zelda.gb" 0 0 89
 check "plain ROM titled HELLO (not in the table: grey)" "$cart.hello.gb" 0 0 1
 rm -f "$cart".*.gb
 
-link=$(find roms -maxdepth 1 -name "*Link's Awakening DX.gbc" 2>/dev/null | head -1)
+link=$(find roms -maxdepth 1 -name "*Link's Awakening DX.gbc" 2>/dev/null | drain_head -1)
 if [ -n "$link" ]; then
   check "Link's Awakening DX" "$link" 1 0
 else

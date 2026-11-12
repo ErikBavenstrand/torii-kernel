@@ -6,6 +6,8 @@
 # Runs inside the torii-emu container after `just build`, `just emu-headless`
 # and building tests/roms/hello.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
 # shellcheck source=tests/nav.sh
@@ -26,7 +28,7 @@ boot() { # log [mgba-shot options]
   local log=$1
   shift
   OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin "$@" >"$log" 2>&1 || true
-  ! grep -qE 'assert failed|^crash at frame' "$log" || fail "a crash or failed assert: $(grep -E 'assert|crash' "$log" | head -2)"
+  ! grep -qE 'assert failed|^crash at frame' "$log" || fail "a crash or failed assert: $(grep -E 'assert|crash' "$log" | drain_head -2)"
 }
 
 # 2026-10-21 12:00 UTC: a set clock
@@ -40,7 +42,7 @@ boot "$cart/1.log" -C $t0 $(nav_game gba 1) -k @24:L -k @60:L+A -k @64:- -u "lau
 grep -q '^kernel: games: start /Other.gba (how 4, hard reset)' "$cart/1.log" ||
   fail "L+A didn't start Other.gba with a hard reset: $(grep '^kernel: games' "$cart/1.log" | tail -2)"
 grep -q "^kernel: launch: boot mode with addons (Settings')" "$cart/1.log" ||
-  fail "A didn't follow Settings' boot mode: $(grep '^kernel: launch' "$cart/1.log" | head -3)"
+  fail "A didn't follow Settings' boot mode: $(grep '^kernel: launch' "$cart/1.log" | drain_head -3)"
 grep -q '^kernel: launch: loading Other.gba' "$cart/1.log" || fail "Other.gba didn't load: $(grep '^kernel: launch' "$cart/1.log" | tail -2)"
 echo "PASS: L held doesn't page a game list, and L+A starts the selected row with a hard reset"
 
@@ -52,7 +54,7 @@ boot "$cart/2.log" -c $((t0 + 30)) -k 100:A -k 106:- \
   -w "nav: home ready" -k @8:LEFT -k @12:- -k @24:A -k @28:- -w "nav: page recent ready" -s "@8:$cart/recent.png" \
   -u "games: row 0 played 1m ago" -f 6000
 grep -q '^kernel: games: row 0 played just now' "$cart/2.log" ||
-  fail "Recent's first row isn't Hello, just now: $(grep '^kernel: games' "$cart/2.log" | head -3)"
+  fail "Recent's first row isn't Hello, just now: $(grep '^kernel: games' "$cart/2.log" | drain_head -3)"
 grep -q '^kernel: games: row 0 played 1m ago' "$cart/2.log" ||
   fail "the played text didn't follow the clock: $(grep '^kernel: games' "$cart/2.log" | tail -3)"
 echo "PASS: a launched game is first on Recent, played just now, and the text follows the clock"
@@ -136,7 +138,7 @@ setting 1 1
 # shellcheck disable=SC2046 # nav.sh's options
 boot "$cart/2.log" $(nav_game gba 0) -k @20:A -k @24:- -u "launch: loading" -f 1500
 grep -q "^kernel: launch: boot mode clean (the game's)" "$cart/2.log" ||
-  fail "A didn't follow the game's boot mode: $(grep '^kernel: launch' "$cart/2.log" | head -3)"
+  fail "A didn't follow the game's boot mode: $(grep '^kernel: launch' "$cart/2.log" | drain_head -3)"
 grep -q '^kernel: launch: loading A.gba, CLEAN BOOT' "$cart/2.log" || fail "A.gba didn't start clean: $(grep '^kernel: launch' "$cart/2.log" | tail -2)"
 echo "PASS: A starts a game by its own boot mode"
 
@@ -146,7 +148,7 @@ NAV_SHOWN="recent gba"
 # shellcheck disable=SC2046 # nav.sh's options
 boot "$cart/3.log" $(nav_game gba 1) -k @20:A -k @24:- -u "launch: loading" -f 1500
 grep -q "^kernel: launch: boot mode with addons (Settings')$" "$cart/3.log" ||
-  fail "A didn't follow Settings' boot mode: $(grep '^kernel: launch' "$cart/3.log" | head -3)"
+  fail "A didn't follow Settings' boot mode: $(grep '^kernel: launch' "$cart/3.log" | drain_head -3)"
 grep -q '^kernel: launch: loading B.gba, BOOT WITH ADDON' "$cart/3.log" || fail "B.gba didn't start with addons: $(grep '^kernel: launch' "$cart/3.log" | tail -2)"
 echo "PASS: A starts a game with its addons by default"
 
@@ -155,7 +157,7 @@ setting 35 1
 # shellcheck disable=SC2046 # nav.sh's options
 boot "$cart/4.log" $(nav_game gba 1) -k @20:A -k @24:- -u "launch: loading" -f 1500
 grep -q "^kernel: launch: boot mode clean (Settings')" "$cart/4.log" ||
-  fail "A didn't follow Settings' boot mode Clean: $(grep '^kernel: launch' "$cart/4.log" | head -3)"
+  fail "A didn't follow Settings' boot mode Clean: $(grep '^kernel: launch' "$cart/4.log" | drain_head -3)"
 grep -q '^kernel: launch: loading B.gba, CLEAN BOOT' "$cart/4.log" || fail "B.gba didn't start clean: $(grep '^kernel: launch' "$cart/4.log" | tail -2)"
 echo "PASS: Settings' GBA boot mode Clean starts a game clean"
 

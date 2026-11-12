@@ -5,6 +5,8 @@
 # Before Torii's patch, run(1) set it back to on at every start. Runs inside
 # the torii-emu container after `just build` and `just emu-headless`.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
 # shellcheck source=tests/nav.sh
@@ -34,7 +36,7 @@ settings() {
     -k @170:DOWN -k @176:- -k @184:DOWN -k @190:- -k @198:DOWN -k @204:- -k @212:A -k @218:- \
     -s "@240:$cart/$shot" "$@" >/dev/null 2>"$cart/kernel.log" || fail "the emulator failed"
   grep -q '^crash at frame' "$cart/kernel.log" && fail "the emulator caught a crash"
-  grep -q '^kernel error:' "$cart/kernel.log" && fail "errors: $(grep '^kernel error:' "$cart/kernel.log" | head -3)"
+  grep -q '^kernel error:' "$cart/kernel.log" && fail "errors: $(grep '^kernel error:' "$cart/kernel.log" | drain_head -3)"
   return 0
 }
 

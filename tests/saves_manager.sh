@@ -15,6 +15,8 @@
 # Runs inside the torii-emu container after `just build`, `just
 # emu-headless` and building tests/roms.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
 # shellcheck source=tests/nav.sh
@@ -37,7 +39,7 @@ boot() {
   # The clock stands at 2026-01-21, 20 days after the trash's folder
   OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin -C 1769000000 "$@" >/dev/null 2>"$cart/run.log" || true
   ! grep -q '^crash at frame' "$cart/run.log" || fail "the emulator caught a crash"
-  ! grep -q '^kernel error: ' "$cart/run.log" || fail "an error: $(grep '^kernel error: ' "$cart/run.log" | head -1)"
+  ! grep -q '^kernel error: ' "$cart/run.log" || fail "an error: $(grep '^kernel error: ' "$cart/run.log" | drain_head -1)"
 }
 logged() { grep -qF "kernel: $1" "$cart/run.log" || fail "no log line: $1"; }
 
@@ -56,7 +58,7 @@ card_save() { # CHAR SIZE ::/PATH
   mcopy -i "$img" "$f" "$3"
 }
 has() { mdir -i "$img" "::$1" >/dev/null 2>&1; }
-content() { mtype -i "$img" "::$1" 2>/dev/null | head -c 1; }
+content() { mtype -i "$img" "::$1" 2>/dev/null | drain_head -c 1; }
 
 mkfs.fat -C -F 32 -n SAVES "$img" 65536 >/dev/null
 card_dir ::/G
@@ -104,7 +106,7 @@ boot $(nav_setting saves) "${to_screen[@]}" \
   -k @70:RIGHT -k @74:- -k @82:A -k @86:- -w "orphan: deleted /G/Renamed.gba" -f 6000
 ! has /torii/saves/G/Renamed.gba || fail "the orphan is still in the saves"
 ! has /torii/backups/G/Renamed.gba || fail "the orphan's history is still there"
-trash=$(mdir -b -i "$img" ::/torii/trash | grep -v 20260101 | head -1 | sed 's|/$||; s|.*/||')
+trash=$(mdir -b -i "$img" ::/torii/trash | grep -v 20260101 | drain_head -1 | sed 's|/$||; s|.*/||')
 [ -n "$trash" ] || fail "nothing new in the trash"
 [ "$(content "/torii/trash/$trash/G/Renamed.gba/Main.sav")" = A ] || fail "the orphan's save isn't in the trash"
 # shellcheck disable=SC2046 # nav.sh's options

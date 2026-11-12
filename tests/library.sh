@@ -8,6 +8,8 @@
 # Runs inside the torii-emu container after `just build`, `just emu-headless`
 # and building tests/roms/hello. With N/M, only every Mth case from the Nth.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
 # shellcheck source=tests/nav.sh
@@ -40,7 +42,7 @@ not_logged() { # log text
 }
 
 no_errors() { # log
-  if grep -q '^kernel error:' "$1"; then fail "errors in $1: $(grep '^kernel error:' "$1" | head -3)"; fi
+  if grep -q '^kernel error:' "$1"; then fail "errors in $1: $(grep '^kernel error:' "$1" | drain_head -3)"; fi
 }
 
 # The index on the card, as tests/library_idx.py lists it: the newer valid
@@ -161,7 +163,7 @@ $(index "$cart")"
   boot "$cart" "$cart/5.log" -f 600 -u "library: wrote"
   logged "$cart/5.log" "library: the card changed: building a new index"
   logged "$cart/5.log" "library: wrote /torii/library.idx (generation 3)"
-  [ "$(index "$cart" | head -1)" = "GBA	/Root Game.gba	$sz	-" ] || fail "the custom name didn't sort first:
+  [ "$(index "$cart" | drain_head -1)" = "GBA	/Root Game.gba	$sz	-" ] || fail "the custom name didn't sort first:
 $(index "$cart")"
   echo "PASS: a custom name in names.txt sorts its game by it, without a rescan"
 fi
@@ -211,7 +213,7 @@ if shard_case; then
   boot "$cart" "$cart/4.log" -f 300
   logged "$cart/4.log" "library: the index is another card's"
   logged "$cart/4.log" "library: new index: 1 games (GBA 1, GBC 0, GB 0, NES 0)"
-  grep -E "kernel: (library: new index|screen ready: home)" "$cart/4.log" | head -1 | grep "new index" >/dev/null ||
+  grep -E "kernel: (library: new index|screen ready: home)" "$cart/4.log" | drain_head -1 | grep "new index" >/dev/null ||
     fail "the menu came up before the new index"
   index "$cart" --header | grep -x "volume_serial 12345678" >/dev/null || fail "the new index has another serial"
   echo "PASS: another card's index is built again before the menu"

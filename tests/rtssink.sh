@@ -18,6 +18,8 @@
 # Runs inside the torii-emu container after `just build`, `just emu-headless`
 # and `just test-roms`.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
 # shellcheck source=tests/nav.sh
@@ -55,7 +57,7 @@ clusters() {
 case $mode in
 truncated)
   rts_sink "$cart/sd.img"
-  first=$(clusters | head -1)
+  first=$(clusters | drain_head -1)
   [ "$(clusters | wc -l)" = 896 ] || fail "the test's rts.bin isn't 896 clusters of 512 bytes"
   # The 10th cluster's FAT entry made the chain's end, in both FATs
   python3 - "$cart/sd.img" $((first + 9)) <<'PY'

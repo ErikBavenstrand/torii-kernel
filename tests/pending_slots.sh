@@ -18,6 +18,8 @@
 # Runs inside the torii-emu container after `just build`, `just emu-headless`
 # and building tests/roms/savetest.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
 # shellcheck source=tests/nav.sh
@@ -201,7 +203,7 @@ d[B + 0x400:B + 0x600] = record("/torii/saves/Other.gba/Main.sav")'
   # With slot 1 used up, the stray slot 2 must not become the record
   [ "$(pending)" = 0000 ] || fail "after the copy, stray slot 2 reads as the pending record ($(pending))"
   boot -k 100:A -k 106:- -f 800
-  ! grep -qF 'Other.gba' "$cart/run.log" || fail "the next power-on offered to copy the stray record's save: $(grep -F Other.gba "$cart/run.log" | head -2)"
+  ! grep -qF 'Other.gba' "$cart/run.log" || fail "the next power-on offered to copy the stray record's save: $(grep -F Other.gba "$cart/run.log" | drain_head -2)"
   only_test_save
   echo "PASS: pending-slots garbage: a stray live slot past the record never becomes it"
   ;;

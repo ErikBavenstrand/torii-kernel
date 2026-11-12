@@ -17,6 +17,8 @@
 # Runs inside the torii-emu container after `just build` and `just
 # emu-headless` (`just compat` runs it).
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
@@ -70,7 +72,7 @@ cht() {
 at() { printf '%08X' $((0x$1 & ~($2 - 1))); }
 
 # value FILE ADDR: the bytes a run dumped at ADDR, as hex
-value() { sed -n "s/^mem frame [0-9]* $2: //p" "$1" | head -1 | tr -d ' ' | tr A-F a-f; }
+value() { sed -n "s/^mem frame [0-9]* $2: //p" "$1" | drain_head -1 | tr -d ' ' | tr A-F a-f; }
 want() { python3 -c "import sys; print(int(sys.argv[1], 16).to_bytes(int(sys.argv[2]), 'little').hex())" "$1" "$2"; }
 
 # check WRITES TORII MGBA: sets $tbad (Torii's misses) and $mbad (mGBA's)
