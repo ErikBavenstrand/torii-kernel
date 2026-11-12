@@ -448,7 +448,7 @@ index 1d0c0dd..80e46af 100644
  		return;
 diff --git a/src/gba/cart/omega.c b/src/gba/cart/omega.c
 new file mode 100644
-index 0000000..cd973c9
+index 0000000..ba1a162
 --- /dev/null
 +++ b/src/gba/cart/omega.c
 @@ -0,0 +1,1931 @@
@@ -2240,7 +2240,7 @@ index 0000000..cd973c9
 +// lost (as a flash chip ignores plain writes); "flip-image": a byte of the
 +// overlay image (page 0xB0's window offset 0x400) reads with bit 0 flipped;
 +// "chip" (GBAOmegaOwnsSRAM): a flash or EEPROM game's save chip on every page.
-+// Torii (v0.9.22): "drop:FIRST-LAST" loses only the writes to cart SRAM
++// Torii (v0.9.23): "drop:FIRST-LAST" loses only the writes to cart SRAM
 +// offsets FIRST to LAST (hex), so a test can fail one of the overlay's own
 +// backups (the cheat search's IWRAM, the extension's EWRAM) but not the
 +// stub's.

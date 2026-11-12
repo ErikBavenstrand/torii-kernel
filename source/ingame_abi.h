@@ -66,7 +66,7 @@
 // overlay loads itself: the core image fills its 24 KB at INGAME_SRAM_IMAGE
 #define INGAME_SRAM_EXT 0xF2000
 #define INGAME_EXT_MAX 0x5000
-// The cheat search's Undo (v0.9.22): the values the last pass wrote over in
+// The cheat search's Undo (v0.9.23): the values the last pass wrote over in
 // the snapshot, of the candidates before it, one after another in their
 // bits' order, as many as fit
 #define INGAME_SRAM_UNDO_VALUES 0xF7000
@@ -113,7 +113,7 @@ struct ingame_search {
 	uint8_t first;  // INGAME_FIRST_*
 	uint8_t first_pass;  // the pass that kept it (its undo loses it)
 	uint8_t bcd;  // 1: elements are BCD, two decimal digits a byte (scores)
-	// 1 (v0.9.22): INGAME_SRAM_UNDO_VALUES holds the values the last pass
+	// 1 (v0.9.23): INGAME_SRAM_UNDO_VALUES holds the values the last pass
 	// wrote over, so Undo puts the snapshot back too
 	uint8_t undo_values;
 	// 1: an Undo couldn't put the snapshot back (too many values), so the
@@ -142,13 +142,13 @@ struct ingame_found_cheat {
 #define INGAME_POINTERS_MAGIC 0x31525450u  // "PTR1"
 #define INGAME_POINTER_REACH 0x1000
 #define INGAME_POINTERS_MAX 960
-// An offset's bit (v0.9.22): the pointer passed every Check made
+// An offset's bit (v0.9.23): the pointer passed every Check made
 #define INGAME_POINTER_PASSED 0x80000000u
 struct ingame_pointer {
 	uint32_t at;  // the pointer's address
 	uint32_t offset;  // below INGAME_POINTER_REACH, with INGAME_POINTER_PASSED
 };
-// Check (v0.9.22) marks the pointers that pass rather than dropping the
+// Check (v0.9.23) marks the pointers that pass rather than dropping the
 // others: one that passes none leaves the list as it was, and the page can
 // show the list as Find made it
 struct ingame_pointers {
@@ -394,7 +394,7 @@ struct ingame_shot {
 #define INGAME_SAVE_SLOT_BYTES 100  // a save slot's name (SAVESLOT_NAME_BYTES, 97), word-rounded
 #define INGAME_PALETTE 16
 
-// Found cheats a boot couldn't file (v0.9.22), at INGAME_SRAM_FOUND_WAIT:
+// Found cheats a boot couldn't file (v0.9.23), at INGAME_SRAM_FOUND_WAIT:
 // the next launch's session takes the block their game's path is in, so
 // they wait here with it until a boot files them
 #define INGAME_FOUND_WAIT_MAGIC 0x31544157u  // "WAT1"
@@ -532,10 +532,10 @@ enum ingame_text {
 	INGAME_TEXT_SEARCH_PICK,  // the list's footer
 	INGAME_TEXT_SEARCH_SAVE_ENDS,  // the Save state row's footer while a search runs
 	INGAME_TEXT_UNSAVED_FOUND,  // the menu's footer while found cheats wait: alone,
-	INGAME_TEXT_UNSAVED_STATE_FOUND,  // with a state (v0.9.22),
+	INGAME_TEXT_UNSAVED_STATE_FOUND,  // with a state (v0.9.23),
 	INGAME_TEXT_UNSAVED_SHOTS_FOUND,  // with screenshots
 	INGAME_TEXT_UNSAVED_ALL_FOUND,  // or with both
-	// v0.9.22: the confirmations (a second A does it)
+	// v0.9.23: the confirmations (a second A does it)
 	INGAME_TEXT_SEARCH_CONFIRM_NEW,
 	INGAME_TEXT_SEARCH_CONFIRM_FIND,
 	INGAME_TEXT_SEARCH_CONFIRM_SAVE,
@@ -736,7 +736,7 @@ struct ingame_session {
 // search's (v0.9) on, the block after the whole names, which the session
 // block has no room for
 #define INGAME_SRAM_TEXTS 0x3C100
-// The Cheat search row while a search runs, its count in it (v0.9.22): the
+// The Cheat search row while a search runs, its count in it (v0.9.23): the
 // overlay's extension writes it, the menu (without the extension) reads it
 #define INGAME_SRAM_SEARCH_ROW INGAME_TEXT_SRAM(INGAME_TEXTS)
 // struct ingame_glyph[INGAME_GLYPHS]: after the screenshot's IWRAM backup,

@@ -11,7 +11,7 @@
 // behind), as games that shuffle their save in memory do. The log line
 // also says "coins N" (the BCD's digits).
 //
-// v0.9.22: twenty words of 1,000,000 (marks), for a 32-bit search that
+// v0.9.23: twenty words of 1,000,000 (marks), for a 32-bit search that
 // keeps 16 finds; and L points the block's pointer at VRAM, as a game that
 // reuses a pointer's word does: a cheat kept through it must not write
 // there (tests/search_more.sh).

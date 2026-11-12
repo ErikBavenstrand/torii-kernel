@@ -26,7 +26,7 @@
 #       it again; Check the pointers keeps those that point the same way;
 #       its value set to 999 and kept through the first, the coins read
 #       0999, and Back to Torii files [POINTER]+24:0999. A keep from the
-#       first list, before any Check, is off (v0.9.22), and the checked keep
+#       first list, before any Check, is off (v0.9.23), and the checked keep
 #       of the same pointer replaces it: one record, on.
 # cut:  set's run, the power cut at each cutpoint (tests/cutsweep.sh), the
 #       filing's write among them. Cart SRAM past the save has no battery,

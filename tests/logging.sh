@@ -210,7 +210,7 @@ debug)
   # Past the save chip, the menu's backups and the savestate buffer
   # (0x00000-0xAFFFF) and the menu the launch wrote (0xB0000-0xBFFFF), only
   # page 0xF0 changed (cmp counts bytes from 1): the cart log, and from
-  # 0xF2000 the menu's extension and search lines the launch wrote (v0.9.22).
+  # 0xF2000 the menu's extension and search lines the launch wrote (v0.9.23).
   changed=$({ cmp -l "$cart/sram-before.bin" "$cart/sram.bin" || true; } |
     awk -v menu_end=$((0xC0000)) -v ours=$((0xF0000)) -v ours_end=$((0x100000)) \
       '$1 - 1 >= menu_end && ($1 - 1 < ours || $1 - 1 >= ours_end) { n++ } END { print n + 0 }')

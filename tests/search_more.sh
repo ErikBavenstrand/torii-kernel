@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The in-game cheat search's 1.0 review (v0.9.22): what tests/search.sh's
+# The in-game cheat search's 1.0 review (v0.9.23): what tests/search.sh's
 # end-to-end runs don't reach, on the emulated cart with tests/roms/searchtest
 # (lives 5, A loses one; twenty words of 1,000,000; L points the coins'
 # pointer at VRAM).

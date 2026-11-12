@@ -1,4 +1,4 @@
-# The cheat search's 1.0 review (v0.9.22) over tests/roms/searchtest, which
+# The cheat search's 1.0 review (v0.9.23) over tests/roms/searchtest, which
 # has no cheat file: Start's pass says it is searching (busy); with too
 # many left, Show them's footer says how many and to narrow to 32 (few);
 # New search asks for A again (confirm); the menu's row counts what is

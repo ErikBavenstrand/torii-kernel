@@ -4,7 +4,7 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
-## v0.9.22
+## Unreleased
 
 - **Fixed:** a found cheat kept through a pointer, or a typed pointer code,
   could write anywhere its pointer's word pointed (I/O, VRAM). The
@@ -26,9 +26,11 @@ git log, not here.
   only made log lines; the next launch wiped those that waited. A known
   code isn't added twice, the boot after the game says what was added or
   why not, and records the card refused wait with their game's path until
-  a boot files them. (866a4ae5, df1febdd)
+  a boot files them. (866a4ae5, df1febdd, dea9b4a7)
 - **Changed:** the search's footers that ran past their width are shorter
   in English and Swedish. (dafb230b)
+
+## v0.9.22
 
 - **Added:** a Korean pack, `lang/ko.ini`, with Galmuri9's Hangul, jamo and
   kana as its script font (273 KB of the 320 KB). It is a draft no native

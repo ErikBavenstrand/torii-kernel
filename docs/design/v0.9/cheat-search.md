@@ -41,7 +41,7 @@ screenshots. So the search **borrows the save-state buffer**:
 | `0xA4000-0xAFF7F` | their values at the first scan, one after another (49,024 bytes) |
 
 And in the cart log's page (`0xF0000`), past what it keeps for the next
-boot (v0.9.22): the overlay's extension at `0xF2000` (the room a launch's
+boot (v0.9.23): the overlay's extension at `0xF2000` (the room a launch's
 cheat patches take until the launch applied them), Undo's values at
 `0xF7000-0xFDFFF` (28 KB), and the search's lines past the first block's
 60 at `0xFE000`, with the Cheat search row and its count after them.
@@ -71,10 +71,10 @@ has nothing to load, and the kernel's next boot neither files the buffer
 screenshot's IWRAM backup (which ends at `0x2DA00`): a magic, a count and up
 to 16 records (address, value, size, on now). The overlay writes a record and
 then the count. Back to Torii (`ingame_after_game`) files them. Keeping a
-place again (another value, or on now) replaces its record (v0.9.22); the
+place again (another value, or on now) replaces its record (v0.9.23); the
 head's flags say one is on now in the live block, for Reset game's footer.
 
-### What is Torii's in the searched run (v0.9.22)
+### What is Torii's in the searched run (v0.9.23)
 
 A game whose stack top is in EWRAM (`0x0203FFFC`, `Get_spend_address`) has
 the hook's spend area, `0x0203FF7C-0x0203FFFB`, in the searched run: a
@@ -110,7 +110,7 @@ pairs are constant writes, as the cheat filed for them is. The BIOS's
 SoftReset (Reset game) clears the block if it is in IWRAM's last 512 bytes;
 a game that clears its RAM at its start clears it too, else it runs on, as
 the filed cheat would. The Reset game row's footer says it stops them
-(v0.9.22). All off and Back to my picks on the cheat list clear the block
+(v0.9.23). All off and Back to my picks on the cheat list clear the block
 too and file the found cheats off: they weren't picked at launch.
 
 The live block needs the interpreter, which a launch puts in only with cheats
@@ -133,7 +133,7 @@ narrows. The game is frozen meanwhile; the footer says "Searching..." first.
 
 The compare runs as ARM from the game's IWRAM, which the pass borrows as the
 screenshot's packing does (kept at `INGAME_BACKUP_SHOT` meanwhile, and read
-from there as searched RAM; v0.9.22: read back first, written once more if
+from there as searched RAM; v0.9.23: read back first, written once more if
 it didn't, and on a second mismatch the pass doesn't run and the footer
 says cart memory failed a check), with its chunk buffers: in Thumb from the
 window the first pass took 190 frames, most of it the compare's registers
@@ -198,7 +198,7 @@ a signed compare.
   address. A pointer from the page is kept as `[POINTER]+OFFSET:VALUE`, a
   pointer code the cheat interpreter already runs (AnyGBA's raw extension);
   in game it is set once, as the live block takes plain addresses.
-  v0.9.22: Check marks the pointers that pass (`INGAME_POINTER_PASSED`)
+  v0.9.23: Check marks the pointers that pass (`INGAME_POINTER_PASSED`)
   rather than dropping the rest, so a Check that passes none leaves the
   list as it was (and says so), and the page's last row shows the list as
   Find made it ("All found before the check") or back. Find asks for A
@@ -245,14 +245,14 @@ Its page:
 - **The menu's row** (or the cheat list's) shows the candidates left while
   a search runs ("Cheat search: 1,204 left"): the extension writes that line
   to cart SRAM at each pass, so the menu draws it without loading the
-  extension (v0.9.22).
+  extension (v0.9.23).
 - **No search:** Size (8, 16 or 32 bits; A cycles it) and Start search. The
   footer: what Start does, or why it can't.
 - **A search:** Same as before, Changed, Went up, Went down, Equals N, Show
   them (greyed until 1-32 are left), Undo the last, New search. Each filter
   first copies the candidates to `INGAME_SRAM_SEARCH_UNDO` (`0x92000`, at
   most 36,800 bytes; about 10 frames at 8 bits), so a filter picked by
-  mistake doesn't end the search: Undo puts them back (once). v0.9.22: the
+  mistake doesn't end the search: Undo puts them back (once). v0.9.23: the
   pass also keeps, for each chunk whose snapshot it writes over, the values
   of the candidates before it (`cheatsearch_pack`, at `0xF7000`, 28 KB), and
   Undo puts them back in the snapshot, so the next relative filter compares
@@ -300,7 +300,7 @@ does). Then one `cheatstore_write`, power-cut safe as every cheat file write is.
 records are cleared after the write. A larger file (read in windows) gets them in its last window.
 Rename one on the Cheats page.
 
-v0.9.22: a code the file has already (the same text: a cheat kept in two
+v0.9.23: a code the file has already (the same text: a cheat kept in two
 sessions, or the set filed again after a power cut between the write and
 the clear) isn't added again; it is picked if it was on. The boot shows
 what happened for a moment ("2 found cheats added to Game"), or, waiting
@@ -315,7 +315,7 @@ launch's session block takes the path; each boot files them first.
   every opening (backup, load, check), so every byte there costs the menu's
   opening: with the search in it, the panel showed a frame late (5 frames,
   `tests/menu.sh` allows 4). So the search, the screenshot and the DEBUG
-  snapshot are an extension (`EXT` in `ov.c`, `.ext` in `ov.ld`; v0.9.22:
+  snapshot are an extension (`EXT` in `ov.c`, `.ext` in `ov.ld`; v0.9.23:
   two parts, `.ext` for the lists, the scroll bar, the screenshot and the
   DEBUG snapshot, 3.4 KB, and `.exs` for the search, 13 KB, which only the
   search pages load; their image lives at `0xF2000`, and the game's EWRAM
@@ -343,7 +343,7 @@ launch's session block takes the path; each boot files them first.
 
 - `tests/host/test_cheatsearch.c`: every filter at every size, alignment,
   values at the size's edges, counting, a chunk with no candidates.
-- `tests/search_more.sh` (v0.9.22): Undo with a relative filter after it,
+- `tests/search_more.sh` (v0.9.23): Undo with a relative filter after it,
   a search ending at none, a 32-bit search keeping 16 finds (three on now,
   a fourth refused), All off over a cheat on now, Sleep and Reset game mid
   search, cart SRAM failing the pass's and the extension's backups

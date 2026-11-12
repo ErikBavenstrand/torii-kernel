@@ -312,7 +312,7 @@ def cases():
     both(f"{g}-ptr16", enc, raw, lambda f: [f.write_ptr(2, P, 0x8282, 4)])
     both(f"{g}-ptr32", enc, raw, lambda f: [f.write_ptr(4, P, 0x84848484)])
     both(f"{g}-ptr-iwram", enc, raw, lambda f: [f.write_ptr(2, P + 4, 0x9292, 2)])
-    # A pointer whose target is out of RAM (v0.9.22): EWRAM's mirror past
+    # A pointer whose target is out of RAM (v0.9.23): EWRAM's mirror past
     # 0x02040000, which mGBA writes through to the targets; Torii writes
     # through a pointer only into EWRAM and IWRAM, so its run is the
     # baseline's

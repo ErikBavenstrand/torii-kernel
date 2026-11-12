@@ -237,7 +237,7 @@ static void test_bcd(void)
 	CHECK_EQ(t_pass(1, CHEATSEARCH_EQUALS, CHEATSEARCH_BCD, 100, 0), 1);  // past 99: 99
 }
 
-// Undo (v0.9.22), as the overlay makes it: a pass keeps the snapshot's
+// Undo (v0.9.23), as the overlay makes it: a pass keeps the snapshot's
 // values it writes over, of the candidates before it (cheatsearch_pack),
 // and Undo puts them back (cheatsearch_unpack). Lives at element 3 went
 // 5 to 4; Went up by mistake drops them; Undo; Went down must keep them.
@@ -281,7 +281,7 @@ static void test_undo(void)
 	CHECK(out[0] == 1 && out[1] == 2 && out[2] == 5 && out[3] == 6);
 }
 
-// Negative numbers and Stored as toggled (v0.9.22): a number kept where the
+// Negative numbers and Stored as toggled (v0.9.23): a number kept where the
 // new way holds it, else the fallback
 static void test_convert(void)
 {

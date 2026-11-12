@@ -318,7 +318,7 @@ run32:	run_loop str
 	b	ext_done
 	.endm
 
-@ in_ram REG, TMP, SKIP (v0.9.22): on to SKIP unless REG is in EWRAM or
+@ in_ram REG, TMP, SKIP (v0.9.23): on to SKIP unless REG is in EWRAM or
 @ IWRAM (0x02000000-0x0203FFFF, 0x03000000-0x03007FFF), the RAM a game
 @ keeps its values in; TMP a free register. A write through a pointer goes
 @ nowhere else: a pointer the game has moved or not set yet (a found cheat

@@ -175,7 +175,7 @@ _Static_assert(TILE_TEXT + 2 * WIDE_SPRITES * 8 + (SLOTS_MAX - 2) * SLOT_TILES <
 // is loaded (m.ext).
 #define EXT __attribute__((section(".ext.text"), noinline))
 #define EXT_DATA __attribute__((section(".ext.data"), aligned(4)))  // sram_copy takes words
-// The extension's second part (v0.9.22), the cheat search's, after the
+// The extension's second part (v0.9.23), the cheat search's, after the
 // first (the lists', the scroll bar's, the screenshot's and the DEBUG
 // snapshot's): only the search pages load it, so the others open as soon
 // as they did before the search grew
@@ -241,7 +241,7 @@ enum page_id {
 	PAGE_PTRS,  // the pointer scan's pointers to a candidate (v0.9.7)
 };
 
-// What a second press of A confirms (v0.9.22): what drops something
+// What a second press of A confirms (v0.9.23): what drops something
 enum confirm {
 	CONFIRM_NONE,
 	CONFIRM_NEW,  // New search: the search ends
@@ -1958,7 +1958,7 @@ EXS static int first_keep(uint32_t *wpos, uint32_t *wn)
 	return 1;
 }
 
-// The words of the searched run that are Torii's in game (v0.9.22): the
+// The words of the searched run that are Torii's in game (v0.9.23): the
 // hook's spend area (and the live block after it), which a game whose
 // stack top is in EWRAM has in the run (GBApatch.c's Get_spend_address),
 // and the IRQ stack's frames under the menu, wherever the game put that
@@ -1994,7 +1994,7 @@ EXS static uint32_t owned_drop(uint32_t at, uint32_t *bits)
 	return dropped;
 }
 
-// Undo's values (v0.9.22): n bytes after those before at *pos (the scratch's
+// Undo's values (v0.9.23): n bytes after those before at *pos (the scratch's
 // stream holding *held of them), to cart SRAM a chunk at a time; 0 once
 // they don't fit INGAME_UNDO_VALUES_BYTES
 EXS static int undo_put(const uint8_t *v, uint32_t n, uint32_t *pos, uint32_t *held)
@@ -2198,7 +2198,7 @@ EXS static void search_filter(uint32_t op)
 	slots_update();  // the rows greyed or not with what is left
 }
 
-// The snapshot's values the last pass wrote over, back (v0.9.22): in each
+// The snapshot's values the last pass wrote over, back (v0.9.23): in each
 // chunk that had candidates before it (INGAME_SRAM_SEARCH_UNDO) and has
 // some after it, the values of those before, from INGAME_SRAM_UNDO_VALUES
 // in their order
@@ -2331,7 +2331,7 @@ EXS static void live_drop(uint32_t addr)
 		((volatile uint32_t *)m.live)[i] = w[i];
 }
 
-// All off and Back to my picks on the cheat list (v0.9.22): the found
+// All off and Back to my picks on the cheat list (v0.9.23): the found
 // cheats on now stop (the live block cleared: no pair writes) and are
 // filed off
 EXT static void found_all_off(void)
@@ -2419,7 +2419,7 @@ EXS static void pointers_find(uint32_t target)
 	debug_number(log_ptr_found, n, log_ptrs);
 }
 
-// Check (v0.9.22): of the list's pointers (those that passed every Check
+// Check (v0.9.23): of the list's pointers (those that passed every Check
 // before), those that point the same way at target now (the value found
 // again after it moved) get INGAME_POINTER_PASSED, the rest lose it. None
 // passing leaves the list as it was. The pointers that pass.
@@ -2759,7 +2759,7 @@ EXS static uint32_t mode_with(uint32_t op, uint32_t sign, uint32_t bcd)
 	return bcd ? CHEATSEARCH_BCD : sign && op >= CHEATSEARCH_EQUALS ? CHEATSEARCH_SIGNED : CHEATSEARCH_UNSIGNED;
 }
 
-// Negative numbers or Stored as toggled (v0.9.22): the filters' numbers as
+// Negative numbers or Stored as toggled (v0.9.23): the filters' numbers as
 // the same numbers read the new way, or their first values where that
 // can't hold them (-5 unsigned, 300 in BCD's two digits)
 EXS static void values_convert(uint32_t sign, uint32_t bcd)
@@ -2866,7 +2866,7 @@ EXS static void search_a(uint32_t r)
 	}
 }
 
-// Between's numbers in order (v0.9.22): From 9 to 2 searches from 2 to 9
+// Between's numbers in order (v0.9.23): From 9 to 2 searches from 2 to 9
 EXS static void between_order(void)
 {
 	uint32_t lo = m.search.value[CHEATSEARCH_BETWEEN], hi = m.search.value_hi, flip = 0;
@@ -2904,7 +2904,7 @@ EXS static void edit_done(void)
 }
 
 // B in a number's edit: the number as it was; on Between's upper, its
-// lower too (v0.9.22: the lower stayed as edited)
+// lower too (v0.9.23: the lower stayed as edited)
 EXS static void edit_cancel(void)
 {
 	if (m.page == PAGE_SEARCH && m.cursor == CHEATSEARCH_BETWEEN && m.edit_stage == 1)
