@@ -361,6 +361,13 @@ cheat-fuzz-decode seed="1" count="1000": emu-image
     @emu/fetch.sh
     {{emu_docker}} tests/cheat_fuzz.sh --decode {{seed}} {{count}}
 
+# Blargg's Game Boy test ROMs and dmg-acid2/cgb-acid2 (fetched into dist/gb-tests on first use, never
+# committed) run through Jagoomba on the emulated cart; the report is dist/gb-tests/report.txt, the
+# acid2 screenshots dist/gb-tests/out/. Reports only: Jagoomba isn't cycle-accurate
+gb-accuracy: build emu-headless
+    tools/gb_tests_fetch.sh
+    {{emu_docker}} tests/gb_accuracy.sh
+
 # Fetch libretro's GBA cheat database again into dist/cheat-corpus (for `just cheat-corpus`)
 cheat-corpus-fetch:
     tools/cheat_corpus_fetch.sh --refresh
@@ -375,6 +382,11 @@ palette:
 font:
     uv run -q tools/font.py assets/fonts/galmuri/Galmuri9.bdf --name body --line-height 12 --squeeze --clip -o source/engine/font_body
     uv run -q tools/font.py assets/fonts/galmuri/Galmuri11-Bold.bdf --name heading --line-height 16 --squeeze --clip -o source/engine/font_heading
+
+# Cut the Korean pack's script glyphs (assets/fonts/galmuri/Galmuri9-hangul.bdf) from the pinned
+# Galmuri release (tools/galmuri.py checks its SHA-256; it fetches the zip into dist/galmuri-full)
+galmuri:
+    python3 -I tools/galmuri.py
 
 # Turn lang/en.ini into source/lang_ids.h and source/lang_en.c (committed;
 # tests/lang_test.py checks they match), and every lang/<code>.ini, and the

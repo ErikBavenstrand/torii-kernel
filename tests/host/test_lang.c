@@ -1,8 +1,10 @@
 // The menu's strings (source/lang.c): filling in, English and a pack's
 // strings, the pack checks, the dates and numbers, and the language list.
+#include <stdio.h>
 #include <string.h>
 
 #include "../../source/engine/script.h"
+#include "../../source/engine/text.h"
 #include "../../source/lang.h"
 #include "../kernel/lang_test_pack.h"
 #include "../kernel/torii_test.h"
@@ -210,15 +212,94 @@ void test_lang_pack_font(void)
 	CHECK_EQ(lang_pack_check_header(pack), LANG_PACK_OK);
 }
 
+// The Korean pack as tools/lang.py builds it (tests/host.sh writes dist/host/ko.lng
+// from lang/ko.ini): its Galmuri blob loads, every Hangul syllable has a glyph
+// in both menu fonts' lines, the text layout hands out script indices, a launch
+// takes them away again, and the strings of the launch sections stay Latin-1
+// (a launch draws what is not as the replacement box)
+static u32 ko_words[0x24000];  // the pack: 64 KB of strings and up to 320 KB of font
+
+void test_lang_korean(void)
+{
+	FILE *f = fopen("dist/host/ko.lng", "rb");
+	CHECK(f != NULL);
+	if (!f)
+		return;
+	u32 size = (u32)fread(ko_words, 1, sizeof(ko_words), f);
+	fclose(f);
+	const u8 *ko = (const u8 *)ko_words;
+	CHECK_EQ(lang_pack_check_header(ko), LANG_PACK_OK);
+	u32 at, bytes;
+	lang_pack_font(ko, &at, &bytes);
+	CHECK(bytes > 0 && bytes <= SCRIPT_MAX && at + bytes == size);
+	CHECK_EQ(lang_pack_check(ko, lang_pack_strings_bytes(ko)), LANG_PACK_OK);
+	CHECK(script_header_ok(ko + at));
+	CHECK_EQ(script_use(ko + at, bytes), 1);
+
+	// Every syllable, the compatibility jamo and the kana have a glyph; Hanja and
+	// the syllables' neighbours don't
+	const struct torii_script *body = script_of(&font_body);
+	CHECK(body != NULL && script_of(&font_heading) != NULL);
+	CHECK(body->glyph_count > 11172);
+	for (u32 cp = 0xAC00; cp <= 0xD7A3; cp++)
+		CHECK(script_glyph(body, cp) >= (int)TORII_FONT_SCRIPT);
+	CHECK(script_glyph(body, 0x314B) >= 0 && script_glyph(body, 0x3131) >= 0 && script_glyph(body, 0x318E) >= 0);
+	CHECK(script_glyph(body, 0x3042) >= 0 && script_glyph(body, 0x30AB) >= 0);
+	CHECK_EQ(script_glyph(body, 0xABFF), -1);
+	CHECK_EQ(script_glyph(body, 0xD7A4), -1);
+	CHECK_EQ(script_glyph(body, 0x4E00), -1);
+	// The heading font draws the body's glyphs on its own baseline
+	CHECK_EQ(script_of(&font_heading)->glyphs, body->glyphs);
+	CHECK_EQ(script_of(&font_heading)->dy, (int)font_heading.baseline - (int)font_body.baseline);
+
+	// "한글 Torii": a script glyph per syllable, ten pixels each, Latin as before
+	static const char hangul[] = "\xED\x95\x9C\xEA\xB8\x80 Torii";
+	u32 pos = 0;
+	int g = text_next_glyph(&font_body, hangul, 6, &pos);
+	CHECK(g >= (int)TORII_FONT_SCRIPT && pos == 3);
+	CHECK_EQ(torii_font_glyph(&font_body, (u32)g)->advance, 10);
+	CHECK(text_next_glyph(&font_body, hangul, 6, &pos) >= (int)TORII_FONT_SCRIPT && pos == 6);
+	CHECK_EQ(text_width(&font_body, hangul, 6), 20);
+	CHECK_EQ(text_width(&font_heading, hangul, 6), 20);
+	CHECK(text_width(&font_body, hangul, (u32)strlen(hangul)) > 20);
+
+	// A launch fills PSRAM: script_drop (lang_before_launch) and they are boxes
+	script_drop();
+	pos = 0;
+	CHECK_EQ(text_next_glyph(&font_body, hangul, 6, &pos), TORII_FONT_REPLACEMENT);
+	CHECK_EQ(pos, 3);
+
+	// The pack's strings: Korean in the menu's sections, English where it leaves them
+	lang_use(ko);
+	CHECK(lang_using_pack());
+	CHECK(!strcmp(S(STR_ITEM_RECENT), "\xEC\xB5\x9C\xEA\xB7\xBC"));  // 최근
+	CHECK(!strcmp(S(STR_INGAME_RESUME), "Resume"));
+	CHECK(!strcmp(S(STR_LAUNCH_PATCHING), "Patching the game"));
+	CHECK(!strcmp(S(STR_HINT_CANCEL), "\xEC\xB7\xA8\xEC\x86\x8C"));  // 취소, the menu's
+
+	// What a launch keeps (lang_keep_launch): Latin-1 only, so no string draws
+	// as boxes once the script font is gone; [hint]'s Korean labels are English
+	static u32 room[LANG_LAUNCH_MAX / 4];
+	CHECK(lang_keep_launch(room, sizeof(room)));
+	for (u32 id = 0; id < STR_LAUNCH_END; id++)
+		for (const char *c = S(id); *c; c++)
+			CHECK((u8)*c < 0xC4);  // ASCII and two-byte Latin-1 only: no Hangul
+	CHECK(!strcmp(S(STR_HINT_CANCEL), "cancel"));
+	CHECK(!strcmp(S(STR_HINT_OK), "OK"));
+	CHECK(!strcmp(S(STR_FORMAT_DATE), "{month}.{day}"));  // the pack's, kept
+	lang_use(NULL);
+}
+
 void test_lang_launch(void)
 {
 	static const struct lang_test_string strings[] = {
 		{STR_LAUNCH_PATCHING, "Patchar spelet"},
 		{STR_INGAME_RESUME, "Fortsätt"},
 		{STR_ITEM_RECENT, "Senaste"},
+		{STR_INGAME_RESET, "R\xCE\xB5set"},  // Greek: no font draws it in a launch
 	};
 	CHECK(STR_INGAME_RESUME < STR_LAUNCH_END && STR_ITEM_RECENT >= STR_LAUNCH_END);
-	u32 size = lang_test_pack(pack, sizeof(pack_words), "sv", "Svenska", strings, 3);
+	u32 size = lang_test_pack(pack, sizeof(pack_words), "sv", "Svenska", strings, 4);
 	CHECK_EQ(lang_pack_check(pack, size), LANG_PACK_OK);
 	lang_use(pack);
 	static u32 room[LANG_LAUNCH_MAX / 4];
@@ -227,9 +308,10 @@ void test_lang_launch(void)
 	CHECK(!strcmp(S(STR_LAUNCH_PATCHING), "Patchar spelet"));
 	CHECK(!strcmp(S(STR_INGAME_RESUME), "Fortsätt"));
 	CHECK(!strcmp(S(STR_INGAME_SAVE), "Save state"));  // the pack lacks it
+	CHECK(!strcmp(S(STR_INGAME_RESET), "Reset game"));  // beyond Latin-1: English
 	CHECK(!strcmp(S(STR_ITEM_RECENT), "Recent"));  // not a launch's: English
 	// No room: English for all
-	size = lang_test_pack(pack, sizeof(pack_words), "sv", "Svenska", strings, 3);
+	size = lang_test_pack(pack, sizeof(pack_words), "sv", "Svenska", strings, 4);
 	lang_use(pack);
 	CHECK(!lang_keep_launch(room, 2 * STR_LAUNCH_END + 4));
 	CHECK(!lang_using_pack());

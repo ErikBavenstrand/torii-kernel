@@ -1,0 +1,23 @@
+# ingame-cheats.opts in Korean: lang/ko.ini's pack set in Settings (slot 0, its
+# id 0xBB63). A launch fills PSRAM and drops the pack's script font
+# (script_drop), so the in-game menu draws what is Hangul as the replacement
+# box: the cheats' names (tests/shots/data/ko-hello.cht: Hangul, kana and Latin
+# in one name) show boxes where the characters are, and every string the in-game
+# menu shows is English, since the pack leaves those sections out for this
+# reason. Over Hello.gba with Save states on, dark theme: the menu, then the
+# cheat list.
+#! settings 0=47971
+#! settings 2=1
+#! sd-file /torii/lang/ko.lng 0 dist/lang/ko.lng
+#! sd-file /torii/cheats/Hello.cht 0 tests/shots/data/ko-hello.cht
+-w "nav: home ready"
+-P "@8:nav_test_path:/Hello.gba" -p @8:nav_test_action:0x7E000002
+-w "launch: starting the game"
+-k @300:L+R+START -k @306:-
+-w "screen ready: ingame"
+-s @1:menu.png
+-k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:A -k @48:-
+-w "screen ready: ingame-cheats"
+-s @4:list.png
+-k @10:DOWN -k @14:-
+-s @24:second.png

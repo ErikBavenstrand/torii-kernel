@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Writes a tiny Game Boy ROM for tests/gb_save.sh: usage gb_rom.py OUT.gb [8]
+"""Writes a tiny Game Boy ROM for tests/gb_save.sh: usage gb_rom.py OUT.gb [8] [dual|gbc|sgb|none] [TITLE]
 
 Written for Torii's tests (no third-party code), so it can live in the
 repo. MBC5 with 32 KB of battery-backed RAM (cart type $1B, RAM size $03),
@@ -35,13 +35,18 @@ def program(banks: int) -> bytes:
     return bytes(code)
 
 
-def rom(ram_kb: int = 32) -> bytes:
+def rom(ram_kb: int = 32, mode: str = "", title: str = "SAVETEST") -> bytes:
     data = bytearray(0x8000)
     data[0x100:0x104] = bytes([0x00, 0xC3, 0x50, 0x01])  # NOP, JP $0150
     data[0x104:0x108] = bytes(
         [0xCE, 0xED, 0x66, 0x66]
     )  # what Jagoomba checks of the header (gbx_id)
-    data[0x134:0x13C] = b"SAVETEST"
+    data[0x134 : 0x134 + len(title)] = title.encode()
+    if mode in ("dual", "gbc"):
+        data[0x143] = 0x80 if mode == "dual" else 0xC0  # GBC-compatible / only
+    if mode in ("dual", "sgb"):
+        data[0x146] = 0x03  # SGB functions
+        data[0x14B] = 0x33  # old licensee code that says the header has the new one
     data[0x147] = 0x1B  # MBC5+RAM+BATTERY
     data[0x148] = 0x00  # 32 KB ROM
     data[0x149] = 0x03 if ram_kb == 32 else 0x02  # 32 or 8 KB RAM
@@ -53,4 +58,6 @@ def rom(ram_kb: int = 32) -> bytes:
 
 if __name__ == "__main__":
     with open(sys.argv[1], "wb") as f:
-        f.write(rom(int(sys.argv[2]) if len(sys.argv) > 2 else 32))
+        args = sys.argv[2:]
+        kb = int(args.pop(0)) if args and args[0].isdigit() else 32
+        f.write(rom(kb, *args[:2]))

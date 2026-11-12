@@ -14,6 +14,9 @@ DEST SIZE SRC" copies SRC to DEST on the card, padded with 0xFF to SIZE
 bytes: a game large enough for a progress bar to move (boot-progress-big),
 or, with SIZE 0 and SRC /dev/null, an empty file in place of one (quote a
 DEST with spaces).
+"#! sd-put DEST SRC" copies SRC to DEST through the kernel's own FatFs
+(tools/sdimg.sh), which writes UTF-8 names as they are: a game named in
+Hangul (ko-games-gba). DEST's folder must exist.
 "#! sd-rm PATH" deletes PATH (a file or a whole folder) from the card first,
 so a later sd-file can put a file in its place (nor-launch-fail).
 "#! sd-fragmented DEST SIZE RUNS SRC" copies SRC, padded with zeros to SIZE
@@ -320,6 +323,9 @@ def boot(name: str, sd: Path, cart: Path, out: Path, extra: list[str] = ()):
                 ]
             )
             padded.unlink()
+        elif line.startswith("#! sd-put "):
+            _, _, dest, src = shlex.split(line)
+            run(["tools/sdimg.sh", str(cart / "sd.img"), "put", src, dest])
         elif line.startswith("#! sd-fragmented "):
             _, _, dest, size, runs, src = line.split(maxsplit=5)
             data = Path(src).read_bytes()

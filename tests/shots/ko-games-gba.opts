@@ -1,0 +1,34 @@
+# games-gba.opts in Korean: lang/ko.ini's pack set in Settings (slot 0, its id
+# 0xBB63), so every string the scenario shows is Korean, at its width. Three
+# games have Hangul in their file names (written through FatFs's UTF-8 API,
+# `#! sd-put`), one a name's worth of syllables with a space and a digit,
+# so the list, the popup, the delete question and Game info's page (a heading
+# font title, drawn with the body font's Hangul glyphs) show names as they
+# are on the card. The GBA page (source/screens/games.c) in the light theme:
+# the list (the Hangul names sort after the Latin ones), START opens the game
+# popup on the first one, its Delete asks, Game info shows the page.
+#! settings 0=47971
+#! settings 28=1
+#! sd-file /torii/lang/ko.lng 0 dist/lang/ko.lng
+#! sd-put "/한글 게임 1.gba" tests/roms/hello/hello.gba
+#! sd-put "/가나다라마바사.gba" tests/roms/hello/hello.gba
+#! sd-put "/뷁 쀍 ㅋㅋㅋ ひらがな.gba" tests/roms/hello/hello.gba
+#! sd-file "/torii/saves/한글 게임 1.gba/Main.sav" 0x2000 /dev/null
+-p 30:nav_test_action:2113929225
+-w "nav: test hook 9 "
+-w "nav: home ready"
+-k @8:RIGHT -k @12:-
+-k @20:A -k @24:-
+-w "nav: page gba ready"
+-s @2:screen.png
+-k @8:LEFT -k @12:-
+-k @40:START -k @44:-
+-w "screen ready: game-popup"
+-s @8:popup.png
+-k @20:UP -k @24:- -k @64:A -k @68:-
+-s @80:delete.png
+-k @88:B -k @92:-
+-k @112:UP -k @116:-
+-k @124:A -k @128:-
+-w "screen ready: game-info"
+-s @20:info.png

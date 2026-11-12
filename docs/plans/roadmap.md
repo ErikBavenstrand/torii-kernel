@@ -47,6 +47,8 @@ Each release's details are in `CHANGELOG.md`; the planning, ticket reports and r
 - **v0.9.19 Kerning and script fonts (2026-11-02):** kerning (13 left glyphs, 224 and 174 pairs in the body and heading fonts, picked by their ink: a variant of the left glyph a pixel narrower, one rule in `text_layout`, `text_width`, the labels, rename's wrapping, the copy's percentage and the in-game menu's lines); a language pack's script font (`font` in `[meta]`, `source/engine/script.h`; glyph indices are 16-bit; the pseudo-locale en-XA has numbered boxes for Greek, Cyrillic and kana, golden `lang-script`); frame figures leave out the log flush and the timing summary no longer pushes older lines out; the Swedish terms reviewed; `tests/cheats.sh` passed 5 runs in a row after the SIGPIPE fix.
 - **v0.9.20 Licences (2026-11-02):** `THIRD_PARTY_NOTICES.md` (each part's copyright and licence) and `licenses/`, attached to each release as `torii-licenses.zip`; the release binary is under the GNU GPL 3 or later (it contains minilzo); Info's Credits names the kernel base, FatFs, libgba and minilzo; the roadmap's baseline, slot and power-off items closed; Emerald's sleep confirmed on the real cart.
 - **v0.9.21 Analysis and slots (2026-11-02):** the static-analysis baseline from 97 findings to none (fixed in the code, or a false alarm marked beside it with its reason); Settings, Saves, Ask for a slot (off plays the active slot; SELECT with A still asks); a test for it.
+- **Tracker items (2026-11-02):** `just gb-accuracy` runs Blargg's tests and the acid2 ROMs through Jagoomba (15 of 54 pass, all `cpu_instrs`; the rest is Jagoomba's accuracy, not fixed), `tests/gb_mode.sh` checks GBC/SGB/DMG mode and the default palette (jagoombacolor#42, #34); PocketNES#14 multiboot closed as nothing to do.
+- **v0.9.22 Korean (2026-11-11):** the first real script font: `lang/ko.ini` with Galmuri9's 11,172 Hangul syllables, compatibility jamo and kana (273 KB of the pack's 320 KB in PSRAM; `tools/galmuri.py` cuts them from the pinned release), drafted and marked `review = pending`, so `dist/lang/ko.lng` builds but the release's `torii-lang.zip` leaves it out until a native speaker has read it; a launch keeps any of its strings beyond Latin-1 in English, so the in-game menu and a launch's dialogs never draw a replacement box for the pack's own text (a cheat's or game's Hangul name still does); goldens in Korean, with Hangul file names listed, launched, saved under and back to Torii.
 
 ## Open work, before 1.0
 
@@ -59,12 +61,6 @@ Each release's details are in `CHANGELOG.md`; the planning, ticket reports and r
 Code fixes that the emulator can test, plus the leftovers from v0.9.
 
 
-### Menus
-
-The UX reviews' open proposals (`docs/design/v0.5/ux-review.md`, `settings-ux-review.md`) and the owner's asks.
-
-- **The SD page's Play « »** stays beside Game info's Boot mode (decided in v0.9.18): its file info is a text dialog, and a Boot mode there needs an editable page. Play names default's way as the lists do.
-
 ### In game
 
 - **Sound after LOAD (1.0?):** games on Nintendo's MP2000 engine keep the PCM buffer's position in RAM, which could re-sync DMA1 at LOAD.
@@ -74,32 +70,16 @@ The UX reviews' open proposals (`docs/design/v0.5/ux-review.md`, `settings-ux-re
   - **Cart check:** a pointer kept in Pokémon Emerald (money through gSaveBlock1Ptr) across a door.
   - **Untested:** a card write that fails while filing (the records wait for the next boot); a 32-bit search with large values and 16 different addresses kept, in the emulator.
 
-### Fonts and scripts
+### Languages
 
-- **A real script font (1.0?):** the mechanism ships in v0.9.19 (a pack's `font` in `[meta]`, loaded into the 320 KB in PSRAM, tested with the numbered boxes of en-XA), but no pack has a font yet: it needs a full BDF with an open licence (Galmuri's Hangul and kana, say; the repository holds its Latin-1 subset only) and a translation to go with it. The in-game menu (`ingame.c`) and a launch's dialogs draw those characters as the replacement box, since a launch fills PSRAM.
+- **Korean review:** `lang/ko.ini` was drafted by Claude and no native speaker has read it, so the release's `torii-lang.zip` leaves it out (only a build from source makes `ko.lng`). After a review, set `review = done` in its `[meta]` and the next release ships it.
 
 ### Emulators and cheats
 
 - **(1.0?) Hi-colour GBC:** these games lose mid-frame palette writes (jagoombacolor#20, #53). A per-line palette path in Jagoomba needs about 18 KB and its last DMA channel (`docs/research/gbc-hicolor.md`).
 - **(1.0?) GB, GBC and NES cheats** (owner, 2026-10-25): libretro's GameShark and Game Genie files, with the codes passed to Jagoomba and PocketNES. **Built but not released** (owner, 2026-11-02: the quality can't be guaranteed yet): Game Genie as ROM patches, GameShark `01` and `90`-`97` and NES raw pokes as per-frame writes, typing codes on the cart; emulator-tested, with 84% of GB, 87% of GBC and 99.5% of NES cheats in libretro's files running, and a first real-cart pass (Pokémon Red's HP poke, Crystal's Game Genie). The work stays unpublished until a fuller real-cart check (Zelda II and other NES codes, a banked game, a save left clean, speed and sound with many pokes) passes and the owner says to ship it.
 - **(maybe) Live values in game** (owner, 2026-10-30: less useful than the rest): each cheat in the in-game list shows the value now at the address it writes ("Money 3,421"), with digits the kernel draws for the overlay. Encrypted values (Pokémon's money) would read as nonsense.
-- From the trackers: jagoombacolor#42 accuracy tests, #43 a GBC-compatible ROM run as DMG, #34 the default palette; PocketNES#14 multiboot.
-
-### Licences
-
-- **Ask Jaga (jagoombacolor) and Dwedit (Goomba Color, PocketNES) to put a licence in their repositories**, or to say in writing that Torii may build and release their code with our patches. Neither repository has one, and the release's binary includes both (`THIRD_PARTY_NOTICES.md`, "Open points"). Nothing else in the licence audit is open.
-
-### Research (doesn't block 1.0 unless a finding does)
-
-- **Hardware probes** (`docs/research/omega-de-hardware.md`):
-  - Is an SD write right after the FPGA's ROM copy safe?
-  - What does the real BIOS do on an undefined instruction? The crash handler can't catch a crash that turns IRQs off or loops inside the kernel.
-  - Where does a DMA into PSRAM from cart space land?
-  - WAITCNT `0x4018` for control-register writes, SD, NOR and the RTC.
-  - HBlank DMA into palette RAM at the theme wipe's edge, and mid-frame mode switching.
-  - The open register questions: the `0x09E00000` status values, `0x096C0000` auto-save, Mode B's slot, the frames at minor `0x17`, what `0x09700000` changes in the ROM map, and how the unlock sequence is checked.
-  - A blue EZODE-B's raw version word and NOR IDs, if an owner of one can read them.
-- **Unverified:** "chip select high" as mid-read assumes the RTC port reads back its output pins. That holds in mGBA but hasn't been checked on the cart.
+- From the trackers (checked 2026-11-02, `docs/research/gba-emulators.md`): jagoombacolor#43 stays open until someone has the issue's ROM (Super Connard, patched): Torii's mode logic is tested and right for `$143 = $80`/`$C0`. #34's remaining part is a taste call: a global default palette for games the GBC table doesn't know (grey today).
 
 ### Known limits (accepted, no work planned)
 
@@ -117,6 +97,26 @@ The UX reviews' open proposals (`docs/design/v0.5/ux-review.md`, `settings-ux-re
   - The session record in cart RAM page `0xF0` doesn't survive a power cycle.
   - EZ-Flash's loader installs only the first 3 MB of `ezkernelnew.bin` (`tools/omega_image.py` enforces it).
   - `Save_savefile`'s second half runs frames with SRAM page 0x10 selected, and `FRAM_save_op` runs frames with a file open. Both are safe today and commented.
+
+## After 1.0
+
+Taken off the 1.0 list (owner, 2026-11-11).
+
+### Licences
+
+- **Ask Jaga (jagoombacolor) and Dwedit (Goomba Color, PocketNES) to put a licence in their repositories**, or to say in writing that Torii may build and release their code with our patches. Neither repository has one, and the release's binary includes both (`THIRD_PARTY_NOTICES.md`, "Open points"). Nothing else in the licence audit is open.
+
+### Research
+
+- **Hardware probes** (`docs/research/omega-de-hardware.md`):
+  - Is an SD write right after the FPGA's ROM copy safe?
+  - What does the real BIOS do on an undefined instruction? The crash handler can't catch a crash that turns IRQs off or loops inside the kernel.
+  - Where does a DMA into PSRAM from cart space land?
+  - WAITCNT `0x4018` for control-register writes, SD, NOR and the RTC.
+  - HBlank DMA into palette RAM at the theme wipe's edge, and mid-frame mode switching.
+  - The open register questions: the `0x09E00000` status values, `0x096C0000` auto-save, Mode B's slot, the frames at minor `0x17`, what `0x09700000` changes in the ROM map, and how the unlock sequence is checked.
+  - A blue EZODE-B's raw version word and NOR IDs, if an owner of one can read them.
+- **Unverified:** "chip select high" as mid-read assumes the RTC port reads back its output pins. That holds in mGBA but hasn't been checked on the cart.
 
 ## Process
 

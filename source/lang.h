@@ -148,7 +148,8 @@ void lang_use(const u8 *pack);
 int lang_using_pack(void);
 // Copies the launch's strings (ids below STR_LAUNCH_END) of the pack in use
 // into room (bytes long, word-aligned), and reads them there from now on;
-// every other string shows in English. Returns 0 (and uses English) if
+// every other string shows in English, and so does a launch string with a
+// character beyond Latin-1 (the launch drops the script font: script_drop). Returns 0 (and uses English) if
 // they don't fit, which tools/lang.py's LANG_LAUNCH_MAX keeps from
 // happening.
 int lang_keep_launch(void *room, u32 bytes);

@@ -6,6 +6,14 @@ git log, not here.
 
 ## Unreleased
 
+- **Added:** a Korean pack, `lang/ko.ini`, with Galmuri9's Hangul, jamo and
+  kana as its script font (273 KB of the 320 KB). It is a draft no native
+  speaker has read (`review = pending`), so `torii-lang.zip` leaves it out;
+  `just build` makes `dist/lang/ko.lng`. (78796807)
+- **Changed:** a launch keeps any of its strings beyond Latin-1 in English, as
+  it would draw them as boxes once the script font is dropped, so packs can
+  translate the menu's hints (Korean's 취소). (ebd51129)
+
 - **Changed:** the last 8 static-analysis findings (cppcheck's
   `constParameterCallback` on job steps and text providers, whose parameter
   types the callback types fix) are marked beside the code with their reason,

@@ -1,0 +1,13 @@
+cheats = 3
+
+cheat0_desc = "무한 생명"
+cheat0_code = "32001000 0063"
+cheat0_enable = true
+
+cheat1_desc = "달 점프 (ムーンジャンプ)"
+cheat1_code = "74000130 03FE+32001004 0001"
+cheat1_enable = true
+
+cheat2_desc = "Super speed 초고속"
+cheat2_code = "32001008 0001"
+cheat2_enable = false

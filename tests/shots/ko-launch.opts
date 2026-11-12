@@ -1,0 +1,28 @@
+# A game with a Hangul file name launched in Korean, and back (lang/ko.ini's
+# pack in Settings, slot 0, its id 0xBB63): FatFs opens the UTF-8 name as it
+# is and the game starts; the launch drops the script font (the game fills
+# PSRAM), so the in-game menu is English and draws the name's Hangul as
+# replacement boxes; Back to Torii restarts the kernel, which loads the pack
+# and its 273 KB of Galmuri glyphs again: the boot's question about the game's
+# save (its Hangul folder under /torii/saves), home (facing Recent) and
+# Recent's page, with the game's Hangul name, draw Hangul.
+#! settings 0=47971
+#! settings 2=1
+#! sd-file /torii/lang/ko.lng 0 dist/lang/ko.lng
+#! sd-put "/한글 게임.gba" tests/roms/hello/hello.gba
+-w "nav: home ready"
+-P "@8:nav_test_path:/한글 게임.gba" -p @8:nav_test_action:0x7E000002
+-w "launch: starting the game"
+-k @300:L+R+START -k @306:-
+-w "screen ready: ingame"
+-s @1:ingame.png
+-k @40:UP -k @44:- -k @52:A -k @56:-
+-w "lang: ko's script font"
+-w "screen ready: dialog"
+-s @4:dialog.png
+-k @8:A -k @12:-
+-w "nav: home ready"
+-s @2:home.png
+-k @8:A -k @12:-
+-w "nav: page recent ready"
+-s @2:recent.png
