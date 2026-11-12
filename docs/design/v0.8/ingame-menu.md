@@ -32,15 +32,18 @@ work RAM*), so page `0x20` is offset `0x20000`.
 | `0x00000-0x1FFFF` | the game's save |
 | `0x20000-0x3FFFF` | the overlay's backups: OBJ VRAM (16 KB), OAM (1 KB), OBJ palette (512 B), the EWRAM window (24 KB), registers |
 | `0x40000-0xAFFFF` | the save-state buffer (unchanged) |
-| `0xB0000-0xB5FFF` | the overlay's image |
+| `0xB0000-0xB5FFF` | the overlay's image: its core, which the stub loads (v0.9.22: its extension moved to `0xF2000`) |
 | `0xB6000-0xBFFFF` | the session block, kernel to overlay and back |
 | `0x2C800-0x2D9FF` | the game's IWRAM a screenshot's packing borrows (its table, buffer and ARM code) |
 | `0x2E000-0x2E0CF` | the cheats the cheat search found, for Back to Torii (v0.9, `struct ingame_found`) |
 | `0x30000-0x3C0FF` | the cheat list's names whole, for the highlighted row's marquee (v0.10, `struct ingame_wide`) |
-| `0x3C400-0x3F10F` | the cheat search's lines and number glyphs (v0.9: the session block has no room) |
+| `0x3C100-0x3FFFF` | the cheat search's lines (v0.9: the session block has no room); its glyphs at `0x2DA00` |
 | `0x40000-0x91FFF` | while a cheat search runs, in the save-state buffer: its snapshot, candidates and head ([v0.9/cheat-search.md](../v0.9/cheat-search.md)) |
 | `0xC0000-0xEFFFF` | the screenshots (P4): up to 5 records of `struct ingame_shot` and the packed palettes, OAM, VRAM |
-| `0xF0000` | the cart log (`source/cartlog.h`) |
+| `0xF0000-0xF1FFF` | the cart log (`source/cartlog.h`); at `0xF1D00`, found cheats a boot couldn't file, with their game's path (v0.9.22, `struct ingame_found_wait`) |
+| `0xF2000-0xF6FFF` | the overlay's extension and IWRAM code (v0.9.22, `INGAME_SRAM_EXT`): the cart log's room for a launch's cheat patches, free once the launch applied them |
+| `0xF7000-0xFDFFF` | the cheat search's Undo: the snapshot's values the last pass wrote over (v0.9.22) |
+| `0xFE000-0xFFFFF` | the cheat search's lines past the first block's 60, and the Cheat search row with its count (v0.9.22) |
 
 ### The ABI
 
@@ -130,8 +133,10 @@ write-only, so a menu on a BG can't give them back (today's BG2 affine bug).
   the kernel's check mark, then "All off", "Back to my picks" and "Cheat search" in the
   accent, as the kernel's list ends in "+ Add code"; the cursor starts on the first cheat.
   The title shows how many are on ("✓ 3/8"), drawn with the kernel's number glyphs. LEFT
-  and RIGHT page through it. The list's own code (the count, toggling, the marquee) and the
-  lists' scrolling are the extension's (ext_load, as the cheat search's): every byte of the
+  and RIGHT page through it. The list's own code (the count, toggling, the marquee, its
+  footers) and the lists' scrolling are the extension's first part (ext_load; v0.9.22 split
+  the extension in two, the lists' 3.4 KB and the search's, which only the search pages
+  load, each read back and checked, so the save and cheat pages open as fast as before): every byte of the
   overlay's image costs the menu's opening time, since the stub backs up the window and
   loads the image at each opening; 400 more bytes cost it a frame. Its footer
   says why the row under the cursor can't change, else that the toggles are kept.

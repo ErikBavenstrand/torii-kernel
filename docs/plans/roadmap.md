@@ -48,6 +48,7 @@ Each release's details are in `CHANGELOG.md`; the planning, ticket reports and r
 - **v0.9.20 Licences (2026-11-02):** `THIRD_PARTY_NOTICES.md` (each part's copyright and licence) and `licenses/`, attached to each release as `torii-licenses.zip`; the release binary is under the GNU GPL 3 or later (it contains minilzo); Info's Credits names the kernel base, FatFs, libgba and minilzo; the roadmap's baseline, slot and power-off items closed; Emerald's sleep confirmed on the real cart.
 - **v0.9.21 Analysis and slots (2026-11-02):** the static-analysis baseline from 97 findings to none (fixed in the code, or a false alarm marked beside it with its reason); Settings, Saves, Ask for a slot (off plays the active slot; SELECT with A still asks); a test for it.
 - **Tracker items (2026-11-02):** `just gb-accuracy` runs Blargg's tests and the acid2 ROMs through Jagoomba (15 of 54 pass, all `cpu_instrs`; the rest is Jagoomba's accuracy, not fixed), `tests/gb_mode.sh` checks GBC/SGB/DMG mode and the default palette (jagoombacolor#42, #34); PocketNES#14 multiboot closed as nothing to do.
+- **Cheat search's 1.0 review (2026-11-12):** pointer finds picked only after a Check, which marks rather than drops (the list kept when none pass, the list before the Check shown again, Find asks before it replaces one); the interpreter writes through a pointer only into EWRAM and IWRAM; Undo puts the snapshot's values back; the IWRAM a pass borrows and the EWRAM under the search's code read back from cart SRAM first; the hook's words out of the searched run (a stack top in EWRAM); New search and Save state ask first; a found code filed once, the boot says what it filed or why it couldn't, and records the card refused wait with their game; the numbers converted with Negative numbers and BCD, From A to B in order; All off stops the found cheats on now; the menu's row counts the candidates; `tests/search_more.sh` (Undo, 16 finds at 32 bits, the live block's three, Sleep and Reset mid-search, cart SRAM and card faults, a stack in EWRAM, a pointer to VRAM, a cut mid-pass). The overlay's extension is in two parts in cart SRAM page `0xF0`, so the menu still opens in 4 frames.
 - **v0.9.22 Korean (2026-11-11):** the first real script font: `lang/ko.ini` with Galmuri9's 11,172 Hangul syllables, compatibility jamo and kana (273 KB of the pack's 320 KB in PSRAM; `tools/galmuri.py` cuts them from the pinned release), drafted and marked `review = pending`, so `dist/lang/ko.lng` builds but the release's `torii-lang.zip` leaves it out until a native speaker has read it; a launch keeps any of its strings beyond Latin-1 in English, so the in-game menu and a launch's dialogs never draw a replacement box for the pack's own text (a cheat's or game's Hangul name still does); goldens in Korean, with Hangul file names listed, launched, saved under and back to Torii.
 
 ## Open work, before 1.0
@@ -64,11 +65,8 @@ Code fixes that the emulator can test, plus the leftovers from v0.9.
 ### In game
 
 - **Sound after LOAD (1.0?):** games on Nintendo's MP2000 engine keep the PCM buffer's position in RAM, which could re-sync DMA1 at LOAD.
-- **Cheat search (shipped in v0.9.7–v0.9.10; [design](../design/v0.9/cheat-search.md)):** what is left of it. Reviewed 2026-10-31 (a code reviewer and an adversarial tester in the emulator); the review's fixes shipped. Open:
-  - **Contestable decisions:** it borrows the save-state buffer (no other cart SRAM has 288 KB), so a state not yet on the card blocks it and saving a state ends it; a game whose stack top is the BIOS's default (`0x03007F00`) gets its stack 32 bytes lower for the live block, others none (Street Fighter Alpha 3, top `0x03007EC0`, crashed with it: "on now" sets the value once there); the Cheat search row is on the Cheats page when the game has a cheat list (the menu has room for nine rows); the menu's lines past the seventh draw a frame later, with the footer.
-  - **Not done:** naming a found cheat in game (the overlay has no font or keyboard: rename it on the Cheats page); more than one Undo (the buffer's 288 KB leaves no room for a second copy: `cheat-search.md`); pointer chains (one level only); "on now" through a pointer (set once instead); a memory view around a candidate; VRAM, palette and OAM searches.
-  - **Cart check:** a pointer kept in Pokémon Emerald (money through gSaveBlock1Ptr) across a door.
-  - **Untested:** a card write that fails while filing (the records wait for the next boot); a 32-bit search with large values and 16 different addresses kept, in the emulator.
+- **Cheat search (shipped in v0.9.7–v0.9.10; [design](../design/v0.9/cheat-search.md)):** the 1.0 review's fixes are done (Done); what stays is a cart check, and the rest is in Known limits.
+  - **Cart check:** a pointer kept in Pokémon Emerald (money through gSaveBlock1Ptr) across a door; the menu's opening and the search pages on the real cart with the two-part extension in cart SRAM page `0xF0`.
 
 ### Languages
 
@@ -83,6 +81,13 @@ Code fixes that the emulator can test, plus the leftovers from v0.9.
 
 ### Known limits (accepted, no work planned)
 
+- **Cheat search:**
+  - It borrows the save-state buffer (no other cart SRAM has 288 KB), so a state not yet on the card blocks it and saving a state ends it (Save state asks first).
+  - A game whose stack top is the BIOS's default (`0x03007F00`) gets its stack 32 bytes lower for the live block, others none (Street Fighter Alpha 3, top `0x03007EC0`, crashed with it): there "on now" is "set now", set once and held from the next launch. Emerald, Mario Kart, GTA, Metroid and F-Zero log stack literal 0 and have no live block.
+  - One Undo; when a pass writes over more snapshot values than its 28 KB of Undo room holds, the filters against the last scan wait, after an Undo, for one against a number.
+  - Pointer chains (one level only); "on now" through a pointer (set once, and only after a Check); naming a found cheat in game (no font or keyboard: rename it on the Cheats page); a memory view around a candidate; VRAM, palette and OAM searches.
+  - A found code is looked for in a larger cheat file's last window only.
+  - The Cheat search row is on the Cheats page when the game has a cheat list (the menu has room for nine rows); the menu's lines past the seventh draw a frame later, with the footer.
 - **In-game menu:**
   - The game's name shows above the rows only when they leave room. That's by design: the game is on screen behind the menu.
   - A 32 MB ROM with no padding gets the in-game code over its last bytes, as the official kernel did.

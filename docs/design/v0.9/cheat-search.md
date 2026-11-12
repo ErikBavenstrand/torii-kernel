@@ -40,6 +40,12 @@ screenshots. So the search **borrows the save-state buffer**:
 | `0x9B000-0xA3FBF` | the candidates the first filter left, for Compare with the first scan |
 | `0xA4000-0xAFF7F` | their values at the first scan, one after another (49,024 bytes) |
 
+And in the cart log's page (`0xF0000`), past what it keeps for the next
+boot (v0.9.22): the overlay's extension at `0xF2000` (the room a launch's
+cheat patches take until the launch applied them), Undo's values at
+`0xF7000-0xFDFFF` (28 KB), and the search's lines past the first block's
+60 at `0xFE000`, with the Cheat search row and its count after them.
+
 The buffer's tag, mark and info (`0xAFF80-0xAFFFF`) are left alone except
 that starting a search zeroes the mark and the tag's magic: Load state then
 has nothing to load, and the kernel's next boot neither files the buffer
@@ -64,7 +70,20 @@ has nothing to load, and the kernel's next boot neither files the buffer
 `struct ingame_found` at `0x2E000`, in the backups' page window after the
 screenshot's IWRAM backup (which ends at `0x2DA00`): a magic, a count and up
 to 16 records (address, value, size, on now). The overlay writes a record and
-then the count. Back to Torii (`ingame_after_game`) files them.
+then the count. Back to Torii (`ingame_after_game`) files them. Keeping a
+place again (another value, or on now) replaces its record (v0.9.22); the
+head's flags say one is on now in the live block, for Reset game's footer.
+
+### What is Torii's in the searched run (v0.9.22)
+
+A game whose stack top is in EWRAM (`0x0203FFFC`, `Get_spend_address`) has
+the hook's spend area, `0x0203FF7C-0x0203FFFB`, in the searched run: a
+candidate there is the hook's saved registers. Every pass drops the
+elements over the spend area (and the live block after it), and over the
+IRQ stack's frames under the menu wherever the game put that stack; the
+pointer scan skips words there, a candidate there can't be kept, and Set now
+and a pointer's write go only into RAM. `tests/search_more.sh ewram`
+patches the test ROM's stack top to `0x0203FFFC`: Start leaves 294,272.
 
 ### Turning one on now: the live block
 
@@ -90,12 +109,16 @@ the block (a game that resets its stack to the old top) writes nothing. The
 pairs are constant writes, as the cheat filed for them is. The BIOS's
 SoftReset (Reset game) clears the block if it is in IWRAM's last 512 bytes;
 a game that clears its RAM at its start clears it too, else it runs on, as
-the filed cheat would.
+the filed cheat would. The Reset game row's footer says it stops them
+(v0.9.22). All off and Back to my picks on the cheat list clear the block
+too and file the found cheats off: they weren't picked at launch.
 
 The live block needs the interpreter, which a launch puts in only with cheats
 on and a table (`Patch_RTS_Cheat`); the session's `live_at` is 0 otherwise,
 and for a NOR game written before (whose patch is burned in). Then "on now"
-becomes **set now**: the overlay writes the value once as the game resumes.
+becomes **set now** ("Keep it, set now"): the overlay writes the value once
+as the game resumes, and the footer says so: "Set once; held from next
+launch".
 Either way the cheat is filed, and picked when "on now" was chosen, so it
 runs from the next launch.
 
@@ -110,7 +133,9 @@ narrows. The game is frozen meanwhile; the footer says "Searching..." first.
 
 The compare runs as ARM from the game's IWRAM, which the pass borrows as the
 screenshot's packing does (kept at `INGAME_BACKUP_SHOT` meanwhile, and read
-from there as searched RAM), with its chunk buffers: in Thumb from the
+from there as searched RAM; v0.9.22: read back first, written once more if
+it didn't, and on a second mismatch the pass doesn't run and the footer
+says cart memory failed a check), with its chunk buffers: in Thumb from the
 window the first pass took 190 frames, most of it the compare's registers
 spilling to the window's slow stack; it is one copy per size so they stay
 in registers. Equals compares against a chunk filled with its value, so it
@@ -171,8 +196,19 @@ a signed compare.
   (a door, a reload), the player finds it again with a new search, and
   Check the pointers found keeps those that point the same way at the new
   address. A pointer from the page is kept as `[POINTER]+OFFSET:VALUE`, a
-  pointer code the cheat interpreter already runs (AnyGBA's raw extension),
-  picked; in game it is set once, as the live block takes plain addresses.
+  pointer code the cheat interpreter already runs (AnyGBA's raw extension);
+  in game it is set once, as the live block takes plain addresses.
+  v0.9.22: Check marks the pointers that pass (`INGAME_POINTER_PASSED`)
+  rather than dropping the rest, so a Check that passes none leaves the
+  list as it was (and says so), and the page's last row shows the list as
+  Find made it ("All found before the check") or back. Find asks for A
+  again before it replaces a list. A on a pointer keeps it on (picked, set
+  now) only once it passed a Check, else off ("Kept, off: check it to turn
+  it on"); SELECT keeps it off. The page's title counts what it shows ("12
+  found", "3 passed the check"), its footer says what A does, and after a
+  scan that was full that the real pointer may be missing. The interpreter
+  writes through a pointer only into EWRAM and IWRAM (`in_ram` in
+  `cheatrun.s`), so a pointer the game later reuses writes nothing.
   One level: a chain of pointers isn't followed. `tests/search.sh ptr` moves
   a block of BCD coins and keeps them through the pointer to it.
 - **Room:** the glyphs moved to `0x2DA00` and the search's lines start at
@@ -206,16 +242,32 @@ the Cheats page (after All off and Back to my picks) when the game has a
 cheat list, and the menu's own row (where Cheats would be) when it has none.
 Its page:
 
+- **The menu's row** (or the cheat list's) shows the candidates left while
+  a search runs ("Cheat search: 1,204 left"): the extension writes that line
+  to cart SRAM at each pass, so the menu draws it without loading the
+  extension (v0.9.22).
 - **No search:** Size (8, 16 or 32 bits; A cycles it) and Start search. The
   footer: what Start does, or why it can't.
 - **A search:** Same as before, Changed, Went up, Went down, Equals N, Show
   them (greyed until 1-32 are left), Undo the last, New search. Each filter
   first copies the candidates to `INGAME_SRAM_SEARCH_UNDO` (`0x92000`, at
   most 36,800 bytes; about 10 frames at 8 bits), so a filter picked by
-  mistake doesn't end the search: Undo puts them back (once). The snapshot
-  keeps the undone pass's values, so the next filter compares against those
-  (in a chunk the pass emptied, against the values before it). The footer shows how many are
-  left ("1,204 left"), or "None left" or "Searching...".
+  mistake doesn't end the search: Undo puts them back (once). v0.9.22: the
+  pass also keeps, for each chunk whose snapshot it writes over, the values
+  of the candidates before it (`cheatsearch_pack`, at `0xF7000`, 28 KB), and
+  Undo puts them back in the snapshot, so the next relative filter compares
+  as it would have before the undone pass (lives 5 to 4, Went up by mistake,
+  Undo, Went down keeps the lives). When they don't fit (a first filter over
+  much of RAM), the filters against the last scan are greyed after the Undo
+  ("Undone: compare with a number") until a pass against a number, which
+  takes the values now. The footer shows how many are
+  left ("1,204 left"), or "None left" or "Searching...". New search asks for
+  A again; so does a Save state slot while a search runs (it ends the
+  search), and the Save state row's footer says so at every opening. Show
+  them greyed says how many are left and to narrow to 32. Negative numbers
+  and Stored as convert the filters' numbers (one the new way can't hold
+  goes back to 0, By's to 1); From A to B searches in order whichever is
+  typed first, and B on its second number cancels both.
 - **Equals N** edits N in place: A starts the edit with the cursor on the
   last digit, LEFT and RIGHT pick a digit, UP and DOWN change it, A searches,
   B leaves N as it was. N has the size's digits (3, 5 or 10) and can't pass
@@ -224,7 +276,8 @@ Its page:
   hex and its value now in decimal. A opens it.
 - **A candidate:** its address as the title; Value N (edited as Equals'),
   Keep it, and Keep it, on now (or set it now); the cursor starts on Keep it. Keeping writes a found record;
-  the footer then says it is filed on Back to Torii. Three on now at most.
+  the footer then says it is filed on Back to Torii. Three on now at most:
+  a fourth is greyed.
 
 Numbers are drawn from glyphs the kernel renders at launch (`0-9`, `A-F`,
 the thousands separator, the body font): the overlay
@@ -244,9 +297,17 @@ record is added with `cheatstore_add` as a code of the user's
 One cheat an address: a record kept again later for the same address and
 size wins (the same code twice would be greyed as doing what the first
 does). Then one `cheatstore_write`, power-cut safe as every cheat file write is. The
-records are cleared after the write; a write the card refuses keeps them for
-the next boot. A larger file (read in windows) gets them in its last window.
+records are cleared after the write. A larger file (read in windows) gets them in its last window.
 Rename one on the Cheats page.
+
+v0.9.22: a code the file has already (the same text: a cheat kept in two
+sessions, or the set filed again after a power cut between the write and
+the clear) isn't added again; it is picked if it was on. The boot shows
+what happened for a moment ("2 found cheats added to Game"), or, waiting
+for A, how many weren't saved and why (the file full, the card, the file
+unreadable). Records the card didn't take move with their game's path to
+`struct ingame_found_wait` at `0xF1D00` before that notice, since the next
+launch's session block takes the path; each boot files them first.
 
 ## Memory
 
@@ -254,7 +315,11 @@ Rename one on the Cheats page.
   every opening (backup, load, check), so every byte there costs the menu's
   opening: with the search in it, the panel showed a frame late (5 frames,
   `tests/menu.sh` allows 4). So the search, the screenshot and the DEBUG
-  snapshot are an extension (`EXT` in `ov.c`, `.ext` in `ov.ld`), linked
+  snapshot are an extension (`EXT` in `ov.c`, `.ext` in `ov.ld`; v0.9.22:
+  two parts, `.ext` for the lists, the scroll bar, the screenshot and the
+  DEBUG snapshot, 3.4 KB, and `.exs` for the search, 13 KB, which only the
+  search pages load; their image lives at `0xF2000`, and the game's EWRAM
+  under each is read back before it loads), linked
   after the window and stored after the image in cart SRAM, which the
   overlay loads itself when one of them is used: the game's EWRAM there
   goes to the window's backup first (one run with it), the kernel's check
@@ -278,6 +343,13 @@ Rename one on the Cheats page.
 
 - `tests/host/test_cheatsearch.c`: every filter at every size, alignment,
   values at the size's edges, counting, a chunk with no candidates.
+- `tests/search_more.sh` (v0.9.22): Undo with a relative filter after it,
+  a search ending at none, a 32-bit search keeping 16 finds (three on now,
+  a fourth refused), All off over a cheat on now, Sleep and Reset game mid
+  search, cart SRAM failing the pass's and the extension's backups
+  (`OMEGA_GAME_SRAM=drop:FIRST-LAST`), a stack top in EWRAM, a read-only
+  cheat file (the found cheat waits, the next boot files it), a pointer
+  cheat whose word points at VRAM, and a power cut during a pass.
 - `tests/search.sh` (a new `tests/roms/searchtest`, whose lives go down on
   A): start an 8-bit search, Equals 5, lose a life, Equals 4, one candidate
   left: the lives' address; keep it on now with 9; A in game no longer lowers

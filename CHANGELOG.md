@@ -6,6 +6,30 @@ git log, not here.
 
 ## Unreleased
 
+- **Fixed:** a found cheat kept through a pointer, or a typed pointer code,
+  could write anywhere its pointer's word pointed (I/O, VRAM). The
+  interpreter now writes through a pointer only into EWRAM and IWRAM. (3f4c9e59)
+- **Fixed:** the in-game cheat search's 1.0 review. A pointer find is picked
+  only once it passed a Check; Check keeps the list when none pass and the
+  page can show the list from before it; Find asks before it replaces one.
+  Undo puts the compared values back, so a filter after it compares as
+  before the undone pass. The game's IWRAM and EWRAM the search borrows are
+  read back from cart SRAM before anything changes, and the hook's words
+  (a stack top in EWRAM) are left out of the search. New search and Save
+  state ask first; Keep again replaces a find; Negative numbers and BCD
+  convert the numbers typed, From A to B searches in order, and B on its
+  second number cancels both. All off stops the found cheats on now; the
+  menu's row counts what is left; greyed rows say why. The extension is
+  now two parts in cart SRAM page 0xF0, so the menu opens as fast. (7c468dba)
+- **Fixed:** found cheats were added again when the cheat file had them (a
+  power cut before the records were cleared), and refused or unsaved ones
+  only made log lines; the next launch wiped those that waited. A known
+  code isn't added twice, the boot after the game says what was added or
+  why not, and records the card refused wait with their game's path until
+  a boot files them. (866a4ae5, df1febdd)
+- **Changed:** the search's footers that ran past their width are shorter
+  in English and Swedish. (dafb230b)
+
 - **Added:** a Korean pack, `lang/ko.ini`, with Galmuri9's Hangul, jamo and
   kana as its script font (273 KB of the 320 KB). It is a draft no native
   speaker has read (`review = pending`), so `torii-lang.zip` leaves it out;
