@@ -1,0 +1,54 @@
+# ingame-search-more.opts in Swedish: lang/sv.ini's pack set in Settings (slot 0,
+# its id 0x564E), the review's footers at their widths.
+#! settings 0=22094
+#! sd-file /torii/lang/sv.lng 0 dist/lang/sv.lng
+# The cheat search's 1.0 review (v0.9.22) over tests/roms/searchtest, which
+# has no cheat file: Start's pass says it is searching (busy); with too
+# many left, Show them's footer says how many and to narrow to 32 (few);
+# New search asks for A again (confirm); the menu's row counts what is
+# left (menu), and its Save state row says saving ends the search (save);
+# a slot asks for A again (saveconfirm). A life lost, Equals 4 leaves the
+# lives; their page's Keep it, set now says the game may change the value
+# and it holds from the next launch (sethint).
+#! settings 2=1
+#! sd-file /searchtest.gba 0 tests/roms/searchtest/searchtest.gba
+-w "nav: home ready"
+-P "@8:nav_test_path:/searchtest.gba" -p @8:nav_test_action:0x7E000002
+-w "launch: starting the game"
+-k @300:L+R+START -k @306:-
+-w "screen ready: ingame"
+-k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:A -k @48:-
+-w "screen ready: ingame-search"
+-k @10:A -k @14:-
+-s @24:busy.png
+-w "search: started"
+-w "screen ready: ingame-search"
+-k @10:DOWN -k @14:- -k @18:DOWN -k @22:- -k @26:DOWN -k @30:- -k @34:DOWN -k @38:- -k @42:DOWN -k @46:-
+-k @50:DOWN -k @54:- -k @58:DOWN -k @62:- -k @66:DOWN -k @70:- -k @74:DOWN -k @78:- -k @82:DOWN -k @86:-
+-s @100:few.png
+-k @106:DOWN -k @110:- -k @114:DOWN -k @118:- -k @122:DOWN -k @126:- -k @130:DOWN -k @134:- -k @138:DOWN -k @142:-
+-k @150:A -k @154:-
+-s @170:confirm.png
+-k @176:UP -k @180:- -k @190:B -k @194:-
+-s @220:menu.png
+-k @226:UP -k @230:-
+-s @260:save.png
+-k @266:A -k @270:-
+-w "screen ready: ingame-save"
+-k @10:A -k @14:-
+-s @30:saveconfirm.png
+-k @36:B -k @40:- -k @60:B -k @64:-
+-k @100:A -k @104:-
+-k @160:L+R+START -k @166:-
+-w "screen ready: ingame"
+-k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:A -k @48:-
+-w "screen ready: ingame-search"
+-k @10:DOWN -k @14:- -k @18:DOWN -k @22:- -k @26:DOWN -k @30:- -k @34:DOWN -k @38:- -k @42:DOWN -k @46:- -k @50:DOWN -k @54:-
+-k @62:A -k @66:- -k @74:UP -k @78:- -k @82:UP -k @86:- -k @90:UP -k @94:- -k @98:UP -k @102:- -k @110:A -k @114:-
+-w "left"
+-k @10:DOWN -k @14:- -k @18:DOWN -k @22:- -k @26:DOWN -k @30:- -k @34:DOWN -k @38:- -k @46:A -k @50:-
+-w "screen ready: ingame-search-list"
+-k @10:A -k @14:-
+-w "screen ready: ingame-search-pick"
+-k @10:DOWN -k @14:-
+-s @30:sethint.png

@@ -78,6 +78,8 @@ keys() {
   done
 }
 wait_for() { args+=(-w "$1"); }
+# shot @N NAME: with SEARCH_SHOTS set (a folder), the screen at @N as NAME there
+shot() { if [ -n "${SEARCH_SHOTS:-}" ]; then args+=(-s "$1:$SEARCH_SHOTS/$2"); fi; }
 
 # The menu to the search page: with a cheat list its row is on the list's
 # page (its last row: UP from the first cheat), else on the menu (past Save state, Load
@@ -128,6 +130,7 @@ if [ "$mode" = ptr ]; then
   keys 10 DOWN DOWN A
   wait_for "search: pointers found"
   wait_for "screen ready: ingame-search-pointers"
+  shot @6 ptr-found.png
   # Kept before a Check: off (filed unpicked); the checked keep later
   # replaces its record
   keys 10 A
@@ -159,6 +162,7 @@ if [ "$mode" = ptr ]; then
   keys 300 DOWN DOWN DOWN DOWN A
   wait_for "search: pointers checked"
   wait_for "screen ready: ingame-search-pointers"
+  shot @6 ptr-checked.png
   keys 10 A
   wait_for "search: kept a cheat through a pointer"
   keys 10 B B B B B

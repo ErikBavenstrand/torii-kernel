@@ -164,14 +164,14 @@ const char *const lang_en[STR_COUNT] = {
 	"A again: end this search",  // ingame.search_confirm_new
 	"A again: replace the pointers",  // ingame.search_confirm_find
 	"A again: save, ending the search",  // ingame.search_confirm_save
-	"Undone: compare with a number first",  // ingame.search_stale
-	"Cart memory failed a check: try again",  // ingame.search_failed
+	"Undone: compare with a number",  // ingame.search_stale
+	"Cart memory failed: try again",  // ingame.search_failed
 	"Torii uses this address in game",  // ingame.search_owned
-	"May change; held from the next launch",  // ingame.search_set_hint
+	"Set once; held from next launch",  // ingame.search_set_hint
 	"{1} passed the check",  // ingame.search_ptr_passed
 	"A: keep it on; SELECT: off",  // ingame.search_ptr_hint_on
 	"A keeps it; check it to turn it on",  // ingame.search_ptr_hint_off
-	"The scan was full: it may be missing",  // ingame.search_ptr_full
+	"Scan was full: it may be missing",  // ingame.search_ptr_full
 	"All found before the check",  // ingame.search_ptr_all
 	"Only those that passed",  // ingame.search_ptr_only
 	"None passed: the list is unchanged",  // ingame.search_ptr_none_pass
