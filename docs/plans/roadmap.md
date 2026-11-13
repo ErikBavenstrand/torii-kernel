@@ -52,6 +52,7 @@ Each release's details are in `CHANGELOG.md`; the planning, ticket reports and r
 - **v0.9.23 Cheat search's 1.0 review (2026-11-12):** pointer finds picked only after a Check, which marks rather than drops (the list kept when none pass, the list before the Check shown again, Find asks before it replaces one); the interpreter writes through a pointer only into EWRAM and IWRAM; Undo puts the snapshot's values back; the IWRAM a pass borrows and the EWRAM under the search's code read back from cart SRAM first; the hook's words out of the searched run (a stack top in EWRAM); New search and Save state ask first; a found code filed once, the boot says what it filed or why it couldn't, and records the card refused wait with their game; the numbers converted with Negative numbers and BCD, From A to B in order; All off stops the found cheats on now; the menu's row counts the candidates; `tests/search_more.sh` (Undo, 16 finds at 32 bits, the live block's three, Sleep and Reset mid-search, cart SRAM and card faults, a stack in EWRAM, a pointer to VRAM, a cut mid-pass). The overlay's extension is in two parts in cart SRAM page `0xF0`, so the menu still opens in 4 frames.
 - **Tests (2026-11-13):** every test pipeline ends in `drain_grep` or `drain_head` (`tests/pipes.sh`), never `grep -q` or `head`, whose early exit could SIGPIPE the writer under `pipefail` and fail a test now and then (`search_more midgame`, 1 run in 24; 72 of 72 after); `just lint` refuses the bare forms (`tools/pipe_check.py`).
 
+- **Unreleased: sound after the in-game menu (38020788):** games on Nintendo's MP2000 (m4a) engine got the wrong samples for up to `pcmDmaPeriod` - 1 frames after every Resume, Save state and Load state (all 49 m4a games in `roms/`: the stub turned the sound DMAs on at the buffer's start, mid-period); the stub now leaves them off for the engine's next re-arm (`m4a_hold`). `tests/m4a_sound.py` measures it from mGBA's DMA and FIFO state (`mgba-shot -a`), on a homebrew engine in `just test` and in every game's state trips in `just compat`.
 ## Open work, before 1.0
 
 **Everything below is not done.** When an item ships, move it to [Done](#done) (one line under its release) and delete it here; an item partly done keeps only what is left. Swept on 2026-10-28 from the code's TODOs, `docs/design`, `docs/research`, the release checklist, `tools/analyze-baseline.txt` and hand-over notes; checked again against git history on 2026-11-02, after v0.9.16, and on 2026-11-13, after v0.9.23. The groups were first planned as patches v0.9.1–v0.9.5, but the releases went to cheats instead, so they are themes now, not version numbers.
@@ -66,7 +67,6 @@ Code fixes that the emulator can test, plus the leftovers from v0.9.
 
 ### In game
 
-- **Sound after LOAD (1.0?):** games on Nintendo's MP2000 engine keep the PCM buffer's position in RAM, which could re-sync DMA1 at LOAD.
 - **Cheat search (shipped in v0.9.7–v0.9.10; [design](../design/v0.9/cheat-search.md)):** the 1.0 review's fixes are done (Done); what stays is a cart check, and the rest is in Known limits.
   - **Cart check:** a pointer kept in Pokémon Emerald (money through gSaveBlock1Ptr) across a door; the menu's opening and the search pages on the real cart with the two-part extension in cart SRAM page `0xF0`.
 
@@ -91,6 +91,7 @@ Code fixes that the emulator can test, plus the leftovers from v0.9.
   - A 32 MB ROM with no padding gets the in-game code over its last bytes, as the official kernel did.
   - The screenshot's clock read can't see a game's write-only clock command when the port is unreadable.
 - **States:**
+  - After Resume, Save state and Load state, a game on the m4a engine is silent until the engine re-arms its sound DMAs: up to `pcmDmaPeriod` - 1 frames (6 in Pokémon's, 11 in Wolfenstein 3D's). Starting them where the engine has them needs the PCM buffer's address, which only the write-only DMA source holds; SoundInfo's `pcmBuffer` is it in most games but not in Camelot's (Golden Sun: The Lost Age, Mario Golf, Mario Power Tennis). Other engines (Metroid's, Mario & Luigi's, Nintendo EAD's in Super Mario Advance 3 and 4) still get their sound DMAs back at their source's start, as before.
   - Write-only display registers can't be put back in games that keep no RAM copy of them; 44 compat games stay blank until the game redraws.
   - The exact-ROM hook patches cover only the EU builds of GTA Advance, Super Monkey Ball Jr., LEGO Star Wars II and Tomb Raider: Legend; their other regions get no in-game menu (`docs/research/hook-coverage.md`).
   - Sonic Advance and Moto Racer replace the IRQ hook, and HP Quidditch blocks the menu. These are compat's three known failures.

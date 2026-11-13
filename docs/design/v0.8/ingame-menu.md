@@ -85,7 +85,23 @@ write-only, so a menu on a BG can't give them back (today's BG2 affine bug).
 ## IRQs, DMA, sound and input
 
 - Run in IRQ mode with IME 0, polling `VCOUNT`, as today.
-- Clear and restore the DMA0-3 `CNT_H` registers, as today.
+- Clear and restore the DMA0-3 `CNT_H` registers, as today. Not the sound DMAs of
+  Nintendo's MP2000 (m4a, "Sappy") engine (the word at `0x3007FF0` points into EWRAM or
+  IWRAM at a SoundInfo whose ident is `Smsh`, or `Smsh` + 1 while its SoundMain runs):
+  after Resume, SAVE and LOAD the stub leaves DMA1 and DMA2 off for the engine to turn on
+  (`m4a_hold`), which its `m4aSoundVSync` does at its next re-arm (pret's decomps,
+  `src/m4a_1.s`). The engine points their source at its PCM buffer once (`SoundInit`) and
+  re-arms them there every `pcmDmaPeriod` frames, so between re-arms they are partway
+  through it; turned on at once, they started at the buffer's start and played the wrong
+  segments until that re-arm, up to `pcmDmaPeriod` - 1 frames (a glitch on every m4a game
+  measured, 49 of them; `tests/m4a_sound.py`). Off, the sound comes back where the engine
+  has it after at most that many frames of silence (6 in Pokémon's 7 x 224-byte buffer, 11
+  in the 12 x 132 of Wolfenstein 3D and Super Street Fighter II Turbo Revival). Starting
+  them at their place instead needs the buffer's address, which only the write-only source
+  register holds: SoundInfo's `pcmBuffer` (offset `0x350`) is it in most games, but not in
+  Camelot's (Golden Sun: The Lost Age, Mario Golf: Advance Tour, Mario Power Tennis), whose
+  buffer is elsewhere and which a wrong source would have left playing other memory until
+  the game set it again.
 - Mute through `SOUNDCNT_L` and `SOUNDCNT_H` (readable), not the `SOUNDCNT_X` master switch:
   zeroing it resets the PSG, which is today's noise bug.
 - Edge-detect the keys with auto-repeat; on opening, wait for the menu key's release; on
@@ -253,7 +269,8 @@ and paging spare PSRAM from the menu (tier C) stay off until the cart probe says
   channels the game had repeating on a timing on again with the addresses the game last
   wrote: within one game nearly always what it wrote before the save (a launch into a
   state has the game's start's, and Need for Speed's double-buffered DMA shows a frame
-  or two otherwise). A channel restarts at its source's start, so a
+  or two otherwise); the m4a engine's are left for it to re-arm (above). A channel
+  restarts at its source's start, so a
   game counting its sound DMA's IRQs (Metroid) goes on a little otherwise: the state
   trips call that drift. The trips call a load whose screen went otherwise while all a
   CPU can read was the save's a display load: the write-only registers above (Wario

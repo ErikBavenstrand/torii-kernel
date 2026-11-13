@@ -4,6 +4,14 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Fixed:** after Resume, Save state and Load state, games on Nintendo's
+  MP2000 (m4a) sound engine played the wrong part of their sound buffer for
+  up to 11 frames (Pokémon, Zelda, Mario Kart, Fire Emblem: all 49 m4a games
+  tested). The menu now leaves the sound off until the engine restarts it
+  where it belongs, at most that many frames later. (38020788)
+
 ## v0.9.23
 
 - **Fixed:** a found cheat kept through a pointer, or a typed pointer code,
