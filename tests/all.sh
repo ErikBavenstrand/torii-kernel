@@ -80,6 +80,7 @@ jobs=(
   "tests/states.sh cut"
   "tests/state_trips.sh hello"
   "tests/state_trips.sh refuse"
+  "tests/m4a_sound.sh"
   "tests/settings.sh"
   "tests/menu.sh"
   "tests/sleep.sh"

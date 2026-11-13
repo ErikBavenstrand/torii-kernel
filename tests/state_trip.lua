@@ -15,6 +15,7 @@
 --                     BLDCNT's brightness effect on, or 64 or more palette
 --                     colours changed in a frame
 --   reset             the menu's Reset game (the game from its start)
+--   resume            the menu opened and closed with Resume
 --   torii             the menu's Back to Torii; the run goes on in the kernel
 --
 -- A digest covers EWRAM and IWRAM in 1 KB blocks, but for the hook's own
@@ -25,10 +26,13 @@
 -- the game back at a frame's start. Lines it logs (stderr, as "script: ..."):
 --
 --   trip game ENTRY                the game started
+--   trip menu FRAME DMA1           the menu showed at FRAME's end; DMA1's
+--                                  CNT_H as the stub found it (hex)
 --   trip saved NAME FRAME INFO     the game went on after Save state at
 --                                  FRAME (the first frame end after it);
 --                                  INFO: the display mode, effects, sound
 --   trip loaded NAME FRAME INFO    the same after Load state
+--   trip resumed FRAME             the game went on after Resume at FRAME
 --   trip same NAME K               the replay's K digests all matched
 --   trip differs NAME +J WHERE     the first frame of the replay whose
 --                                  digest differs, and its first block
@@ -265,6 +269,9 @@ local function menu(names, on_open)
 			tick()
 			if not opened and overlay_up() then
 				opened = true
+				-- and DMA1's CNT_H as the stub found it (its SP_DMA + 2)
+				local spend = patchStart and E:read32(patchStart + 0x18) or 0
+				log(string.format("menu %d %04X", E:currentFrame(), spend ~= 0 and E:read16(spend + 0x4A) or 0))
 				if on_open then
 					on_open()
 				end
@@ -580,6 +587,17 @@ local function run()
 			ok = step_save(tonumber(parts[2]), parts[3])
 		elseif kind == "load" then
 			ok = step_load(parts[2], parts[3] == "fade")
+		elseif kind == "resume" then
+			ok = menu({ "A" })
+			local f = ok and resumed(1200)
+			if not ok then
+				log("fail menu didn't open for resume")
+			elseif not f then
+				log("fail the stub never gave the game back after resume")
+				ok = false
+			else
+				log(string.format("resumed %d", f))
+			end
 		elseif kind == "reset" then
 			-- Resume, then UP round the end: Back to Torii, Sleep, Reset game
 			ok = menu({ "UP", "UP", "UP", "A" })

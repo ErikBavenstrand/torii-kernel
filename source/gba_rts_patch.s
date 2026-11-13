@@ -717,6 +717,8 @@ ingame_resume:						@;r10 I/O, r11 the spend area
 	ldrh	r1,[r11,#SP_PAL0]
 	mov		r2,#0x05000000
 	strh	r1,[r2]
+	add		r3,r11,#SP_DMA+2
+	bl		m4a_hold
 	bl		ingame_thaw
 	ldr		r1,[r11,#SP_ACT]
 	cmp		r1,#ACT_SLEEP
@@ -747,6 +749,34 @@ ingame_thaw:
 	ldrh	r1,[r11,#SP_IME]
 	add		r2,r10,#0x200
 	strh	r1,[r2,#8]
+	bx		lr
+
+@;Torii: the sound DMAs of Nintendo's MP2000 (m4a) engine left off for the
+@;engine to turn on. The engine sets their source to its PCM buffer once
+@;(SoundInit) and re-arms DMA1 and DMA2 there when its pcmDmaCounter runs
+@;out (m4aSoundVSync), so between re-arms they are partway through it, at a
+@;place no register gives (the source is write-only, and Camelot's engine
+@;keeps its buffer elsewhere). Turned on again, they started at the buffer's
+@;start and played the wrong segments, a glitch of up to 6 frames, after
+@;every menu, SAVE and LOAD (tests/m4a_sound.py). Off, the sound comes back
+@;at the engine's next re-arm, where it would have re-armed them anyway, as
+@;it does each pcmDmaPeriod frames (at most 12 in the games measured; 7 in
+@;Pokémon's). The engine's: the word at 0x3007FF0 (SOUND_INFO_PTR) points
+@;into EWRAM or IWRAM at its SoundInfo, whose ident is "Smsh" ("Smsh" + 1
+@;while SoundMain runs). r10 I/O, r3 DMA1's saved CNT_H (DMA2's after it):
+@;both set to 0; uses r4 and r5
+m4a_hold:
+	ldr		r4,[r10,#-16]		@;0x3007FF0, in IWRAM's mirror
+	mov		r5,r4,lsr #24
+	sub		r5,r5,#2
+	cmp		r5,#1
+	ldrls	r4,[r4]
+	ldrls	r5,=0x68736D53		@;ID_NUMBER
+	subls	r4,r4,r5
+	cmpls	r4,#1
+	movls	r4,#0
+	strlsh	r4,[r3]
+	strlsh	r4,[r3,#2]
 	bx		lr
 
 @;Waits for the next frame's start (VCOUNT 160); r10 I/O, uses r1
@@ -1282,6 +1312,7 @@ register_list_end:
 	@;read gives, may be another scene's, or the boot's at a launch into a
 	@;state (a count of 0 is the most a channel moves)
 	add		r3,r12,#SP_DMA+2
+	bl		m4a_hold			@;not the m4a engine's
 	add		r2,r0,#REG_DM0CNT_H+0xC
 	mov		r11,#2				@;the ldmia below sets it
 1:	ldrh	r1,[r3],#2
