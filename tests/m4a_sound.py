@@ -26,7 +26,10 @@ buffer's start: up to PERIOD - 1 frames of the wrong segments.
 
 A game whose own lead varies by more than a segment (an engine calling the
 VSync from its main loop, or Camelot's, with its buffer elsewhere) is only
-checked for its DMAs coming back.
+checked for its DMAs coming back. A window ends at the next step's menu. DMA1
+reading outside the buffer altogether is reported, not failed: after Reset
+game, the source the game's start set for a SoundInfo elsewhere (Rayman 10th
+Anniversary, A Link to the Past), which no load gives back (write-only).
 
 For each ROM, on a trip cart (tests/state_trips.py), tests/state_trip.lua
 plays, saves, loads and resumes (STEPS). A ROM whose word at 0x3007FF0 doesn't
@@ -163,24 +166,38 @@ def judge(lines: list[str], sound: dict, verbose: bool) -> tuple[bool, str]:
     steady = hi - lo <= SLACK
     ptr, _, period, samples = sound[m4a[-1]][3]
     bad_total, parts = 0, []
+    found = {int(w[1]): int(w[2], 16) for w in words if w[0] == "menu"}
+    menus = sorted(found)
+    saved = {name: at for kind, name, at in events if kind == "saved"}
+    elsewhere = []
     for kind, name, at in sorted(events, key=lambda e: e[2]):
-        bad, seen, on = [], [], False
-        for f in range(at, at + period + 2):
+        # to the next step's menu (its key goes down 20 frames before it shows)
+        end = min([at + period + 2] + [m - 20 for m in menus if m > at])
+        bad, seen, ever_on = [], [], False
+        for f in range(at, end):
             e = sound.get(f)
             on = bool(e and e[1] & 0x8000)
+            ever_on |= on
             x = lead(e) if on else None
             seen.append(x if on else "off")
             # (a counter of 0: the frame ended inside the engine's VSync,
             # between its re-arm and the counter's reload, Prince of Persia)
-            if (
-                on
-                and steady
-                and e[3]
-                and e[3][1]
-                and (x is None or not lo - SLACK <= x <= hi + SLACK or not e[2])
-            ):
+            if not (on and steady and e[3] and e[3][1]):
+                continue
+            if x is not None and not -PCM_BUF <= x <= 2 * PCM_BUF:
+                # Not this SoundInfo's buffer at all: the source the game set
+                # after Reset game, for a SoundInfo elsewhere (Rayman 10th
+                # Anniversary): no load gives the write-only source back
+                elsewhere.append(f"{kind} {name}@{at}".replace(" @", "@"))
+                break
+            if x is None or not lo - SLACK <= x <= hi + SLACK or not e[2]:
                 bad.append(f - at)
-        if not on:
+        # DMA1 on as the stub found it (a load's: its save's) must come back
+        # (F-Zero's engine was off, m4aSoundVSyncOff, at one save)
+        when = saved.get(name, at) if kind == "loaded" else at
+        shown = max((m for m in menus if m < when), default=None)
+        was_on = shown is None or found[shown] & 0xB200 == 0xB200
+        if was_on and not ever_on and end - at > period + 1:
             bad.append("never on")
         bad_total += len(bad)
         silent = seen.count("off")
@@ -190,6 +207,10 @@ def judge(lines: list[str], sound: dict, verbose: bool) -> tuple[bool, str]:
         if verbose or bad:
             part += f" (leads {seen})"
         parts.append(part)
+    if elsewhere:
+        parts.append(
+            f"DMA1 reads outside the buffer after {', '.join(sorted(set(elsewhere)))}"
+        )
     own_text = (
         f"lead {lo}..{hi}"
         if steady
