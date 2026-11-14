@@ -105,6 +105,7 @@ jobs=(
   "tests/gb_mode.sh"
   "tests/gb_save.sh"
   "tests/gb_settings.sh"
+  "tests/gb_hicolor.sh"
   "tests/nes_save.sh"
   "tests/nes_region.sh"
   "tests/names.sh fat32"

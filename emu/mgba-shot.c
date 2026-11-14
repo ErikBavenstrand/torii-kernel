@@ -88,6 +88,12 @@
 // RAM starts filled with 0xA5 (poison_ram), as the cart's holds junk at
 // power-on.
 //
+// A .gb or .gbc ROM runs in mGBA's own Game Boy core, the reference for the
+// kernel's Jagoomba (tests/gb_hicolor.sh): -k, -s, -h, -f and -m work, and
+// the screen is 256x224 (room for a Super Game Boy border) with the Game
+// Boy's 160x144 at its top left; the GBA-only options (-a, -T, -X, -E, -R's
+// frame skip) don't apply.
+//
 // A BIOS Stop (SWI 3, the sleep) prints "stop at frame N". The CPU then
 // sleeps as the cart's does, until a keypad, serial or Game Pak IRQ enabled
 // in IE (a -k press that meets KEYCNT), and "wake at frame N" says when; the
@@ -1238,7 +1244,12 @@ int main(int argc, char **argv)
 		return 1;
 	}
 	core->reset(core);
-	poison_ram(core);
+	// The GBA's own: a Game Boy ROM (mGBA's GB core, the reference for
+	// Jagoomba) runs with none of the GBA-only parts below
+	int gba = core->platform(core) == mPLATFORM_GBA;
+	if (gba) {
+		poison_ram(core);
+	}
 	if (getenv("TORII_COVERAGE")) {
 		cover_start(core, getenv("TORII_COVERAGE"), argv[1]);
 	}
@@ -1325,7 +1336,7 @@ int main(int argc, char **argv)
 
 	int status = 0;
 	int draw_all = opts.drawAll || opts.nscripts || opts.realtime || opts.gdbPort || opts.tears.count;
-	struct GBAVideo *video = &((struct GBA *)core->board)->video;
+	struct GBAVideo *video = gba ? &((struct GBA *)core->board)->video : NULL;
 	unsigned frame;
 	for (frame = 1; frame <= frames; ++frame) {
 		current_frame = frame;
@@ -1349,7 +1360,9 @@ int main(int argc, char **argv)
 			tear_on |= in_range(&opts.tears.list[i], frame);
 		}
 		// mGBA's frame skip: the counter is checked before each line is drawn
-		video->frameskipCounter = draw_all || draws(&opts, frame) ? 0 : 1;
+		if (video) {
+			video->frameskipCounter = draw_all || draws(&opts, frame) ? 0 : 1;
+		}
 		if (debugger) {
 			mDebuggerRunFrame(debugger);
 			if (debugger->state == DEBUGGER_SHUTDOWN) {
@@ -1359,7 +1372,7 @@ int main(int argc, char **argv)
 			core->runFrame(core);
 		}
 		static bool was_stopped;
-		bool stopped = ((struct GBA *)core->board)->stopped;
+		bool stopped = gba && ((struct GBA *)core->board)->stopped;
 		if (was_stopped && !stopped) {
 			fprintf(stderr, "wake at frame %u\n", current_frame);
 		}

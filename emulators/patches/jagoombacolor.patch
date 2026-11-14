@@ -80,11 +80,49 @@ index 02fa1b2..d886ff2 100644
  
  #ifdef _MB_VERSION
  	#define RTCSUPPORT 0
+diff --git a/src/equates.h b/src/equates.h
+index a2f9bee..a46b388 100644
+--- a/src/equates.h
++++ b/src/equates.h
+@@ -205,6 +205,33 @@ RECENT_TILENUM_SIZE = 128
+ @ Next = _FF41_PC_4
+ 
+ 
++@Torii: hi-colour GBC (lcd.s hc_*): per frame, the BG palettes as they
++@stood at line 0 and the colours written to them during the visible lines
++@(one word each: line<<24 | GBA palette offset<<16 | colour), replayed at
++@each GBA line by an HBlank interrupt. Three buffers (hc_swap), each the
++@list's end, the line 0 palettes (64 bytes), a guard word, HC_ENTRIES
++@entries and the end mark.
++ HC_ENTRIES = 768
++ HC_BUF_SIZE = 4 + 64 + 4 + HC_ENTRIES*4 + 4
++ HC_BUF1 = Next - HC_BUF_SIZE
++ HC_BUF2 = HC_BUF1 - HC_BUF_SIZE
++ HC_BUF3 = HC_BUF2 - HC_BUF_SIZE
++ HC_GAMMA = HC_BUF3 - 64	@32 halfwords: a gamma-converted grey per level
++ HC_VARS = HC_GAMMA - 48
++ gbc_palette2 = HC_VARS - 128	@Torii: these two moved from IWRAM, to make room for hc_hblank
++ gbc_palette = gbc_palette2 - 128	@CGB $FF68-$FF6D
++ Next = gbc_palette
++@HC_VARS offsets
++ HC_REC = 0		@the buffer recording this frame
++ HC_REC_PTR = 4		@its next free entry
++ HC_REC_END = 8		@past its last entry (the end mark's slot)
++ HC_READY = 12		@a finished frame's, for the next VBlank (or 0)
++ HC_SHOWN = 16		@the one on the screen
++ HC_SPARE = 20		@the third, while none is ready (or 0)
++ HC_GAMMA_FOR = 24	@the gamma value HC_GAMMA was made for (byte)
++ HC_MAX = 28		@the most entries a frame has had
++ HC_FULL = 32		@frames that ran out of entries
++
+  MULTIBOOT_LIMIT	= Next	@How much data is left for Multiboot to work.
+  END_OF_EXRAM = MULTIBOOT_LIMIT
+ 
 diff --git a/src/gbz80.s b/src/gbz80.s
-index a4ec3d1..864c9aa 100644
+index a4ec3d1..5128cf7 100644
 --- a/src/gbz80.s
 +++ b/src/gbz80.s
-@@ -1,2869 +1,2869 @@
+@@ -1,2869 +1,2868 @@
 - .section .iwram.0, "ax", %progbits
 -
 -@	#include "equates.h"
@@ -5815,8 +5853,7 @@ index a4ec3d1..864c9aa 100644
 + .section .bss.end
 + .align
 +CANARY1:	.skip 4
-+gbc_palette:	.skip 128	@CGB $FF68-$FF6D???
-+gbc_palette2:	.skip 128
++@Torii: gbc_palette and gbc_palette2 are in EWRAM (equates.h), for hi-colour's IWRAM code
 +CHR_DECODE: .skip 0x400
 +CANARY2:	.skip 4
 +
@@ -5824,9 +5861,18 @@ index a4ec3d1..864c9aa 100644
 +	@.end
 +
 diff --git a/src/lcd.s b/src/lcd.s
-index 634594d..c08c6c9 100644
+index 634594d..98dfb94 100644
 --- a/src/lcd.s
 +++ b/src/lcd.s
+@@ -244,7 +244,7 @@ GFX_init_irq:
+ 	strh r0,[r2,#2]		@stop pending interrupts
+ @	ldr r0,=0x1081
+ @	strh r0,[r2]		;key,vblank,serial interrupt enable
+-	ldr r0,=0x1085
++	ldr r0,=0x1087		@Torii: and HBlank, which DISPSTAT turns on for hi-colour frames (hc_hblank)
+ 	strh r0,[r2]		@key,vcount,vblank,serial interrupt enable
+ 	mov r0,#1
+ 	strh r0,[r2,#8]		@master irq enable
 @@ -331,6 +331,11 @@ GFX_reset:	@called with CPU reset
  	movs r0,r0
  	bne 1f
@@ -5839,7 +5885,65 @@ index 634594d..c08c6c9 100644
  	@get GBC palette
  	ldr_ r0,memmap_tbl
  	blx_long GetGbcPaletteNumber
-@@ -2357,8 +2362,27 @@ display_frame:	@called at vblank
+@@ -349,6 +354,8 @@ GFX_reset:	@called with CPU reset
+ @	bl memset32_
+ 
+ @@--------
++	bl_long hc_init		@Torii: hi-colour buffers
++
+ 	@clear dirty tile bits
+ 	ldr r0,=DIRTY_TILE_BITS
+ 	mov r2,#48
+@@ -1541,6 +1548,8 @@ irqhandler:	@r0-r3,r12 are safe to use
+ 	mov r3,#REG_BASE
+ 	ldr r1,[r2,#REG_IE]!
+ 	and r1,r1,r1,lsr#16	@r1=IE&IF
++	tst r1,#0x02		@Torii: HBlank, first and on its own: hi-colour palettes
++	bne hc_hblank
+ 	ldrh r0,[r3,#-8]
+ 	orr r0,r0,r1
+ 	strh r0,[r3,#-8]
+@@ -1589,6 +1598,39 @@ irq0:
+ vbldummy:
+ 	bx lr
+ @----------------------------------------------------------------------------
++@Torii: hi-colour GBC. At the HBlank before each GBA line, the colours the
++@game wrote before the GB line it shows (hc_record's entries, line<<24 |
++@offset from 0x05000100<<16 | colour): line L shows on GBA line L+8, so
++@this HBlank takes the entries up to line VCOUNT-7. Colour 0 also goes to
++@its palette's solid tile (0x050000F0 + palette*2), as transfer_palette_
++@does. IRQ mode, IRQs off; r2=REG_BASE+REG_IE, r3=REG_BASE.
++hc_hblank:
++	mov r0,#0x02
++	strh r0,[r2,#2]			@IF clear
++	ldrh r1,[r3,#REG_VCOUNT]
++	ldr r12,hc_cursor
++	sub r1,r1,#SCREEN_Y_START-1
++	mov r2,#PALETTE_BASE
++	add r2,r2,#0x100
++0:
++	ldr r0,[r12]
++	cmp r1,r0,lsr#24		@due? (the end mark's line, 255, never is)
++	strlo r12,hc_cursor
++	bxlo lr
++	add r12,r12,#4
++	mov r3,r0,lsr#16
++	and r3,r3,#0xFF
++	strh r0,[r2,r3]
++	tst r3,#0x06			@colour 0?
++	moveq r3,r3,lsr#4
++	subeq r3,r3,#0x10
++	streqh r0,[r2,r3]
++	b 0b
++	.global hc_cursor
++	.global hc_active
++hc_cursor: .word 0			@the next entry to replay
++hc_active: .word 0			@0x10 (DISPSTAT's HBlank IRQ) on a frame with entries
++@----------------------------------------------------------------------------
+ vblankfptr: .word vbldummy			@later switched to vblankinterrupt
+ @serialfptr DCD serialinterrupt
+  .if RUMBLE
+@@ -2357,8 +2399,28 @@ display_frame:	@called at vblank
  	bl add_ui_border
  	ldrb_ r0,bg_cache_updateok
  	movs r0,r0
@@ -5865,9 +5969,295 @@ index 634594d..c08c6c9 100644
 +	cmp r0,#164
 +	blo df_wait_line
 +no_bg_wait:
++	bl_long hc_vblank	@Torii: a hi-colour frame's palettes as at its line 0
  	bl display_bg
  	
  	ldmfd sp!,{globalptr,pc}
+@@ -2907,6 +2969,8 @@ do_gba_hdma:
+ 
+ 	mov r2,#REG_BASE
+ 	ldr r0,=0x28 + 256*(SCREEN_Y_START+144-1) @scanline 144+8-1, enable vblank+vcount interrupts
++	ldr r1,hc_active		@Torii: and HBlank on a hi-colour frame (end_gba_hdma turns it off)
++	orr r0,r0,r1
+ 	strh r0,[r2,#REG_DISPSTAT]
+ 
+ 	ldr_ r0,_ui_border_screen
+@@ -3158,6 +3222,8 @@ newframe_vblank:	@called at line 144	(??? safe to use)
+ 	str_ r1,dispcntbase
+ 	str_ r0,dispcntbase2
+ 
++	bl hc_swap		@Torii: and the hi-colour lists
++
+ 	@@advance 
+ 	@ldr_ r0,bg_cache_cursor
+ 	@str_ r0,bg_cache_base
+@@ -3323,6 +3389,210 @@ after_wait:
+ @	;sgb display is masked off...
+ @	ldrb r0,novblankwait_
+ @	cmp r0,#1
++
++@----------------------------------------------------------------------------
++@Torii: hi-colour GBC (jagoombacolor#20, #53). Games that rewrite the BG
++@palettes during the frame get each line's colours: hc_frame_start keeps
++@the palettes as they stand at line 0, hc_record (FF69_W) lists each
++@colour written during the visible lines with the line it first shows on,
++@hc_swap hands the list over with the scroll buffers, and at the GBA's
++@VBlank hc_vblank puts the line 0 palettes up and turns on the HBlank
++@interrupt (hc_hblank) that replays the list. A frame without a mid-frame
++@write costs a compare at VBlank. The buffers: equates.h, HC_*.
++@----------------------------------------------------------------------------
++	.global hc_frame_start
++	.global hc_record
++	.global hc_init
++	.global hc_vblank
++hc_init:	@at reset: empty lists, the gamma table to be made
++	stmfd sp!,{r0-r3,lr}
++	ldr r3,=HC_VARS
++	mvn r0,#0
++	strb r0,[r3,#HC_GAMMA_FOR]
++	ldr r1,=HC_BUF1
++	bl hc_init_buf
++	str r1,[r3,#HC_REC]
++	str r2,[r3,#HC_REC_PTR]
++	str r2,[r3,#HC_REC_END]
++	ldr r1,=HC_BUF2
++	bl hc_init_buf
++	str r1,[r3,#HC_SHOWN]
++	ldr r1,=HC_BUF3
++	bl hc_init_buf
++	str r1,[r3,#HC_SPARE]
++	mov r0,#0
++	str r0,[r3,#HC_READY]
++	str r0,[r3,#HC_MAX]
++	str r0,[r3,#HC_FULL]
++	ldr r1,=hc_active
++	str r0,[r1]
++	ldmfd sp!,{r0-r3,pc}
++hc_init_buf:	@r1=buffer, r0=-1: an empty list; r2=its first entry
++	add r2,r1,#68
++	str r0,[r2],#4			@guard
++	str r0,[r2]			@end mark
++	str r2,[r1]			@its end: the first entry
++	add r1,r2,#HC_ENTRIES*4
++	str r0,[r1]			@the end mark of a full list
++	sub r1,r2,#72
++	bx lr
++
++hc_frame_start:	@line 0 (timeout.s), GB registers saved: r0-r9,r11,r12 free
++	stmfd sp!,{lr}
++	ldr r12,=HC_VARS
++	ldrb_ r0,_gammavalue
++	ldrb r1,[r12,#HC_GAMMA_FOR]
++	cmp r0,r1
++	blne hc_make_gamma
++	ldr r0,[r12,#HC_REC]
++	add r0,r0,#4
++	ldr r1,=gbc_palette
++	ldmia r1!,{r2-r9}
++	stmia r0!,{r2-r9}
++	ldmia r1!,{r2-r9}
++	stmia r0!,{r2-r9}
++	add r0,r0,#4			@past the guard
++	str r0,[r12,#HC_REC_PTR]
++	add r0,r0,#HC_ENTRIES*4
++	str r0,[r12,#HC_REC_END]
++	ldmfd sp!,{pc}
++
++hc_make_gamma:	@HC_GAMMA[i] = gamma_convert_one(grey i); r12=HC_VARS kept
++	stmfd sp!,{r12,lr}
++	strb r0,[r12,#HC_GAMMA_FOR]
++	ldr r4,=HC_GAMMA
++	mov r8,#0
++0:
++	add r9,r8,r8,lsl#5
++	add r9,r9,r8,lsl#10
++	str r9,[sp,#-4]!
++	mov r5,sp
++	ldrb_ r1,_gammavalue
++	bl_long gamma_convert_one
++	add sp,sp,#4
++	add r8,r8,#1
++	cmp r8,#32
++	bne 0b
++	ldmfd sp!,{r12,pc}
++
++hc_gamma:	@r0=colour, gamma-converted through HC_GAMMA; r1-r3 changed
++	ldr r2,=HC_GAMMA
++	and r3,r0,#0x1F
++	add r3,r3,r3
++	ldrh r1,[r2,r3]
++	and r1,r1,#0x1F
++	and r3,r0,#0x3E0
++	mov r3,r3,lsr#4
++	ldrh r3,[r2,r3]
++	and r3,r3,#0x3E0
++	orr r1,r1,r3
++	and r3,r0,#0x7C00
++	mov r3,r3,lsr#9
++	ldrh r3,[r2,r3]
++	and r3,r3,#0x7C00
++	orr r0,r1,r3
++	bx lr
++
++
++hc_swap:	@bufferfinish, the GBA's VBlank IRQ off: this frame's list is next
++	@to show. Three buffers: one recording, one showing and one ready
++	@for the next VBlank or spare, so a frame that ends before the GBA's
++	@VBlank never records over the list on the screen. r0-r9,r11,r12 free
++	ldr r12,=HC_VARS
++	ldr r0,[r12,#HC_REC]
++	ldr r1,[r12,#HC_REC_PTR]
++	mvn r3,#0
++	str r3,[r1]			@end mark
++	str r1,[r0]			@the list's end
++	ldr r2,[r12,#HC_READY]		@a list not shown yet: dropped for this one
++	cmp r2,#0
++	bne 1f
++	ldr r2,[r12,#HC_SPARE]
++	mov r3,#0
++	str r3,[r12,#HC_SPARE]
++1:
++	str r0,[r12,#HC_READY]
++	str r2,[r12,#HC_REC]
++	add r2,r2,#72
++	str r2,[r12,#HC_REC_PTR]	@nothing recorded until line 0
++	str r2,[r12,#HC_REC_END]
++	@statistics: the most entries in a frame, frames that filled the list
++	add r0,r0,#72
++	sub r0,r1,r0
++	mov r0,r0,lsr#2
++	ldr r1,[r12,#HC_MAX]
++	cmp r0,r1
++	strhi r0,[r12,#HC_MAX]
++	cmp r0,#HC_ENTRIES
++	ldrhs r1,[r12,#HC_FULL]
++	addhs r1,r1,#1
++	strhs r1,[r12,#HC_FULL]
++	bx lr
++
++hc_vblank:	@display_frame: r0-r9,r11,r12 free
++	ldr r12,=HC_VARS
++	ldr r0,[r12,#HC_READY]		@a new frame's list: on the screen now
++	cmp r0,#0
++	ldrne r1,[r12,#HC_SHOWN]
++	strne r0,[r12,#HC_SHOWN]
++	strne r1,[r12,#HC_SPARE]
++	movne r1,#0
++	strne r1,[r12,#HC_READY]
++	ldreq r0,[r12,#HC_SHOWN]
++	ldr r1,[r0],#4			@its end; r0=its line 0 palettes
++	add r2,r0,#68
++	cmp r1,r2
++	beq hc_off			@no mid-frame writes
++	ldrb_ r3,gbcmode
++	cmp r3,#0
++	beq hc_off
++	ldrb_ r3,sgb_mask
++	cmp r3,#0
++	bne hc_off
++	ldrb_ r3,lcdctrl0frame
++	tst r3,#0x80			@screen off: transfer_palette_'s white
++	beq hc_off
++	stmfd sp!,{lr}
++	ldr r3,=hc_cursor
++	str r2,[r3]
++	@the line 0 palettes, as transfer_palette_ puts them
++	ldr r4,=PALETTE_BASE+0x100
++	ldr r5,=PALETTE_BASE+0xF0
++	mov r6,r0
++	mov r7,#8
++	ldrb_ r8,_gammavalue
++0:
++	ldmia r6!,{r9,r11}
++	cmp r8,#0
++	beq 1f
++	mov r0,r9
++	bl hc_gamma
++	mov r12,r0
++	mov r0,r9,lsr#16
++	bl hc_gamma
++	orr r9,r12,r0,lsl#16
++	mov r0,r11
++	bl hc_gamma
++	mov r12,r0
++	mov r0,r11,lsr#16
++	bl hc_gamma
++	orr r11,r12,r0,lsl#16
++1:
++	stmia r4,{r9,r11}
++	strh r9,[r5],#2
++	add r4,r4,#32
++	subs r7,r7,#1
++	bne 0b
++	mov r0,#0x10
++	ldr r1,=hc_active
++	str r0,[r1]
++	ldmfd sp!,{pc}
++hc_off:
++	mov r0,#0
++	ldr r1,=hc_active
++	str r0,[r1]
++	bx lr
++	.ltorg
+ 	.popsection
+ 
+ 	.pushsection .text
+@@ -4691,8 +4961,6 @@ vram_W2:
+ FF69_W:	@BCPD - BG Color Palette Data
+ 	ldrb_ r1,BCPS_index
+ 	and r2,r1,#0x3F
+-	ldr addy,=gbc_palette
+-	strb r0,[addy,r2]
+ 	tst r1,#0x80
+ 	addne r1,r1,#1
+     @Minucce's tweaks
+@@ -4700,7 +4968,45 @@ FF69_W:	@BCPD - BG Color Palette Data
+     orrne r1, r1, #0x80
+     
+ 	strneb_ r1,BCPS_index
+-	bx lr
++	@Torii: a byte that changes is also recorded for the line (hi-colour)
++	ldr addy,=gbc_palette
++	ldrb r1,[addy,r2]
++	cmp r1,r0
++	bxeq lr
++	strb r0,[addy,r2]
++hc_record:	@Torii: FF69_W's changed byte (r2=its index, addy=gbc_palette), for hi-colour (hc_* in .vram1)
++	@the line it first shows on: this one, or in HBlank the next
++	ldrb_ r1,scanline
++	ldr_ r0,scanline_oam_position
++	cmp cycles,r0
++	addmi r1,r1,#1
++	cmp r1,#144
++	bxhs lr				@the next frame's: in its line 0 palettes
++	stmfd sp!,{r3,r4,lr}
++	bic r2,r2,#1
++	ldrh r0,[addy,r2]		@the colour
++	and r3,r2,#0x38			@palette*8
++	and r2,r2,#0x06			@colour*2
++	orr r2,r2,r3,lsl#2		@its offset from 0x05000100
++	orr r4,r2,r1,lsl#8
++	ldrb_ r1,_gammavalue
++	movs r1,r1
++	beq 0f
++	bl_long hc_gamma
++0:
++	orr r0,r0,r4,lsl#16
++	ldr addy,=HC_VARS
++	ldr r2,[addy,#HC_REC_PTR]
++	ldr r1,[r2,#-4]			@the colour's other byte, same line: one entry
++	eor r1,r1,r0
++	movs r1,r1,lsr#16
++	streq r0,[r2,#-4]
++	ldmeqfd sp!,{r3,r4,pc}
++	ldr r1,[addy,#HC_REC_END]
++	cmp r2,r1
++	strlo r0,[r2],#4
++	strlo r2,[addy,#HC_REC_PTR]
++	ldmfd sp!,{r3,r4,pc}		@full: the rest of the frame's writes are lost
+ @FF69_W	;BCPD - BG Color Palette Data
+ @	ldrb r1,BCPS_index
+ @	and r2,r1,#0x3F
 diff --git a/src/main.c b/src/main.c
 index b1a1a24..895189b 100644
 --- a/src/main.c
@@ -11158,7 +11548,7 @@ index 56f0345..66740fb 100644
  
  static __inline u32 get_sram_owner()
 diff --git a/src/timeout.s b/src/timeout.s
-index 67118de..2b4c506 100644
+index 67118de..847fced 100644
 --- a/src/timeout.s
 +++ b/src/timeout.s
 @@ -35,6 +35,12 @@ line0:
@@ -11174,7 +11564,15 @@ index 67118de..2b4c506 100644
  @	mov r2,#REG_BASE
  @	mov r3,#0x0110				;was 0x0310
  @	strh r3,[r2,#REG_BLDMOD]	;stop darkened screen,OBJ blend to BG0/1
-@@ -599,7 +605,7 @@ _irqGBZ80_:
+@@ -100,6 +106,7 @@ line0x:
+ 
+ 	mov r1,#0
+ 	strb_ r1,scanline		@reset scanline count
++	bl hc_frame_start	@Torii: the palettes at line 0, for hi-colour (lcd.s)
+ @	bl newframe		@display update
+ 
+ 	@now do double speed vblank stuff:
+@@ -599,7 +606,7 @@ _irqGBZ80_:
   .section .iwram.end.105, "ax", %progbits
  @----------------------------------------------------------------------------
  fiveminutes: .word 5*60*60 @fiveminutes_
