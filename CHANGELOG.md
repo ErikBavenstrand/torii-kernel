@@ -4,6 +4,15 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## Unreleased
+
+- **Added:** hi-colour GBC games (Donkey Kong Country's title, and the
+  others that rewrite the background palettes every few lines) show each
+  line's colours, as on a Game Boy Color, instead of the frame's patchy
+  middle-line palettes (jagoombacolor#20, #53). Jagoomba records the
+  palette writes the game makes during the picture and replays them line by
+  line from an HBlank interrupt, only on frames that have them. (3c49daae)
+
 ## v0.9.24
 
 - **Fixed:** after Resume, Save state and Load state, games on Nintendo's
