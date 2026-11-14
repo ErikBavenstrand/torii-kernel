@@ -4,7 +4,7 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
-## Unreleased
+## v0.9.25
 
 - **Added:** hi-colour GBC games (Donkey Kong Country's title, and the
   others that rewrite the background palettes every few lines) show each
