@@ -442,7 +442,7 @@ entries, or picked in the menu): `0x11` SRAM 32K, `0x21` EEPROM 512,
 (treated as 64 KB SRAM). Pokémon Ruby, Sapphire, FireRed, LeafGreen and
 Emerald (`BPEE`, `BPEJ`) are all `0x31`.
 
-**Save and work RAM** (from *ez-flash-omega-de.pdf*, EZ-Flash's document,
+**Save and work RAM** (from EZ-Flash's *EZ-FLASH OMEGA DE DOCUMENT*, a PDF not in this repository,
 matching what the kernel does). `0x0E000000–0x0E00FFFF` shows 64 KB starting
 at page `0x09C00000` × 4 KB:
 
@@ -598,7 +598,7 @@ which `disk_read` passes to FatFs as `RES_ERROR` (the official kernel copied
 the stale buffer and returned 0, so FatFs never saw an error). What other
 status values mean, if any mean a CRC error, isn't known.
 
-**Kernel NOR and the boot loader.** From the official *ez-flash-omega-de.pdf*
+**Kernel NOR and the boot loader.** From EZ-Flash's *EZ-FLASH OMEGA DE DOCUMENT*
 (its NOR allocation lists 16-bit word addresses, so double
 them for bytes) and a bricked cart (2026-10-18):
 

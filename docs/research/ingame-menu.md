@@ -51,7 +51,7 @@ Research for v0.8 (2026-10-25).
 4. [source/GBApatch.c:771-821, ezkernelnew.c:688-715, 1648-1659](../../source/ezkernelnew.c) · HEAD · primary
 5. [docs/research/omega-de-hardware.md](../../docs/research/omega-de-hardware.md) · 2026-10 · primary
 6. [GBATEK](https://problemkaputt.de/gbatek.htm) · undated · primary (read through a summarizing fetch)
-7. EZ-FLASH OMEGA DE DOCUMENT.pdf (repo root) · undated · vendor
+7. EZ-Flash's *EZ-FLASH OMEGA DE DOCUMENT* (a PDF from EZ-Flash, not in this repository) · undated · vendor
 8. [emu/mgba/src/gba/cart/omega.c:715-741](../../emu/mgba/src/gba/cart/omega.c) · HEAD · primary
 9. [CHANGELOG.md](../../CHANGELOG.md) v0.6.1–v0.6.2 · 2026-10-25 · primary
 10. EverDrive GBA PRO user manual (PDF, krikzz via stoneagegamer.com) · 2026-04-20 · vendor

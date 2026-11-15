@@ -123,7 +123,7 @@ enum ui_bank {
 
 // --- Themes ------------------------------------------------------------------
 // Two built-in themes, light and dark, with one layout: switching between
-// them is a palette change. Their colours are docs/design/v0.4/palette.json
+// them is a palette change. Their colours are assets/ui/palette.json
 // (ui/palette.h, generated); their sizes and motions are the shared look of
 // docs/design/v0.4/spec.md, in one place so a tweak is a one-line change.
 

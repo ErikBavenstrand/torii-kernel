@@ -9,7 +9,8 @@
 #include "ff.h"
 #include "tlog.h"
 
-// f_read and f_write take word-aligned buffers (CLAUDE.md)
+// f_read and f_write take word-aligned buffers: FatFs hands whole sectors to
+// Write_SD_sectors, whose 16-bit DMA rounds an odd address down
 #define CHUNK 512
 static FIL sf_file EWRAM_BSS;
 static u8 sf_chunk[CHUNK] EWRAM_BSS ALIGN(4);

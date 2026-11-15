@@ -66,7 +66,7 @@ EVERYTHING = {LINT, TEST, SIZE, ANALYZE, COMPAT}
 # (patterns, tiers, why): fnmatch patterns, where "*" also matches "/"
 RULES = [
     (
-        ["docs/design/v0.4/palette.json", "tools/palette.py"],
+        ["assets/ui/palette.json", "tools/palette.py"],
         {LINT, TEST_HOST},
         "palette source, whose generated C test-host checks",
     ),

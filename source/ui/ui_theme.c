@@ -1,7 +1,7 @@
 // The built-in themes and the palette banks they give (ui.h). Hardware-free:
 // ui/ui_run.c loads the banks this builds. Every look value of the new menu
 // that more than one screen shares is here, from docs/design/v0.4/spec.md;
-// the colours are docs/design/v0.4/palette.json (ui/palette.c).
+// the colours are assets/ui/palette.json (ui/palette.c).
 #include "ui.h"
 #include "ui_priv.h"
 

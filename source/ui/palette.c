@@ -1,4 +1,4 @@
-// The menu's palette, written by tools/palette.py from docs/design/v0.4/palette.json:
+// The menu's palette, written by tools/palette.py from assets/ui/palette.json:
 // don't edit by hand; edit the JSON and run `just palette`.
 #include "palette.h"
 

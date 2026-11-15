@@ -39,12 +39,11 @@ Used on the user's machine or card, never committed or released:
 
 ## Not Torii's
 
-`image.bin` at the root and `docs/research/ez-flash-omega-de.pdf` came with
-the fork. They are EZ-Flash's and have no licence of their own beyond the
-repository's Apache 2.0 file. The build copies the parts of `image.bin` the
-kernel still reads (the FPGA firmware and EZ-Flash's compressed data) into
-`ezkernelnew.bin`, as the official kernel ships them. The PDF is kept for
-reference and goes on EZ-Flash's request.
+`image.bin` at the root came with the fork. It is EZ-Flash's and has no
+licence of its own beyond the repository's Apache 2.0 file. The build copies
+the parts of `image.bin` the kernel still reads (the FPGA firmware and
+EZ-Flash's compressed data) into `ezkernelnew.bin`, as the official kernel
+ships them.
 
 ## Test fixtures
 

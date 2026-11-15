@@ -3,7 +3,7 @@
 # requires-python = ">=3.10"
 # ///
 """Write the menu's palette (source/ui/palette.c and palette.h) from
-docs/design/v0.4/palette.json.
+assets/ui/palette.json.
 
 usage: palette.py [--check]
 
@@ -22,7 +22,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-JSON = ROOT / "docs" / "design" / "v0.4" / "palette.json"
+JSON = ROOT / "assets" / "ui" / "palette.json"
 OUT_C = ROOT / "source" / "ui" / "palette.c"
 OUT_H = ROOT / "source" / "ui" / "palette.h"
 
@@ -96,7 +96,7 @@ def load(data: dict) -> dict:
     }
 
 
-HEAD = "// The menu's palette, written by tools/palette.py from docs/design/v0.4/palette.json:\n// don't edit by hand; edit the JSON and run `just palette`."
+HEAD = "// The menu's palette, written by tools/palette.py from assets/ui/palette.json:\n// don't edit by hand; edit the JSON and run `just palette`."
 
 
 def render_h(p: dict) -> str:

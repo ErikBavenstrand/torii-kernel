@@ -39,3 +39,6 @@ emulators/jagoombacolor/
 emulators/pocketnes/
 emulators/.*-patch
 emulators/out/
+
+# Local instructions for Claude Code, not part of the project
+CLAUDE.md

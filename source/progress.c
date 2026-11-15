@@ -127,7 +127,8 @@ static int percent_hook(void)
 
 // Draws percent into the percentage's label as the label itself would
 // (right-aligned, ui_label_pixels): in IWRAM for the interrupt, with no
-// division (libgcc's is in ROM); extern, as CLAUDE.md asks of IWRAM code.
+// division (libgcc's is in ROM); extern, as IWRAM code stays: GCC would
+// inline a static one into its ROM callers.
 void IWRAM_CODE progress_percent_paint(u32 percent)
 {
 	const struct percent_glyph *g[2 * PERCENT_AFFIX + 3];
@@ -172,7 +173,7 @@ void IWRAM_CODE progress_percent_paint(u32 percent)
 // The VBlank interrupt during the copy: the fill one frame on. In IWRAM,
 // as the kernel's wait is, so it runs whatever the cart does with the ROM
 // meanwhile; it calls nothing (progress_copy_advance is inlined), and
-// extern, as CLAUDE.md asks of IWRAM code.
+// extern, so GCC doesn't inline it into a ROM caller.
 void IWRAM_CODE progress_copy_vblank(void)
 {
 	u32 to = progress_copy_advance(&hook.copy);

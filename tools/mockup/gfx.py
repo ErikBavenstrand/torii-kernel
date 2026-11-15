@@ -1,7 +1,7 @@
 """Drawing kit for the v0.4 mockups: the Paper clean look at 240x160.
 
 Used by tools/mockup/settings.py and keyboard.py. Colours come from
-docs/design/v0.4/palette.json and the shared sizes from source/ui/ui_theme.c
+assets/ui/palette.json and the shared sizes from source/ui/ui_theme.c
 (LOOK), so a mockup drawn here matches what the kernel's theme says. Text is
 drawn from the kernel's own font conversion (tools/font.py, the same options
 as `just font`), so every glyph and advance is the one the GBA draws.
@@ -19,7 +19,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 import font as fontlib
 
 W, H = 240, 160
-PALETTE = json.loads((ROOT / "docs/design/v0.4/palette.json").read_text())
+PALETTE = json.loads((ROOT / "assets/ui/palette.json").read_text())
 ASSETS = ROOT / "assets/ui"
 
 # ui_theme.c LOOK, px

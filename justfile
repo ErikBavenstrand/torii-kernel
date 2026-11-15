@@ -65,6 +65,7 @@ _package stem out:
 
 # Check the build is reproducible: rebuild from a shuffled copy of the source in
 # another folder (tools/repro.sh) and compare with `just build`'s files
+[doc("Check the build is reproducible: rebuild in another folder and compare")]
 repro: build
     #!/usr/bin/env bash
     set -euo pipefail
@@ -106,12 +107,14 @@ sd card *games: build
 # Pull the kernel's logs off an SD card, e.g. `just logs /Volumes/OMEGA`: joined into
 # dist/logs/torii.log, with crash dump addresses named from dist/ezkernelnew.sym
 # if its build ID matches; `--tag v0.2.1` uses that release's symbols, `--sym FILE` others
+[doc("Copy a card's logs to dist/logs/torii.log with crash addresses named, e.g. `just logs /Volumes/OMEGA`")]
 [positional-arguments]
 logs path *args:
     python3 tools/logs.py "$@"
 
 # Write compile_commands.json for clangd, covering the kernel and its unit tests
 # (devkitPro's headers go to dist/devkitpro; .clangd adapts the flags for clang)
+[doc("Write compile_commands.json for clangd")]
 compile-commands: _ready
     mkdir -p dist build build-test
     # The overlay for real first: a dry run doesn't build it, and its .incbin needs it
@@ -121,6 +124,7 @@ compile-commands: _ready
 
 # Kernel size against the cart and GBA memory limits, and the largest symbols;
 # then the test kernel's (tests/kernel linked in), whose EWRAM wraps the same
+[doc("Check the kernel and the test kernel against the kernel area, IWRAM and EWRAM")]
 size count="12": build _test-kernel-build
     {{kernel_docker}} tools/size.sh ezkernelnew.elf ezkernelnew.gba {{count}}
     @echo; echo "Test kernel:"
@@ -191,6 +195,7 @@ shots *scenarios: build emu-headless test-roms _test-kernel-build
 
 # Record the README's screenshots and GIFs (docs/media) on the emulated cart, from tools/media/*.opts;
 # name scenes to record only those
+[doc("Record the README's screenshots and GIFs (docs/media) on the emulated cart")]
 [positional-arguments]
 media *scenes: build emu-headless test-roms
     uv run tools/media.py art
@@ -200,6 +205,7 @@ media *scenes: build emu-headless test-roms
 
 # Re-record the golden screens (tests/shots/hashes.txt and png/) and print what changed;
 # name scenarios to re-record only those, e.g. `just shots-update settings1`
+[doc("Re-record the golden screens; name scenarios to re-record only those")]
 [positional-arguments]
 shots-update *scenarios: build emu-headless test-roms _test-kernel-build
     {{emu_docker}} python3 tests/shots.py --update "$@"
@@ -236,6 +242,7 @@ format:
 
 # Advisory static analysis of source/ (not FatFs): cppcheck, clang-tidy and GCC 10's
 # -fanalyzer. Fails only on findings missing from tools/analyze-baseline.txt
+[doc("Static analysis of source/ with cppcheck, clang-tidy and GCC's -fanalyzer")]
 analyze: _analyze-run
     python3 tools/analyze.py check dist/analyze tools/analyze-baseline.txt
 
@@ -280,6 +287,7 @@ _analyze-run: build compile-commands _analyze-image
 
 # Run the checks the changed files need (against main, or --staged), e.g. `just check`;
 # --full adds the before-merge tier (compat --all), --dry-run only prints the plan
+[doc("Run the checks a change needs (lint, test, size, analyze, compat, repro); --full before a merge")]
 [positional-arguments]
 check *args:
     @JUST={{just_executable()}} python3 tools/check.py "$@"
@@ -291,6 +299,7 @@ _analyze-image: _ready
 # games by code, system, save chip or file name, e.g. `just compat gbc` or `just compat Pokemon`.
 # Unfiltered, it also checks real cheat codes in their games (tests/cheat_codes.sh), alongside:
 # its output follows the games'
+[doc("Play the games in roms/games.toml through the kernel and check boot, saves and clock")]
 [positional-arguments]
 compat *filters: build emu-headless
     #!/usr/bin/env bash
@@ -322,6 +331,7 @@ compat-jobs *filters: emu-headless
 # Build the hardware-free kernel code with tests/host for the host, under ASan and UBSan, and run it;
 # test tools/font.py, tools/asset.py, tools/art.py, tools/art_scrape.py, tools/cheats.py, tools/cheat_encode.py, tools/art_pack.py, tools/library_report.py, tools/card.py, the palette and the upgrade file's layout.
 # They all run at once, each into its own log, printed in order.
+[doc("Build and run the hardware-free tests in tests/host under ASan and UBSan")]
 test-host: emu-image
     #!/usr/bin/env bash
     set -uo pipefail
@@ -347,6 +357,7 @@ test-host: emu-image
 # Run every cheat code type of every format on the cheat test ROM in mGBA's own cheat engine and
 # through Torii, and compare the memory (tests/cheat_engine.sh; part of `just test`).
 # CHEAT_ENGINE_STRICT=0 only reports cases Torii can't run; CHEAT_BUTTON_KEYS the device button's keys (default R+SELECT)
+[doc("Run every cheat code type in Torii and in mGBA's engine and compare the memory")]
 cheat-engine: build emu-headless test-roms
     {{emu_docker}} env CHEAT_ENGINE_JOBS=8 CHEAT_ENGINE_STRICT="${CHEAT_ENGINE_STRICT:-1}" CHEAT_BUTTON_KEYS="${CHEAT_BUTTON_KEYS:-}" tests/cheat_engine.sh
 
@@ -354,6 +365,7 @@ cheat-engine: build emu-headless test-roms
 # never committed) with Torii's decoders and with mGBA's, and explain every difference by a rule of
 # tests/cheat_expected.toml; the report goes to dist/cheat-corpus/report.txt, and a difference no rule
 # explains fails. Another folder of .cht files can be given instead (its report beside them)
+[doc("Decode libretro's GBA cheat database with Torii and mGBA and explain every difference")]
 cheat-corpus dir="dist/cheat-corpus": emu-image
     @emu/fetch.sh
     @if [ "{{dir}}" = dist/cheat-corpus ]; then tools/cheat_corpus_fetch.sh; fi
@@ -362,11 +374,13 @@ cheat-corpus dir="dist/cheat-corpus": emu-image
 # Fuzz the cheat engines: COUNT seeded random cheat programs run in mGBA's engine and through Torii
 # (tests/cheat_fuzz.sh); failing ones are minimized and saved to tests/cheat_fuzz_cases.json, which
 # `just test` runs from then on. E.g. `just cheat-fuzz 7 200`
+[doc("Fuzz the cheat engines, Torii against mGBA, e.g. `just cheat-fuzz 7 200`")]
 cheat-fuzz seed="1" count="100": build emu-headless test-roms
     {{emu_docker}} env CHEAT_ENGINE_JOBS="${CHEAT_ENGINE_JOBS:-8}" tests/cheat_fuzz.sh {{seed}} {{count}}
 
 # Fuzz the cheat decoders alone: COUNT random cheats of each format, addressed anywhere, decoded by
 # Torii's and mGBA's decoders and compared as `just cheat-corpus` does. E.g. `just cheat-fuzz-decode 7 5000`
+[doc("Fuzz the cheat decoders, Torii against mGBA, e.g. `just cheat-fuzz-decode 7 5000`")]
 cheat-fuzz-decode seed="1" count="1000": emu-image
     @emu/fetch.sh
     {{emu_docker}} tests/cheat_fuzz.sh --decode {{seed}} {{count}}
@@ -374,6 +388,7 @@ cheat-fuzz-decode seed="1" count="1000": emu-image
 # Blargg's Game Boy test ROMs and dmg-acid2/cgb-acid2 (fetched into dist/gb-tests on first use, never
 # committed) run through Jagoomba on the emulated cart; the report is dist/gb-tests/report.txt, the
 # acid2 screenshots dist/gb-tests/out/. Reports only: Jagoomba isn't cycle-accurate
+[doc("Run Blargg's GB test ROMs and acid2 through Jagoomba and report the results")]
 gb-accuracy: build emu-headless
     tools/gb_tests_fetch.sh
     {{emu_docker}} tests/gb_accuracy.sh
@@ -382,13 +397,15 @@ gb-accuracy: build emu-headless
 cheat-corpus-fetch:
     tools/cheat_corpus_fetch.sh --refresh
 
-# Convert docs/design/v0.4/palette.json to C: source/ui/palette.c and palette.h
+# Convert assets/ui/palette.json to C: source/ui/palette.c and palette.h
 # (committed; tests/host.sh checks they match), then `just shots-update` for the screens
+[doc("Convert assets/ui/palette.json to C (source/ui/palette.c and palette.h)")]
 palette:
     uv run -q tools/palette.py
 
 # Convert the menu fonts in assets/fonts to C: source/engine/font_body.c and font_heading.c, and
 # their glyphs beyond Latin-1, font_extra.c (committed; tests/font_test.py checks they match)
+[doc("Convert the menu's fonts in assets/fonts to C in source/engine")]
 font:
     uv run -q tools/font.py assets/fonts/galmuri/Galmuri9.bdf --name body --line-height 12 --squeeze --clip -o source/engine/font_body
     uv run -q tools/font.py assets/fonts/galmuri/Galmuri11-Bold.bdf --name heading --line-height 16 --squeeze --clip -o source/engine/font_heading
@@ -396,6 +413,7 @@ font:
 
 # Cut the kernel's glyphs beyond Latin-1 (assets/fonts/galmuri/Galmuri9-extra.bdf) from the pinned
 # Galmuri release (tools/galmuri.py checks its SHA-256; it fetches the zip into dist/galmuri-full)
+[doc("Cut the extra Galmuri glyphs from the pinned release into assets/fonts/galmuri")]
 galmuri:
     python3 -I tools/galmuri.py
 
@@ -403,17 +421,20 @@ galmuri:
 # tests/lang_test.py checks they match), and every lang/<code>.ini, and the
 # test pseudo-locale, into dist/lang/<code>.lng, and the release's packs into
 # dist/torii-lang.zip (`just build` makes those too)
+[doc("Generate source/lang_ids.h and lang_en.c from lang/en.ini, and build the .lng packs")]
 lang:
     python3 tools/lang.py sources
     python3 tools/lang.py packs
 
 # Convert the menu's art in assets/ui (icons, carousel objects, shadows, the placeholder boxes) to C:
 # source/ui/art_data.c and art_ids.h (committed; tests/asset_test.py checks they match)
+[doc("Convert the menu's art in assets/ui to C (source/ui/art_data.c, art_ids.h)")]
 assets:
     uv run -q tools/asset.py ui
 
 # Rewrite the script font the tests use (assets/fonts/test, for the pseudo-locale en-XA;
 # committed, tests/font_test.py checks it is current)
+[doc("Rewrite the test pseudo-locale's script font in assets/fonts/test")]
 script-test-font:
     uv run -q tools/script_test_font.py
 
@@ -436,6 +457,7 @@ _build-test-kernel:
     python3 tools/build_id.py ezkerneltest.gba ezkerneltest.elf
     {{fresh}} record test-kernel -- {{test_kernel_inputs}}
 
+# Build the homebrew test ROMs in tests/roms (only when their sources changed)
 test-roms: _ready
     @{{fresh}} check test-roms {{test_rom_outputs}} -- tests/roms source/eepromprobe.c source/eepromprobe.h source/rumbleprobe.h source/ingameprobe.h source/cartlog.h || {{just_executable()}} _build-test-roms
 
@@ -471,6 +493,7 @@ _cart-copy mode +files:
 # given (files or folders) to the card, then names them, converts your pictures in /torii/art/custom-src,
 # fetches box art, writes cheat files from the cached cheats and reports what's missing. Each step is one
 # of the recipes below. --to, --offline, --no-art, --no-cheats, --fetch-cheats, --dry-run: see --help
+[doc("Set up a card's games in one step: copy, name, covers and cheats, e.g. `just card /Volumes/OMEGA ~/Games/*.gba`")]
 [positional-arguments]
 card sd_path *args:
     uv run -q tools/card.py "$@"
@@ -478,6 +501,7 @@ card sd_path *args:
 # Write the game names database to an SD card, e.g. `just names-update /Volumes/OMEGA`: /torii/names.db
 # from the No-Intro dats of libretro-database (CC BY-SA 4.0; downloaded once to the git-ignored
 # dist/dats, never bundled) and the CRCs of the card's games in /torii/crc.txt. --help lists the options
+[doc("Write No-Intro game names to a card, e.g. `just names-update /Volumes/OMEGA`")]
 [positional-arguments]
 names-update sd_path *args:
     uv run -q tools/names_db.py update "$@"
@@ -485,6 +509,7 @@ names-update sd_path *args:
 # Your own names for many games on an SD card, e.g. `just names-add /Volumes/OMEGA names.tsv`: FILE has
 # a line per game, its file name (with or without the extension), a tab and its name; they go into
 # /torii/names.txt, as Rename's do. --dry-run: see --help
+[doc("Give many games names of your own, e.g. `just names-add /Volumes/OMEGA names.tsv`")]
 [positional-arguments]
 names-add sd_path file *args:
     uv run -q tools/names_db.py add "$@"
@@ -493,6 +518,7 @@ names-add sd_path file *args:
 # converts every picture in /torii/art/custom-src (or a folder given after the card) named after a
 # game's file name, `just art-add "Pokemon Prism.gbc" ~/prism.jpg /Volumes/OMEGA` one game's:
 # /torii/art/custom/NAME.bin, cropped to a square, 80x80, 15 colours dithered. Options: see --help
+[doc("Make custom box art from your pictures, e.g. `just art-add /Volumes/OMEGA`")]
 [positional-arguments]
 art-add +args:
     uv run -q tools/art.py add "$@"
@@ -502,6 +528,7 @@ art-add +args:
 # art already there, and deleting the old placeholders /torii/art/box-<console>.bin. Pictures are
 # cached in the git-ignored dist/art-cache. Box art has no licence grant: keep it on your card, never
 # publish it. --dry-run, --offline, --console: see --help
+[doc("Fetch box art for a card's games from libretro-thumbnails, e.g. `just art-scrape /Volumes/OMEGA`")]
 [positional-arguments]
 art-scrape sd_path *args:
     uv run -q tools/art_scrape.py "$@"
@@ -510,6 +537,7 @@ art-scrape sd_path *args:
 # /torii/cheats/<rom path without extension>.cht, matched by exact CRC32, keeping the files' picks and
 # your own codes. --gamehacking fetches what's missing through a harvester you paste into your browser;
 # the cheats are cached in the git-ignored dist/cheats, never bundled. --only, --base-game: see --help
+[doc("Write cheat files for a card's GBA games from GameHacking.org, e.g. `just cheats /Volumes/OMEGA`")]
 [positional-arguments]
 cheats sd_path *args:
     uv run -q tools/cheats.py "$@"
@@ -519,6 +547,7 @@ cheats sd_path *args:
 # has, so new official games get covers with no PC (romhacks still need `just art-add`). Downloads are
 # cached in dist/art-cache, so a stopped run resumes. Keep the pack on your card, never publish it.
 # --console, --offline, --jobs: see --help
+[doc("Build /torii/art.pak, covers for every official GBA, GB and GBC game, e.g. `just art-pack /Volumes/OMEGA`")]
 [positional-arguments]
 art-pack sd_path *args:
     uv run -q tools/art_pack.py "$@"
@@ -526,6 +555,7 @@ art-pack sd_path *args:
 # Report an SD card's games that need a name or box art, e.g. `just library-report /Volumes/OMEGA`:
 # offline, reads the card only. --write-templates writes names-todo.txt (for `just names-add`) and
 # art-todo.txt here (or --out DIR). Options: see --help
+[doc("List a card's games still missing a name or cover, e.g. `just library-report /Volumes/OMEGA`")]
 [positional-arguments]
 library-report sd_path *args:
     uv run -q tools/library_report.py "$@"
