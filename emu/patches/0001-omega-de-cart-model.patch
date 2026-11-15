@@ -285,6 +285,21 @@ index 37dfe72..2b38bfb 100644
  	uint32_t opcode = cpu->prefetch[0];
  	cpu->prefetch[0] = cpu->prefetch[1];
  	cpu->gprs[ARM_PC] += WORD_SIZE_THUMB;
+diff --git a/src/core/cheats.c b/src/core/cheats.c
+index fe34b03..504dd7d 100644
+--- a/src/core/cheats.c
++++ b/src/core/cheats.c
+@@ -105,7 +105,9 @@ static void _patchROM(struct mCheatDevice* device, struct mCheatSet* cheats) {
+ 	size_t i;
+ 	for (i = 0; i < mCheatPatchListSize(&cheats->romPatches); ++i) {
+ 		struct mCheatPatch* patch = mCheatPatchListGetPointer(&cheats->romPatches, i);
+-		int segment = -1;
++		// Torii: start from the segment a compare found before; with -1 here,
++		// every other refresh re-keyed the patch and also patched the mapped bank
++		int segment = patch->segment;
+ 		if (patch->check && patch->segment < 0) {
+ 			const struct mCoreMemoryBlock* block = mCoreGetMemoryBlockInfo(device->p, patch->address);
+ 			if (!block) {
 diff --git a/src/core/serialize.c b/src/core/serialize.c
 index 19b3225..67ff6e5 100644
 --- a/src/core/serialize.c

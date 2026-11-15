@@ -12,6 +12,8 @@ set -euo pipefail
 . tests/carts.sh
 # shellcheck source=tests/nav.sh
 . tests/nav.sh
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 local_carts "dist/cart-emu-cheats${1:+-$1}"
 
 cart=$carts/emu-cheats
@@ -51,7 +53,7 @@ play() {
   OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_launch "$1" at=100) "${ack[@]}" \
     -s 700:"$cart/game.png" -m "700:0x$wram:4" -m "700:0x$wram100:4" -f 700 >"$cart/out.txt" 2>"$cart/kernel.log" || fail "the emulator failed"
   grep -q '^crash at frame' "$cart/kernel.log" && fail "the emulator caught a crash"
-  grep -q '^kernel error:' "$cart/kernel.log" && fail "errors: $(grep '^kernel error:' "$cart/kernel.log" | head -3)"
+  grep -q '^kernel error:' "$cart/kernel.log" && fail "errors: $(grep '^kernel error:' "$cart/kernel.log" | drain_head -3)"
   grep -qF "kernel: launch: starting the game" "$cart/kernel.log" || fail "$1 wasn't started"
   if [ "${dialog:-}" = 1 ]; then
     grep -qF "kernel: screen ready: dialog" "$cart/kernel.log" || fail "$1: no dialog said what wasn't applied"
@@ -253,7 +255,7 @@ PY
   grep -qF "kernel: launch: starting the game" "$cart/kernel.log" || fail "$real wasn't started"
   grep -qE "kernel: cheats: 1 lines made [1-9][0-9]* patches in the game" "$cart/kernel.log" || fail "$real: the code ($code) patched nothing"
   for pair in ${plan[2]} ${plan[3]}; do
-    got=$(sed -n "s/^mem frame [0-9]* 0*${pair%%:*}: \([0-9A-F]*\).*/\1/p" "$cart/out.txt" | head -1)
+    got=$(sed -n "s/^mem frame [0-9]* 0*${pair%%:*}: \([0-9A-F]*\).*/\1/p" "$cart/out.txt" | drain_head -1)
     [ "$got" = "${pair##*:}" ] || fail "$real: the byte at ${pair%%:*} is $got, wanted ${pair##*:}"
   done
 fi
