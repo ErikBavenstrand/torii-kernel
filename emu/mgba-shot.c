@@ -89,10 +89,10 @@
 // power-on.
 //
 // A .gb or .gbc ROM runs in mGBA's own Game Boy core, the reference for the
-// kernel's Jagoomba (tests/gb_hicolor.sh): -k, -s, -h, -f and -m work, and
-// the screen is 256x224 (room for a Super Game Boy border) with the Game
-// Boy's 160x144 at its top left; the GBA-only options (-a, -T, -X, -E, -R's
-// frame skip) don't apply.
+// kernel's Jagoomba (tests/gb_hicolor.sh): -k, -s, -h, -f, -m and -E (mGBA's
+// GB cheat device: tests/gb_cheat_proof.sh) work, and the screen is 256x224
+// (room for a Super Game Boy border) with the Game Boy's 160x144 at its top
+// left; the GBA-only options (-a, -T, -X, -B, -R's frame skip) don't apply.
 //
 // A BIOS Stop (SWI 3, the sleep) prints "stop at frame N". The CPU then
 // sleeps as the cart's does, until a keypad, serial or Game Pak IRQ enabled

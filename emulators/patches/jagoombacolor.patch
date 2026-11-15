@@ -827,10 +827,10 @@ index 67118de..847fced 100644
  g_hackflags2: .byte 0 @hackflags2
 diff --git a/src/torii_cheats.c b/src/torii_cheats.c
 new file mode 100644
-index 0000000..c8b66be
+index 0000000..aa96334
 --- /dev/null
 +++ b/src/torii_cheats.c
-@@ -0,0 +1,60 @@
+@@ -0,0 +1,62 @@
 +#include "includes.h"
 +
 +// Torii: the RAM writes the kernel's cheat screen picked (source/cheatemu.h,
@@ -859,8 +859,10 @@ index 0000000..c8b66be
 +	{'T', 'O', 'R', 'I', 'I', 'C', 'H', 'T'}, 1, 0, 64, {{0, 0, 0, 0, {0, 0, 0}}}};
 +
 +// Once a GB frame, as the vertical blank starts (lcd.s's newframe_vblank, which
-+// has saved every register): a real GameShark writes in its VBlank interrupt
-+void torii_cheats_run(void)
++// has saved every register): a real GameShark writes in its VBlank interrupt.
++// Torii: in VRAM (.vram1, as dma.c's code), not ROM: run from PSRAM, its code
++// fetches cost about 190 cycles a poke
++__attribute__((section(".vram1"), long_call)) void torii_cheats_run(void)
 +{
 +	u32 n = torii_cheats.count;
 +	if (!n)

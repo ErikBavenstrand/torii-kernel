@@ -44,6 +44,17 @@ new_cart() {
   fi
 }
 
+# The cheat file of FILE (a path from the root) replaced by CHT on the same cart, as the
+# cheat screen rewrites it when a pick changes, after a power-on that answers the
+# last game's "Save to SD card?" (the emulator keeps its settings in the cart's SRAM)
+re_cht() {
+  local file=$1
+  OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin -w "screen ready: dialog" \
+    -k @10:A -k @16:- -u "nor: wrote an empty pending-save record" -f 2000 >/dev/null 2>&1 || true
+  printf '%b' "$2" >"$cart/game.cht"
+  mcopy -o -i "$cart/sd.img" "$cart/game.cht" "::/torii/cheats/${file%.*}.cht"
+}
+
 # Launches FILE and plays; the screen is $cart/game.png
 # With dialog=1, a dialog says picks weren't applied (after the load): A closes it
 play() {
@@ -117,6 +128,9 @@ expect plain "gb without a cheat file"
 new_cart /Cheat.gb "$(cht Red "$(gb 4001 1F E0)")"
 play /Cheat.gb
 expect red "gb genie with its compare" "cheats: 1 lines made 1 patches in the game"
+re_cht /Cheat.gb "$(cht Red "$(gb 4001 1F E0)" | sed 's/enable = true/enable = false/')"
+play /Cheat.gb
+expect plain "gb genie turned off, the next launch on the same cart"
 
 new_cart /Cheat.gb "$(cht Red "$(gb 4001 1F)")"
 play /Cheat.gb
@@ -163,6 +177,12 @@ new_cart /Cheat.gb "$(gs 015500C1)"
 play /Cheat.gb
 expect_count "gb gameshark write to WRAM, every frame" F0
 grep -qF "cheats: 1 pokes written to the emulator's table" "$cart/kernel.log" || fail "gb gameshark: no poke written"
+# the pick turned off, the next launch on the same cart writes nothing: the emulator's table
+# starts empty again, and so does the patched copy (a Game Genie code turned off too)
+re_cht /Cheat.gb "$(gs 015500C1 | sed 's/enable = true/enable = false/')"
+play /Cheat.gb
+expect_count "gb gameshark turned off, the next launch" 00
+! grep -qF "pokes written" "$cart/kernel.log" || fail "gb gameshark turned off: a poke was written"
 
 new_cart /Cheat.gb "$(gs 015500C2)"
 play /Cheat.gb
@@ -300,6 +320,9 @@ expect plain "nes poke game without cheats"
 new_cart /Cheat.nes "$(poke 0300:55)"
 play /Cheat.nes
 expect red "nes raw poke, every frame" "cheats: 1 pokes written to the emulator's table"
+re_cht /Cheat.nes "$(poke 0300:55 | sed 's/enable = true/enable = false/')"
+play /Cheat.nes
+expect plain "nes raw poke turned off, the next launch"
 
 new_cart /Cheat.nes "$(poke 0300:56)"
 play /Cheat.nes

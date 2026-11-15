@@ -107,6 +107,8 @@ jobs=(
   "tests/gb_cheat_games.sh"
   "tests/nes_cheat_proof.sh"
   "tests/emu_cheat_saves.sh"
+  "tests/emu_cheat_speed.sh"
+  "tests/emu_cheat_typing.sh"
   "tests/gb_mode.sh"
   "tests/gb_save.sh"
   "tests/gb_settings.sh"
