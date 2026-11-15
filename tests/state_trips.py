@@ -66,8 +66,10 @@ def run(
     extra_env: dict,
     launch: list[str],
     frames: int,
+    sound: dict | None = None,
 ):
-    """One power-on with the trip script; (lines the script logged, frame -> screen hash, the log)."""
+    """One power-on with the trip script; (lines the script logged, frame -> screen hash, the log).
+    With sound, mgba-shot's -a too, its frames put in sound (tests/m4a_sound.py's parse)."""
     # The clock stands still: a game reading it after the load reads what it
     # read after the save (the real clock runs on, as it should)
     args = [
@@ -83,6 +85,8 @@ def run(
         "trip done|trip torii>nav: home ready",
     ]
     args += launch + ["-H", f"1:{frames}"] + os.environ.get("TRIP_ARGS", "").split()
+    if sound is not None:
+        args += ["-a", f"1:{frames}"]
     env = dict(
         os.environ,
         TZ="UTC",
@@ -103,6 +107,10 @@ def run(
         for f, h in re.findall(r"^hash frame (\d+): (\S+)", p.stdout, re.MULTILINE)
     }
     lines = re.findall(r"^script: trip (.*)$", p.stderr, re.MULTILINE)
+    if sound is not None:
+        import m4a_sound
+
+        sound.update(m4a_sound.parse(p.stdout))
     return lines, hashes, p.stderr
 
 
@@ -186,6 +194,7 @@ class Trips:
         self.mixed: list[
             tuple[str, int]
         ] = []  # loads that showed the state under other registers
+        self.sound = ""  # the first power-on's sound DMAs (tests/m4a_sound.py's judge)
 
     @property
     def status(self) -> str:
@@ -321,10 +330,18 @@ def trips(
     env = {"TRIP_SEED": str(seed), "TRIP_OUT": str(records)}
     steps = run1 if quick else run1 + " torii"
     frames = load_frames + 16000 + (3000 if not quick else 0)
+    sound: dict = {}
     lines, hashes, log = run(
-        cart, sd_name, steps, env, launch_hook(sd_name, G.HOOK_ADDON), frames
+        cart, sd_name, steps, env, launch_hook(sd_name, G.HOOK_ADDON), frames, sound
     )
     t.take(lines, hashes, log)
+    # The sound DMAs after each save and load: on the m4a engine, off until it
+    # re-arms them, then where it has them; on none, on again at once
+    import m4a_sound
+
+    sound_ok, t.sound = m4a_sound.judge(lines, sound, False)
+    if not sound_ok and not t.failed:
+        t.failed = f"sound after the menu: {t.sound}"
     if quick or t.failed:
         return t
     if "states: /torii/states" not in log or "2.state" not in log:

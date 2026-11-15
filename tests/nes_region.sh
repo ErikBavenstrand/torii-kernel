@@ -5,6 +5,8 @@
 # game starts with it again after a power-off. Runs inside the torii-emu
 # container after `just build` and `just emu-headless`.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
 # shellcheck source=tests/nav.sh
@@ -49,7 +51,7 @@ region_row() {
     -w "launch: starting the game" -k @120:L+R -k @126:- "${keys[@]}" \
     -s "@$((f + 20)):$shots/$shot" "$@" >/dev/null 2>"$cart/kernel.log" || fail "the emulator failed"
   grep -q '^crash at frame' "$cart/kernel.log" && fail "the emulator caught a crash"
-  grep -q '^kernel error:' "$cart/kernel.log" && fail "errors: $(grep '^kernel error:' "$cart/kernel.log" | head -3)"
+  grep -q '^kernel error:' "$cart/kernel.log" && fail "errors: $(grep '^kernel error:' "$cart/kernel.log" | drain_head -3)"
   return 0
 }
 # 20 frames after region_row's screenshot

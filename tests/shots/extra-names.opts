@@ -1,0 +1,19 @@
+# File names beyond Latin-1, in English: the kernel's own glyphs
+# (source/engine/font_extra.c, Galmuri9's extended Latin, Greek, Cyrillic,
+# Vietnamese, punctuation and symbols) draw them, with no language pack. The
+# SD card page (source/screens/sdcard.c) at the card's root: the file list,
+# the popup on a Polish and Czech name, and File info, whose heading line
+# draws Galmuri11's glyphs made bold.
+#! sd-put "/Łódź – Žluťoučký kůň.gba" tests/roms/hello/hello.gba
+#! sd-put "/Ελληνικά & Русский.gba" tests/roms/hello/hello.gba
+#! sd-put "/Tiếng Việt “đẹp” ★♪.gba" tests/roms/hello/hello.gba
+#! sd-put "/Ærø Ångström ™ € ….gba" tests/roms/hello/hello.gba
+-w "nav: home ready"
+-k @8:LEFT -k @12:- -k @16:LEFT -k @20:- -k @24:LEFT -k @28:- -k @32:LEFT -k @36:- -k @40:A -k @44:-
+-w "sdcard: counted /"
+-s @2:root.png
+-k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:DOWN -k @48:- -k @56:START -k @60:-
+-w "sdcard: popup"
+-s @12:popup.png
+-k @20:UP -k @24:- -k @32:UP -k @36:- -k @44:A -k @48:-
+-s @80:file-info.png

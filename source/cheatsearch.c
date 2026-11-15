@@ -272,3 +272,35 @@ uint32_t cheatsearch_edit(uint32_t value, uint32_t size, uint32_t mode, uint32_t
 	}
 	return neg ? (0u - mag) & max : mag;
 }
+
+uint32_t cheatsearch_pack(uint8_t *out, const uint8_t *values, const uint8_t *bits, uint32_t n, uint32_t size)
+{
+	uint32_t k = 0;
+	for (uint32_t e = 0; e < n / size; e++)
+		if (bits[e >> 3] >> (e & 7) & 1)
+			for (uint32_t q = 0; q < size; q++)
+				out[k++] = values[e * size + q];
+	return k;
+}
+
+uint32_t cheatsearch_unpack(uint8_t *values, const uint8_t *in, const uint8_t *bits, uint32_t n, uint32_t size)
+{
+	uint32_t k = 0;
+	for (uint32_t e = 0; e < n / size; e++)
+		if (bits[e >> 3] >> (e & 7) & 1)
+			for (uint32_t q = 0; q < size; q++)
+				values[e * size + q] = in[k++];
+	return k;
+}
+
+uint32_t cheatsearch_convert(uint32_t value, uint32_t size, uint32_t from, uint32_t to, uint32_t otherwise)
+{
+	const uint32_t max = cheatsearch_max(size), half = max / 2 + 1;
+	value &= max;
+	// The number: its size and whether it is negative
+	const uint32_t neg = from == CHEATSEARCH_SIGNED && (value & half);
+	const uint32_t mag = neg ? (0u - value) & max : value;
+	if (to == CHEATSEARCH_SIGNED)
+		return neg ? (mag <= half ? (0u - mag) & max : otherwise) : mag < half ? mag : otherwise;
+	return !neg && mag <= cheatsearch_largest(size, to) ? mag : otherwise;
+}

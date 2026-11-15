@@ -1,0 +1,23 @@
+# A game named beyond Latin-1, launched and back, in English with save states
+# on: the launch reads the name through FatFs as it is; the in-game menu
+# (ingame.c) has no script glyphs and folds the name's letters to Latin-1;
+# Back to Torii restarts the kernel, whose question about the game's save names
+# its folder under /torii/saves with the kernel's own glyphs (font_extra.c),
+# and Recent lists the game.
+#! settings 2=1
+#! sd-put "/Łódź Ελλάδα Москва ★.gba" tests/roms/hello/hello.gba
+-w "nav: home ready"
+-P "@8:nav_test_path:/Łódź Ελλάδα Москва ★.gba" -p @8:nav_test_action:0x7E000002
+-w "launch: starting the game"
+-k @300:L+R+START -k @306:-
+-w "screen ready: ingame"
+-s @1:ingame.png
+-k @40:UP -k @44:- -k @52:A -k @56:-
+-w "Torii kernel boot"
+-w "screen ready: dialog"
+-s @4:dialog.png
+-k @8:A -k @12:-
+-w "nav: home ready"
+-k @8:A -k @12:-
+-w "nav: page recent ready"
+-s @2:recent.png

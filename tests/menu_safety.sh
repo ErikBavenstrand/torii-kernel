@@ -28,6 +28,8 @@
 # (OMEGA_BIOS_STACK, emu/patches): the record was lost on the real cart
 # until the stub moved that stack before its SoftReset.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
 # shellcheck source=tests/nav.sh
@@ -94,7 +96,7 @@ else
   grep -q '^crash at frame' <<<"$log" && fail "crashed"
   grep -q '^script: hook [0-9]* patch ' <<<"$log" || fail "the kernel did not hook the game"
   grep -q '^script: hook watch done' <<<"$log" || fail "the run ended early"
-  key=$(sed -n 's/^script: hook \([0-9]*\) key L+R+START$/\1/p' <<<"$log" | head -1)
+  key=$(sed -n 's/^script: hook \([0-9]*\) key L+R+START$/\1/p' <<<"$log" | drain_head -1)
   [ -n "$key" ] || fail "no menu key pressed"
   hash_at() { awk -v f="$1" '$1 == "hash" && $3 == f ":" { print $4 }' <<<"$out"; }
   screens_after() { awk -v f="$1" '$1 == "hash" && $3 + 0 > f { print $4 }' <<<"$out" | sort -u | wc -l; }

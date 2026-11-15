@@ -509,11 +509,15 @@ void test_text_script(void)
 	u32 bytes = make_blob(blob, 1);
 	u32 pos = 0;
 
-	// No script font: Latin Extended-A folds, other scripts draw the box
-	CHECK(script_of(&font_body) == NULL);
-	CHECK_EQ(text_next_glyph(&font_body, "\xC5\x81", 2, &pos), G('L'));
+	// No pack's font: the kernel's own glyphs (font_extra.c), here a Polish L
+	// and an Alpha; kana, which they lack, draws the box
+	CHECK(script_of(&font_body) != NULL && script_of(&other_font) == NULL);
+	CHECK(text_next_glyph(&font_body, "\xC5\x81", 2, &pos) >= (int)TORII_FONT_SCRIPT);
 	pos = 0;
-	CHECK_EQ(text_next_glyph(&font_body, "\xCE\x91", 2, &pos), TORII_FONT_REPLACEMENT);
+	CHECK(text_next_glyph(&font_body, "\xCE\x91", 2, &pos) >= (int)TORII_FONT_SCRIPT);
+	pos = 0;
+	CHECK_EQ(text_next_glyph(&font_body, "\xE3\x83\x86", 3, &pos), TORII_FONT_REPLACEMENT);
+	pos = 0;
 	CHECK_EQ(script_use(blob, bytes - 4), 0);
 
 	CHECK_EQ(script_use(blob, bytes), 1);
@@ -615,13 +619,61 @@ void test_text_script(void)
 	CHECK_EQ(script_use(blob, two), 1);
 	CHECK_EQ(script_of(&font_heading)->dy, 0);
 
+	// Dropped (a launch): the kernel's own glyphs again, not the pack's
 	script_drop();
-	CHECK(script_of(&font_body) == NULL);
+	CHECK(script_of(&font_body) != NULL && script_of(&font_body)->glyph_count > 4);
 	pos = 0;
-	CHECK_EQ(text_next_glyph(&font_body, "\xCE\x92", 2, &pos), TORII_FONT_REPLACEMENT);
-	CHECK_EQ(text_width(&font_body, s, len), font_body.glyphs[G('A')].advance +
-							 3 * font_body.glyphs[TORII_FONT_REPLACEMENT].advance +
-							 font_body.glyphs[G('z')].advance);
+	int beta = text_next_glyph(&font_body, "\xCE\x92", 2, &pos);
+	CHECK(beta >= (int)TORII_FONT_SCRIPT && beta != (int)TORII_FONT_SCRIPT + 2);
+}
+
+// The kernel's own glyphs beyond Latin-1 (font_extra.c, `just font --extra`):
+// the blob reads, with Galmuri11's glyphs made bold for the heading font, and the
+// letters of extended Latin, Greek, Cyrillic, Vietnamese and the punctuation
+// file names have each get a glyph inside the line
+void test_script_extra(void)
+{
+	// The whole blob passes the checks a pack's font gets (the kernel reads its
+	// own without walking every glyph: script.c's extra_start)
+	CHECK_EQ(script_use((const u8 *)font_body_extra, font_body_extra_bytes), 1);
+	script_drop();
+	const struct torii_script *body = script_of(&font_body), *heading = script_of(&font_heading);
+	CHECK(body != NULL && heading != NULL);
+	CHECK(body->glyph_count > 800 && heading->glyph_count > 800);
+	CHECK(heading->glyphs != body->glyphs);  // Galmuri11's, made bold
+	CHECK_EQ(heading->dy, 0);
+	static const u32 cps[] = {
+		0x100,  0x107,  0x10D,  0x111,  0x119,  0x11B,  0x11F,  0x131,  0x142,  0x144,  0x151,  0x159,
+		0x15B,  0x15F,  0x161,  0x16F,  0x171,  0x17C,  0x17E,  0x17F,  0x219,  0x21B,  0x391,  0x3A9,
+		0x3B1,  0x3C9,  0x401,  0x410,  0x416,  0x44F,  0x451,  0x491,  0x1EA0, 0x1EBF, 0x1EF9, 0x2013,
+		0x2014, 0x2018, 0x2019, 0x201C, 0x201D, 0x2026, 0x20AC, 0x2122, 0x2190, 0x2605, 0x2665, 0x266A,
+	};
+	for (u32 i = 0; i < sizeof(cps) / sizeof(cps[0]); i++) {
+		int g = script_glyph(body, cps[i]);
+		CHECK(g >= (int)TORII_FONT_SCRIPT);
+		if (g < 0)
+			continue;
+		const struct torii_glyph *e = torii_font_glyph(&font_body, (u32)g);
+		CHECK(e->advance > 0 && e->rows > 0 && e->top + e->rows <= font_body.line_height);
+		g = script_glyph(heading, cps[i]);
+		CHECK(g >= (int)TORII_FONT_SCRIPT);
+		if (g < 0)
+			continue;
+		const struct torii_glyph *h = torii_font_glyph(&font_heading, (u32)g);
+		CHECK(h->advance > e->advance && h->rows > 0 && h->top + h->rows <= font_heading.line_height);
+	}
+	// Outside the ranges: kana and Hangul draw the box
+	CHECK_EQ(script_glyph(body, 0x30C6), -1);
+	CHECK_EQ(script_glyph(body, 0xAC00), -1);
+	// "Łódź" is four glyphs, the ó Latin-1's own
+	u32 pos = 0;
+	static const char lodz[] = "\xC5\x81\xC3\xB3"
+				   "d\xC5\xBA";
+	CHECK(text_next_glyph(&font_body, lodz, 7, &pos) >= (int)TORII_FONT_SCRIPT);
+	CHECK_EQ(text_next_glyph(&font_body, lodz, 7, &pos), 0xF3 - TORII_FONT_FIRST);
+	CHECK_EQ(text_next_glyph(&font_body, lodz, 7, &pos), G('d'));
+	CHECK(text_next_glyph(&font_body, lodz, 7, &pos) >= (int)TORII_FONT_SCRIPT);
+	CHECK_EQ(pos, 7);
 }
 
 void test_charset_raw(void)

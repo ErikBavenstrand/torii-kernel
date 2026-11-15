@@ -32,6 +32,8 @@
 # Runs inside the torii-emu container after `just build`, `just emu-headless`
 # and building tests/roms/savetest.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
 # shellcheck source=tests/nav.sh
@@ -159,7 +161,7 @@ rom-read-error)
   sectors=$(sd_sectors "$cart/sd.img" /Test.gba)
   # shellcheck disable=SC2046 # nav.sh's options
   OMEGA_SD_READ_ERROR=$sectors boot $(nav_launch /Test.gba save=5 at=180) -f 900
-  err=$(grep -a '^kernel error: ' "$cart/run.log" | head -1)
+  err=$(grep -a '^kernel error: ' "$cart/run.log" | drain_head -1)
   [ -n "$err" ] || fail "no error line: $(grep -a 'kernel: launch' "$cart/run.log" | tail -3)"
   echo "  the launch logged: $err"
   ! grep -q 'launch: starting the game' "$cart/run.log" || fail "the game started after its ROM's read failed"
@@ -188,7 +190,7 @@ rom-read-error)
   boot -f 6000 -u "names: wrote /torii/crc.txt"
   # shellcheck disable=SC2046
   OMEGA_SD_READ_ERROR=$late boot $(nav_launch /Test.gba addon at=180) -f 1500
-  err=$(grep -a '^kernel error: launch: reading Test.gba at ' "$cart/run.log" | head -1 || true)
+  err=$(grep -a '^kernel error: launch: reading Test.gba at ' "$cart/run.log" | drain_head -1 || true)
   [ -n "$err" ] || fail "no read error line: $(grep -a 'kernel: launch' "$cart/run.log" | tail -3)"
   case $err in *"at 262144 "*) ;; *) fail "the error is not at block 3: $err" ;; esac
   echo "  the launch logged: $err"
@@ -610,7 +612,7 @@ nearly-full)
   logged 'save: "Save to SD card?" for /torii/saves/Test.gba/Main.sav, 131072 bytes, save type 31: A, save'
   grep -q "^kernel: screen ready: progress" "$cart/run.log" || fail "no progress dialog for the copy"
   logged "save: wrote /torii/saves/Test.gba/Main.sav, 131072 bytes, verified"
-  grep -q "^kernel error:" "$cart/run.log" && fail "errors: $(grep '^kernel error:' "$cart/run.log" | head -3)"
+  grep -q "^kernel error:" "$cart/run.log" && fail "errors: $(grep '^kernel error:' "$cart/run.log" | drain_head -3)"
   grep -q "^kernel: nav: home ready" "$cart/run.log" || fail "no menu after the copy"
   [ "$(save_record)" = 4f4d525802 ] || fail "the save has $(save_record), expected the second boot record"
   left=$(mdir -i "$cart/sd.img" ::/ | sed -n 's/^ *\([0-9 ]*\) bytes free.*/\1/p' | tr -d ' ')

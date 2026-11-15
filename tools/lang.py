@@ -34,7 +34,9 @@ The .ini format (UTF-8):
 language calls itself, shown in Settings), and in en.ini launch, the
 sections a game's launch reads after the game fills PSRAM (lang.h:
 lang_before_launch). Those sections come first in en.ini.
-A language that needs characters beyond Latin-1 also names a script font:
+A language that needs characters beyond the kernel's own glyphs (Latin-1,
+and source/engine/font_extra.c's extended Latin, Greek and Cyrillic) also
+names a script font, which replaces font_extra.c's while the pack is in use:
   font = assets/fonts/NAME.bdf         a BDF (path from the repository's root),
                                        for the body font's lines (12 px)
   font_heading = assets/fonts/NAME.bdf the heading font's (16 px); without it

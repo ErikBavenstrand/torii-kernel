@@ -7,6 +7,8 @@
 # $A5 to $6001. Runs inside the torii-emu container after `just build` and
 # `just emu-headless`.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
 # shellcheck source=tests/nav.sh
@@ -31,7 +33,7 @@ play() {
   OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_launch /Save.nes at=100) \
     -w "launch: starting the game" -s "@$1:$cart/end.png" >/dev/null 2>"$cart/kernel.log" || fail "the emulator failed"
   grep -q '^crash at frame' "$cart/kernel.log" && fail "the emulator caught a crash"
-  grep -q '^kernel error:' "$cart/kernel.log" && fail "errors: $(grep '^kernel error:' "$cart/kernel.log" | head -3)"
+  grep -q '^kernel error:' "$cart/kernel.log" && fail "errors: $(grep '^kernel error:' "$cart/kernel.log" | drain_head -3)"
   return 0
 }
 

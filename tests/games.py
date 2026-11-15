@@ -50,7 +50,11 @@ Checks, each pass, fail, untested (the run didn't get that far) or n/a:
   across scenes (tests/state_trips.py): each load must give back the
   frames and memory that followed its save, frame for frame, in game, after
   Reset game, Back to Torii and a launch into the slot, with real cheats on
-  where tests/cheat_codes.toml has some; n/a where the in-game menu is
+  where tests/cheat_codes.toml has some; n/a where the in-game menu is.
+  Its first power-on also checks the sound DMAs after each save and load
+  (tests/m4a_sound.py's judge): a game on Nintendo's MP2000 engine has them
+  off until the engine re-arms them, then where it has them; another, on
+  again at once
 
 A game with a starting save (roms/<name>.sav, .esv for GB/GBC) and a key
 script (tests/games/<code>.keys) plays that script instead, saves in-game and
@@ -757,6 +761,7 @@ def check_trips(
     t = state_trips.trips(rom, sd_name, cart, seed=1, save=start_save, cheats=cheats)
     result.metrics["state trips"] = "; ".join(t.info)
     result.metrics["state loads"] = t.counts()
+    result.metrics["m4a sound"] = t.sound
     if cheats:
         result.notes.append(
             "state trips with its cheats from tests/cheat_codes.toml on"

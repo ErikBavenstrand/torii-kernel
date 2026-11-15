@@ -225,6 +225,7 @@ files) into the card's `/torii/lang` first.
 |---|---|
 | Swedish on the cart | Settings, System, Language: pick Svenska with A. Settings comes back in Swedish at once, then home; the log has `lang: sv`. Walk home, a game list and its popup, Saves, Info and the in-game menu of a GBA game started with addons: every text Swedish, none cut in a way the emulator's goldens (`tests/shots/sv-*`) don't show, å, ä and ö drawn |
 | After a power cycle | switch off and on: the menu starts in Swedish |
+| Extended Latin, Greek and Cyrillic names | copy a game named `Łódź Ελλάδα Москва ★.gba` to the card: the SD page lists it with every letter drawn, File info's heading too, and it starts; the in-game menu is English; Back to Torii's save question names its folder |
 | Back to English | Language, English: Settings comes back in English. Set it back before the Diagnostics run, so its report reads the same as every other |
 
 ## In Diagnostics

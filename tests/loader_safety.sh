@@ -20,6 +20,8 @@
 # dist/release-v0.2.2/ezkernelnew.bin, to see it fail. Runs inside the
 # torii-emu container after `just build`, `just emu-headless` and the test ROMs.
 set -uo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 
 kernel=${KERNEL:-dist/ezkernelnew.bin}
 # shellcheck source=tests/carts.sh
@@ -63,7 +65,7 @@ new_cart() {
   mcopy -i "$cart/sd.img" "$root/B.gba" ::/B.gba
   mcopy -i "$cart/sd.img" tests/roms/savetest/flash128.gba ::/Test.gba
   OMEGA_DIR=$cart emu/build-linux/mgba-shot "$kernel" -f 1 >/dev/null 2>&1
-  [ "$(tail -c +$((0x7C00A0 + 1)) "$cart/kernel-nor.bin" | head -c 12)" = "TORII LOADER" ] ||
+  [ "$(tail -c +$((0x7C00A0 + 1)) "$cart/kernel-nor.bin" | drain_head -c 12)" = "TORII LOADER" ] ||
     bad "the emulator didn't seed the loader"
   # Logging on, and Start on Home: the pages' routes start from home
   settings 26=2 32=2

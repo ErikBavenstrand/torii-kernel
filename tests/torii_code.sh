@@ -7,6 +7,8 @@
 # interpreter runs it each frame as the game runs.
 # Runs inside the torii-emu container after `just build`, `just emu-headless`.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
 # shellcheck source=tests/nav.sh
@@ -38,7 +40,7 @@ out=$(OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_launc
 log=$(cat "$cart/log")
 grep -q '^crash at frame' <<<"$log" && fail "crashed"
 grep -q 'cheats: /torii/cheats/Hello.cht: 1 picked, 1 run in game' <<<"$log" ||
-  fail "the launch: $(grep 'cheats:' <<<"$log" | head -3)"
+  fail "the launch: $(grep 'cheats:' <<<"$log" | drain_head -3)"
 
 # The four halfwords at a dump, as hex
 at() { awk -v f="$1" '$1 == "mem" && $3 == f { print $6 $5 " " $8 $7 " " $10 $9 " " $12 $11 }' <<<"$out"; }

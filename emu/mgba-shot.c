@@ -68,6 +68,16 @@
 //                    0-159 scan out prints a "tear:" line (see the tear
 //                    watch below); the run ends with "tears: N". The window
 //                    doesn't make the run longer: -T 1:99999 watches it all
+//   -a FROM:TO       after every frame from FROM to TO (as -H takes them),
+//                    print the sound FIFO DMAs' place: "sound frame N: dma1
+//                    SRC CNT_H dma2 SRC CNT_H fifo BYTES", SRC the channel's
+//                    internal source (where its next transfer reads), BYTES
+//                    those FIFO A holds that it hasn't played, and, when the
+//                    word at 0x3007FF0 points at the SoundInfo of Nintendo's
+//                    MP2000 (m4a) sound engine (its ident "Smsh" or "Smsh"+1),
+//                    "m4a PTR COUNTER PERIOD SAMPLES": its pcmDmaCounter,
+//                    pcmDmaPeriod and pcmSamplesPerVBlank, so a test can tell
+//                    where the engine expects DMA1 to read (tests/m4a_sound.py)
 //   -R               draw every frame. By default mGBA's renderer draws only
 //                    the frames a -s, -h or -H looks at, and the frame before
 //                    each (which leaves the renderer as if every frame had
@@ -77,6 +87,12 @@
 //
 // RAM starts filled with 0xA5 (poison_ram), as the cart's holds junk at
 // power-on.
+//
+// A .gb or .gbc ROM runs in mGBA's own Game Boy core, the reference for the
+// kernel's Jagoomba (tests/gb_hicolor.sh): -k, -s, -h, -f and -m work, and
+// the screen is 256x224 (room for a Super Game Boy border) with the Game
+// Boy's 160x144 at its top left; the GBA-only options (-a, -T, -X, -E, -R's
+// frame skip) don't apply.
 //
 // A BIOS Stop (SWI 3, the sleep) prints "stop at frame N". The CPU then
 // sleeps as the cart's does, until a keypad, serial or Game Pak IRQ enabled
@@ -796,6 +812,7 @@ struct options {
 	struct events states;
 	struct events ranges;
 	struct events tears;
+	struct events sounds;
 	struct events buttons;
 	const char *cheatFile;
 	const char *outDir;
@@ -934,6 +951,16 @@ static void parse_options(struct options *opts, int argc, char **argv)
 			}
 			ev->end = end.frame;
 			note_frame(ev, 0);
+		} else if (!strcmp(argv[i], "-a")) {
+			struct event *ev = add_event(&opts->sounds, argv[++i]);
+			struct event end = {0};
+			parse_frame(&end, ev->arg);
+			if (end.wait != ev->wait || end.frame < ev->frame) {
+				fprintf(stderr, "-a %s: FROM and TO must both be @N or both frames, FROM first\n",
+					argv[i]);
+				exit(2);
+			}
+			ev->end = end.frame;  // a window only, as -T's
 		} else if (!strcmp(argv[i], "-T")) {
 			struct event *ev = add_event(&opts->tears, argv[++i]);
 			struct event end = {0};
@@ -1068,6 +1095,29 @@ static unsigned last_frame(const struct events *events, unsigned frames)
 	return frames;
 }
 
+// -a: the sound FIFO DMAs' internal source, and the m4a engine's view of it.
+static void print_sound(struct mCore *core, unsigned frame)
+{
+	const struct GBA *gba = core->board;
+	const struct GBADMA *dma = gba->memory.dma;
+	// FIFO A's samples read but not played yet: its words, and the bytes
+	// left of the one playing
+	const struct GBAAudioFIFO *a = &gba->audio.chA;
+	int words = (a->fifoWrite - a->fifoRead + GBA_AUDIO_FIFO_SIZE) % GBA_AUDIO_FIFO_SIZE;
+	printf("sound frame %u: dma1 %08X %04X dma2 %08X %04X fifo %d", frame, dma[1].nextSource, (unsigned)dma[1].reg,
+	       dma[2].nextSource, (unsigned)dma[2].reg, words * 4 + a->internalRemaining);
+	uint32_t info = core->rawRead32(core, 0x03007FF0, -1);
+	int in_ram = (info >> 24 == 0x02 && (info & 0xFFFFFF) < 0x40000) ||
+		     (info >> 24 == 0x03 && (info & 0xFFFFFF) < 0x8000);
+	uint32_t ident = in_ram && !(info & 3) ? core->rawRead32(core, info, -1) : 0;
+	if (ident - 0x68736D53u <= 1) {
+		printf(" m4a %08X %u %u %u", info, (unsigned)core->rawRead8(core, info + 4, -1),
+		       (unsigned)core->rawRead8(core, info + 0xB, -1),
+		       (unsigned)core->rawRead32(core, info + 0x10, -1));
+	}
+	printf("\n");
+}
+
 // Prints the screen's hash, as -h does.
 static void print_hash(unsigned frame, const color_t *pixels, unsigned width, unsigned height)
 {
@@ -1194,7 +1244,12 @@ int main(int argc, char **argv)
 		return 1;
 	}
 	core->reset(core);
-	poison_ram(core);
+	// The GBA's own: a Game Boy ROM (mGBA's GB core, the reference for
+	// Jagoomba) runs with none of the GBA-only parts below
+	int gba = core->platform(core) == mPLATFORM_GBA;
+	if (gba) {
+		poison_ram(core);
+	}
 	if (getenv("TORII_COVERAGE")) {
 		cover_start(core, getenv("TORII_COVERAGE"), argv[1]);
 	}
@@ -1281,7 +1336,7 @@ int main(int argc, char **argv)
 
 	int status = 0;
 	int draw_all = opts.drawAll || opts.nscripts || opts.realtime || opts.gdbPort || opts.tears.count;
-	struct GBAVideo *video = &((struct GBA *)core->board)->video;
+	struct GBAVideo *video = gba ? &((struct GBA *)core->board)->video : NULL;
 	unsigned frame;
 	for (frame = 1; frame <= frames; ++frame) {
 		current_frame = frame;
@@ -1305,7 +1360,9 @@ int main(int argc, char **argv)
 			tear_on |= in_range(&opts.tears.list[i], frame);
 		}
 		// mGBA's frame skip: the counter is checked before each line is drawn
-		video->frameskipCounter = draw_all || draws(&opts, frame) ? 0 : 1;
+		if (video) {
+			video->frameskipCounter = draw_all || draws(&opts, frame) ? 0 : 1;
+		}
 		if (debugger) {
 			mDebuggerRunFrame(debugger);
 			if (debugger->state == DEBUGGER_SHUTDOWN) {
@@ -1315,7 +1372,7 @@ int main(int argc, char **argv)
 			core->runFrame(core);
 		}
 		static bool was_stopped;
-		bool stopped = ((struct GBA *)core->board)->stopped;
+		bool stopped = gba && ((struct GBA *)core->board)->stopped;
 		if (was_stopped && !stopped) {
 			fprintf(stderr, "wake at frame %u\n", current_frame);
 		}
@@ -1372,6 +1429,12 @@ int main(int argc, char **argv)
 		for (size_t i = 0; i < opts.hashes.count; ++i) {
 			if (due(&opts.hashes.list[i], frame)) {
 				print_hash(frame, buffer, width, height);
+			}
+		}
+		for (size_t i = 0; i < opts.sounds.count; ++i) {
+			if (in_range(&opts.sounds.list[i], frame)) {
+				print_sound(core, frame);
+				break;
 			}
 		}
 		for (size_t i = 0; i < opts.ranges.count; ++i) {

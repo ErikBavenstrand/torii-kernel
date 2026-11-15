@@ -32,15 +32,18 @@ work RAM*), so page `0x20` is offset `0x20000`.
 | `0x00000-0x1FFFF` | the game's save |
 | `0x20000-0x3FFFF` | the overlay's backups: OBJ VRAM (16 KB), OAM (1 KB), OBJ palette (512 B), the EWRAM window (24 KB), registers |
 | `0x40000-0xAFFFF` | the save-state buffer (unchanged) |
-| `0xB0000-0xB5FFF` | the overlay's image |
+| `0xB0000-0xB5FFF` | the overlay's image: its core, which the stub loads (v0.9.23: its extension moved to `0xF2000`) |
 | `0xB6000-0xBFFFF` | the session block, kernel to overlay and back |
 | `0x2C800-0x2D9FF` | the game's IWRAM a screenshot's packing borrows (its table, buffer and ARM code) |
 | `0x2E000-0x2E0CF` | the cheats the cheat search found, for Back to Torii (v0.9, `struct ingame_found`) |
 | `0x30000-0x3C0FF` | the cheat list's names whole, for the highlighted row's marquee (v0.10, `struct ingame_wide`) |
-| `0x3C400-0x3F10F` | the cheat search's lines and number glyphs (v0.9: the session block has no room) |
+| `0x3C100-0x3FFFF` | the cheat search's lines (v0.9: the session block has no room); its glyphs at `0x2DA00` |
 | `0x40000-0x91FFF` | while a cheat search runs, in the save-state buffer: its snapshot, candidates and head ([v0.9/cheat-search.md](../v0.9/cheat-search.md)) |
 | `0xC0000-0xEFFFF` | the screenshots (P4): up to 5 records of `struct ingame_shot` and the packed palettes, OAM, VRAM |
-| `0xF0000` | the cart log (`source/cartlog.h`) |
+| `0xF0000-0xF1FFF` | the cart log (`source/cartlog.h`); at `0xF1D00`, found cheats a boot couldn't file, with their game's path (v0.9.23, `struct ingame_found_wait`) |
+| `0xF2000-0xF6FFF` | the overlay's extension and IWRAM code (v0.9.23, `INGAME_SRAM_EXT`): the cart log's room for a launch's cheat patches, free once the launch applied them |
+| `0xF7000-0xFDFFF` | the cheat search's Undo: the snapshot's values the last pass wrote over (v0.9.23) |
+| `0xFE000-0xFFFFF` | the cheat search's lines past the first block's 60, and the Cheat search row with its count (v0.9.23) |
 
 ### The ABI
 
@@ -82,7 +85,23 @@ write-only, so a menu on a BG can't give them back (today's BG2 affine bug).
 ## IRQs, DMA, sound and input
 
 - Run in IRQ mode with IME 0, polling `VCOUNT`, as today.
-- Clear and restore the DMA0-3 `CNT_H` registers, as today.
+- Clear and restore the DMA0-3 `CNT_H` registers, as today. Not the sound DMAs of
+  Nintendo's MP2000 (m4a, "Sappy") engine (the word at `0x3007FF0` points into EWRAM or
+  IWRAM at a SoundInfo whose ident is `Smsh`, or `Smsh` + 1 while its SoundMain runs):
+  after Resume, SAVE and LOAD the stub leaves DMA1 and DMA2 off for the engine to turn on
+  (`m4a_hold`), which its `m4aSoundVSync` does at its next re-arm (pret's decomps,
+  `src/m4a_1.s`). The engine points their source at its PCM buffer once (`SoundInit`) and
+  re-arms them there every `pcmDmaPeriod` frames, so between re-arms they are partway
+  through it; turned on at once, they started at the buffer's start and played the wrong
+  segments until that re-arm, up to `pcmDmaPeriod` - 1 frames (a glitch on every m4a game
+  measured, 49 of them; `tests/m4a_sound.py`). Off, the sound comes back where the engine
+  has it after at most that many frames of silence (6 in Pokémon's 7 x 224-byte buffer, 11
+  in the 12 x 132 of Wolfenstein 3D and Super Street Fighter II Turbo Revival). Starting
+  them at their place instead needs the buffer's address, which only the write-only source
+  register holds: SoundInfo's `pcmBuffer` (offset `0x350`) is it in most games, but not in
+  Camelot's (Golden Sun: The Lost Age, Mario Golf: Advance Tour, Mario Power Tennis), whose
+  buffer is elsewhere and which a wrong source would have left playing other memory until
+  the game set it again.
 - Mute through `SOUNDCNT_L` and `SOUNDCNT_H` (readable), not the `SOUNDCNT_X` master switch:
   zeroing it resets the PSG, which is today's noise bug.
 - Edge-detect the keys with auto-repeat; on opening, wait for the menu key's release; on
@@ -130,8 +149,10 @@ write-only, so a menu on a BG can't give them back (today's BG2 affine bug).
   the kernel's check mark, then "All off", "Back to my picks" and "Cheat search" in the
   accent, as the kernel's list ends in "+ Add code"; the cursor starts on the first cheat.
   The title shows how many are on ("✓ 3/8"), drawn with the kernel's number glyphs. LEFT
-  and RIGHT page through it. The list's own code (the count, toggling, the marquee) and the
-  lists' scrolling are the extension's (ext_load, as the cheat search's): every byte of the
+  and RIGHT page through it. The list's own code (the count, toggling, the marquee, its
+  footers) and the lists' scrolling are the extension's first part (ext_load; v0.9.23 split
+  the extension in two, the lists' 3.4 KB and the search's, which only the search pages
+  load, each read back and checked, so the save and cheat pages open as fast as before): every byte of the
   overlay's image costs the menu's opening time, since the stub backs up the window and
   loads the image at each opening; 400 more bytes cost it a frame. Its footer
   says why the row under the cursor can't change, else that the toggles are kept.
@@ -248,7 +269,8 @@ and paging spare PSRAM from the menu (tier C) stay off until the cart probe says
   channels the game had repeating on a timing on again with the addresses the game last
   wrote: within one game nearly always what it wrote before the save (a launch into a
   state has the game's start's, and Need for Speed's double-buffered DMA shows a frame
-  or two otherwise). A channel restarts at its source's start, so a
+  or two otherwise); the m4a engine's are left for it to re-arm (above). A channel
+  restarts at its source's start, so a
   game counting its sound DMA's IRQs (Metroid) goes on a little otherwise: the state
   trips call that drift. The trips call a load whose screen went otherwise while all a
   CPU can read was the save's a display load: the write-only registers above (Wario

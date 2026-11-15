@@ -25,7 +25,9 @@
 #       moves the block on; a new search, Equals 175, SELECT, Up by 25 finds
 #       it again; Check the pointers keeps those that point the same way;
 #       its value set to 999 and kept through the first, the coins read
-#       0999, and Back to Torii files [POINTER]+24:0999.
+#       0999, and Back to Torii files [POINTER]+24:0999. A keep from the
+#       first list, before any Check, is off (v0.9.23), and the checked keep
+#       of the same pointer replaces it: one record, on.
 # cut:  set's run, the power cut at each cutpoint (tests/cutsweep.sh), the
 #       filing's write among them. Cart SRAM past the save has no battery,
 #       so the found cheat is lost with a cut: the next launch reads the
@@ -33,6 +35,8 @@
 #
 # Runs inside the torii-emu container after `just build`, `just emu-headless`.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
 # shellcheck source=tests/nav.sh
@@ -76,6 +80,8 @@ keys() {
   done
 }
 wait_for() { args+=(-w "$1"); }
+# shot @N NAME: with SEARCH_SHOTS set (a folder), the screen at @N as NAME there
+shot() { if [ -n "${SEARCH_SHOTS:-}" ]; then args+=(-s "$1:$SEARCH_SHOTS/$2"); fi; }
 
 # The menu to the search page: with a cheat list its row is on the list's
 # page (its last row: UP from the first cheat), else on the menu (past Save state, Load
@@ -126,11 +132,16 @@ if [ "$mode" = ptr ]; then
   keys 10 DOWN DOWN A
   wait_for "search: pointers found"
   wait_for "screen ready: ingame-search-pointers"
+  shot @6 ptr-found.png
+  # Kept before a Check: off (filed unpicked); the checked keep later
+  # replaces its record
+  keys 10 A
+  wait_for "search: kept a cheat through a pointer, off"
   keys 10 B B B B B
   keys 120 B
   args+=(-k @200:L+R+START -k @206:-)
   to_search
-  keys 10 DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN A
+  keys 10 DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN A A # New search asks first: A again
   wait_for "screen ready: ingame-search"
   keys 10 A
   wait_for "search: started"
@@ -153,6 +164,7 @@ if [ "$mode" = ptr ]; then
   keys 300 DOWN DOWN DOWN DOWN A
   wait_for "search: pointers checked"
   wait_for "screen ready: ingame-search-pointers"
+  shot @6 ptr-checked.png
   keys 10 A
   wait_for "search: kept a cheat through a pointer"
   keys 10 B B B B B
@@ -173,6 +185,9 @@ if [ "$mode" = ptr ]; then
   [ -n "$checked" ] && [ "$checked" -ge 1 ] && [ "$checked" -le "$found" ] ||
     fail "checking $found pointers left ${checked:-none}"
   grep -q 'searchtest: lives [0-9]* coins 0999' <<<"$log" || fail "the coins aren't 0999: $(grep 'coins' <<<"$log" | tail -2)"
+  grep -q 'search: kept a cheat through a pointer, off$' <<<"$log" || fail "a pointer kept before a Check wasn't kept off"
+  [ "$(grep -c 'kernel: cheats: .*found in game, \[' <<<"$log")" = 1 ] ||
+    fail "the pointer kept twice wasn't one record: $(grep 'found in game' <<<"$log")"
   code=$(sed -n 's/^kernel: cheats: .*found in game, \(\[0[23][0-9A-F]*\]+24:0999\) on: added$/\1/p' <<<"$log")
   [ -n "$code" ] || fail "not filed through a pointer: $(grep -E 'cheats:' <<<"$log" | tail -3)"
   file=$(mktemp)
@@ -243,10 +258,10 @@ if [ "$mode" = cut ]; then
     # shellcheck disable=SC2046 # option lists
     cut_run $(nav_launch /searchtest.gba addon) -f 3000 -u "launch: starting"
     grep -q '^crash at frame' "$cart/run.log" && fail "cut at $n ($name): the next power-on crashed"
-    picks=$(sed -n 's/^kernel: cheats: .*searchtest.cht: \([0-9]*\) picked.*/\1/p' "$cart/run.log" | head -1)
+    picks=$(sed -n 's/^kernel: cheats: .*searchtest.cht: \([0-9]*\) picked.*/\1/p' "$cart/run.log" | drain_head -1)
     case $n:$picks in
     0:1 | [1-9]*:1 | [1-9]*:0 | [1-9]*:) ;;
-    *) fail "cut at $n ($name): the next launch read ${picks:-no} picks: $(grep 'cheats:' "$cart/run.log" | head -3)" ;;
+    *) fail "cut at $n ($name): the next launch read ${picks:-no} picks: $(grep 'cheats:' "$cart/run.log" | drain_head -3)" ;;
     esac
     return 0
   }

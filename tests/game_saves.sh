@@ -25,6 +25,8 @@
 # Runs inside the torii-emu container after `just build` and `just
 # emu-headless`, and building tests/roms/hello.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
 # shellcheck source=tests/nav.sh
@@ -66,7 +68,7 @@ put() {
 boot() {
   OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin "$@" >/dev/null 2>"$cart/run.log" || true
   ! grep -q '^crash at frame' "$cart/run.log" || fail "the emulator caught a crash"
-  ! grep -q '^kernel error: ' "$cart/run.log" || fail "an error: $(grep '^kernel error: ' "$cart/run.log" | head -1)"
+  ! grep -q '^kernel error: ' "$cart/run.log" || fail "an error: $(grep '^kernel error: ' "$cart/run.log" | drain_head -1)"
 }
 # boot_err: the same, an error is expected (a refused action logs one)
 boot_err() {
@@ -79,7 +81,7 @@ not_logged() { ! grep -qF "kernel: $1" "$cart/run.log" || fail "log line there: 
 sum() { mtype -i "$cart/sd.img" "::$1" | md5sum | cut -d' ' -f1; }
 slot_of() { mtype -i "$cart/sd.img" ::$S/game.ini | tr -d '\r' | sed -n 's/^slot = //p'; }
 has() { mdir -b -i "$cart/sd.img" "::$1" >/dev/null 2>&1; }
-letter() { mtype -i "$cart/sd.img" "::$1" | head -c 1; }
+letter() { mtype -i "$cart/sd.img" "::$1" | drain_head -c 1; }
 hist() { mdir -b -i "$cart/sd.img" "::/torii/backups/Hello.gba/$1" 2>/dev/null | sed 's|.*/||' | sort; }
 
 # The options of a run go in a file (-i), so the waits' texts keep their blanks.
@@ -352,7 +354,7 @@ run -f 900
 logged "gsaves: new q (0): 0"
 mdir -b -i "$cart/sd.img" "::$G/q.sav" >/dev/null 2>&1 || fail "gb-new: no q.sav"
 [ "$(mtype -i "$cart/sd.img" "::$G/q.sav" | wc -c)" = 65536 ] || fail "gb-new: q.sav isn't 64 KB"
-[ "$(mtype -i "$cart/sd.img" "::$G/q.sav" | head -c 1)" = $'\xff' ] || fail "gb-new: q.sav isn't blank"
+[ "$(mtype -i "$cart/sd.img" "::$G/q.sav" | drain_head -c 1)" = $'\xff' ] || fail "gb-new: q.sav isn't blank"
 [ "$(gb_slot_of)" = Main ] || fail "gb-new: the active slot changed"
 echo "PASS: game saves: a GB game's New slot offers Empty and a copy, no .sav file, and makes a blank 64 KB slot"
 

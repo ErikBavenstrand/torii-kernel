@@ -19,6 +19,8 @@
 # screens. Every other word, the LX9 ones too, shows nothing, writes nothing
 # and logs the raw word.
 set -uo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
 local_carts "dist/cart-fw-update${1:+-$1}"
@@ -43,7 +45,7 @@ new_cart() {
 }
 
 # written: the FPGA flash holds anything but erased bytes
-written() { [ -n "$(tr -d '\377' <"$cart/fpga-flash.bin" 2>/dev/null | head -c 1)" ]; }
+written() { [ -n "$(tr -d '\377' <"$cart/fpga-flash.bin" 2>/dev/null | drain_head -c 1)" ]; }
 
 if [ "${1:-}" = sweep ]; then
   # sweep_word WORD: boot a cart with that version word up to the update's
@@ -71,7 +73,7 @@ if [ "${1:-}" = sweep ]; then
         echo "FAIL: fw_update $case: the word wasn't logged" ;;
       esac
     fi
-    if [ -n "$(tr -d '\377' <"$cart/fpga-flash.bin" 2>/dev/null | head -c 1)" ]; then
+    if [ -n "$(tr -d '\377' <"$cart/fpga-flash.bin" 2>/dev/null | drain_head -c 1)" ]; then
       echo "FAIL: fw_update $case: the FPGA flash was written"
     fi
   }

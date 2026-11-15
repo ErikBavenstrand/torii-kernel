@@ -248,7 +248,7 @@ struct torii_cheats {
   call into a new C function `torii_run_cheats()` in `.text` (ROM, not IWRAM: at most 64 entries of about
   20 cycles is 1,300, under 0.5% of the 280,896-cycle frame; `.vram1` has 1.3 KB free if it ever needs to
   be fast). Writes:
-  - C000-CFFF: `XGB_RAM[addr - 0xC000]` (`XGB_RAM` `0x03005890`, 8 KB, `gbz80.s:2858`);
+  - C000-CFFF: `XGB_RAM[addr - 0xC000]` (`XGB_RAM` `0x03005990` since hi-colour, 8 KB, `gbz80.s:2858`);
   - D000-DFFF: bank 0 or 1 → `XGB_RAM + 0x1000 + (addr-0xD000)`; bank n ≥ 2 → `GBC_EXRAM +
     (n-2)*0x1000 + (addr-0xD000)` (`GBC_EXRAM 0x0202E000`; `io.s:676-707`, `_FF70W`);
   - E000-FDFF: the echo, folded to C000-DDFF; FF80-FFFE: `XGB_HRAM + (addr-0xFF80)` (`0x03007890`);

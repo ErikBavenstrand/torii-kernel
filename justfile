@@ -17,7 +17,7 @@ export FRESH_IMAGE := kernel_image
 kernel_inputs := "source tests/kernel Makefile emulators/out/jagoombacolor.gba emulators/out/pocketnes.gba image.bin tools/omega_image.py tools/nm_to_sym.py tools/build_id.py " + kernel_image
 test_kernel_inputs := "source tests/kernel Makefile emulators/out/jagoombacolor.gba emulators/out/pocketnes.gba tools/build_id.py " + kernel_image
 emu_inputs := "emu/mgba/src emu/mgba/include emu/mgba/CMakeLists.txt emu/mgba/cmake emu/mgba-shot.c emu/build.sh docker/emu.Dockerfile"
-test_rom_outputs := "tests/roms/hello/hello.gba tests/roms/crash/crash.gba tests/roms/crash/crash.sym tests/roms/savetest/flash128.gba tests/roms/savetest/eeprom512.gba tests/roms/idle/idle.gba tests/roms/eeprom/eeprom.gba tests/roms/rumble/rumble.gba tests/roms/ingame/ingame.gba tests/roms/cheattest/cheattest.gba tests/roms/cheattest/cheattest.sym tests/roms/cheattest/cheatirq.gba tests/roms/cheattest/cheatirq-vblank.gba tests/roms/searchtest/searchtest.gba"
+test_rom_outputs := "tests/roms/hello/hello.gba tests/roms/crash/crash.gba tests/roms/crash/crash.sym tests/roms/savetest/flash128.gba tests/roms/savetest/eeprom512.gba tests/roms/idle/idle.gba tests/roms/eeprom/eeprom.gba tests/roms/rumble/rumble.gba tests/roms/ingame/ingame.gba tests/roms/cheattest/cheattest.gba tests/roms/cheattest/cheattest.sym tests/roms/cheattest/cheatirq.gba tests/roms/cheattest/cheatirq-vblank.gba tests/roms/searchtest/searchtest.gba tests/roms/m4a/m4a.gba tests/roms/m4a/m4a-other.gba"
 kernel_image := "devkitpro/devkitarm@sha256:1acab59884288115af0e70782a9b69017a8cc6bad69542b24e8652233f215c56"
 # The built-in emulators each build with the devkitARM of their own source's
 # time (emulators/fetch.sh pins the source): r58 (GCC 12, 2022-05-31) for
@@ -212,6 +212,7 @@ _test-run:
 # Check that text files are UTF-8 with LF, and lint and format-check the C, Python, shell scripts and CI workflows (pinned versions)
 lint:
     python3 tools/text_check.py
+    python3 tools/pipe_check.py
     git ls-files -z '*.c' '*.h' | xargs -0 uvx clang-format@{{clang_format}} --dry-run -Werror
     uvx ruff@0.17.1 check tools tests
     uvx ruff@0.17.1 format --check tools tests
@@ -361,6 +362,13 @@ cheat-fuzz-decode seed="1" count="1000": emu-image
     @emu/fetch.sh
     {{emu_docker}} tests/cheat_fuzz.sh --decode {{seed}} {{count}}
 
+# Blargg's Game Boy test ROMs and dmg-acid2/cgb-acid2 (fetched into dist/gb-tests on first use, never
+# committed) run through Jagoomba on the emulated cart; the report is dist/gb-tests/report.txt, the
+# acid2 screenshots dist/gb-tests/out/. Reports only: Jagoomba isn't cycle-accurate
+gb-accuracy: build emu-headless
+    tools/gb_tests_fetch.sh
+    {{emu_docker}} tests/gb_accuracy.sh
+
 # Fetch libretro's GBA cheat database again into dist/cheat-corpus (for `just cheat-corpus`)
 cheat-corpus-fetch:
     tools/cheat_corpus_fetch.sh --refresh
@@ -370,11 +378,17 @@ cheat-corpus-fetch:
 palette:
     uv run -q tools/palette.py
 
-# Convert the menu fonts in assets/fonts to C: source/engine/font_body.c and font_heading.c
-# (committed; tests/font_test.py checks they match)
+# Convert the menu fonts in assets/fonts to C: source/engine/font_body.c and font_heading.c, and
+# their glyphs beyond Latin-1, font_extra.c (committed; tests/font_test.py checks they match)
 font:
     uv run -q tools/font.py assets/fonts/galmuri/Galmuri9.bdf --name body --line-height 12 --squeeze --clip -o source/engine/font_body
     uv run -q tools/font.py assets/fonts/galmuri/Galmuri11-Bold.bdf --name heading --line-height 16 --squeeze --clip -o source/engine/font_heading
+    uv run -q tools/font.py assets/fonts/galmuri/Galmuri9-extra.bdf --name body --extra --extra-heading assets/fonts/galmuri/Galmuri11-extra.bdf -o source/engine/font_extra
+
+# Cut the kernel's glyphs beyond Latin-1 (assets/fonts/galmuri/Galmuri9-extra.bdf) from the pinned
+# Galmuri release (tools/galmuri.py checks its SHA-256; it fetches the zip into dist/galmuri-full)
+galmuri:
+    python3 -I tools/galmuri.py
 
 # Turn lang/en.ini into source/lang_ids.h and source/lang_en.c (committed;
 # tests/lang_test.py checks they match), and every lang/<code>.ini, and the
@@ -417,7 +431,7 @@ test-roms: _ready
     @{{fresh}} check test-roms {{test_rom_outputs}} -- tests/roms source/eepromprobe.c source/eepromprobe.h source/rumbleprobe.h source/ingameprobe.h source/cartlog.h || {{just_executable()}} _build-test-roms
 
 _build-test-roms:
-    {{kernel_docker}} sh -c 'make -B -C tests/roms/hello && make -B -C tests/roms/idle && make -B -C tests/roms/savetest && make -B -C tests/roms/eeprom && make -B -C tests/roms/rumble && make -B -C tests/roms/ingame && make -B -C tests/roms/crash all && make -B -C tests/roms/cheattest all && make -B -C tests/roms/searchtest'
+    {{kernel_docker}} sh -c 'make -B -C tests/roms/hello && make -B -C tests/roms/idle && make -B -C tests/roms/savetest && make -B -C tests/roms/eeprom && make -B -C tests/roms/rumble && make -B -C tests/roms/ingame && make -B -C tests/roms/crash all && make -B -C tests/roms/cheattest all && make -B -C tests/roms/searchtest && make -B -C tests/roms/m4a all'
     python3 tools/nm_to_sym.py tests/roms/crash/crash.nm tests/roms/crash/crash.sym
     python3 tools/nm_to_sym.py tests/roms/cheattest/cheattest.nm tests/roms/cheattest/cheattest.sym
     {{fresh}} record test-roms -- tests/roms source/eepromprobe.c source/eepromprobe.h source/rumbleprobe.h source/ingameprobe.h source/cartlog.h

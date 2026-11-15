@@ -8,6 +8,8 @@
 # Runs inside the torii-emu container after `just build`, `just emu-headless`
 # and building tests/roms/hello.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
 # shellcheck source=tests/nav.sh
@@ -57,7 +59,7 @@ grep -qF "kernel: launch: loading $long, CLEAN BOOT" "$cart/kernel.log" ||
 # (a game missing from the save table gets its file when the chip differs:
 # the launch names it in the pending-save record)
 grep -qF "save: no /torii/saves/$long/Main.sav yet" "$cart/kernel.log" ||
-  fail "FAT32: no save name for the long name: $(grep 'save:' "$cart/kernel.log" | head -3)"
+  fail "FAT32: no save name for the long name: $(grep 'save:' "$cart/kernel.log" | drain_head -3)"
 echo "PASS: a name past 99 bytes launches and saves on FAT32"
 
 # exFAT: a long name whose first 95 bytes match another file's whole name.

@@ -17,6 +17,8 @@
 # Runs inside the torii-emu container after `just build`, `just emu-headless`
 # and `just test-roms`.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
 # shellcheck source=tests/nav.sh
@@ -40,7 +42,7 @@ run() {
     -c 1767225600 "$@" >"$cart/out.log" 2>"$cart/kernel.log" || true
   ! grep -q '^crash at frame' "$cart/kernel.log" || fail "the emulator caught a crash"
 }
-has() { grep -qF "in-game probe: $1" "$log" || fail "no line '$1': $(grep 'in-game probe' "$log" | head -12)"; }
+has() { grep -qF "in-game probe: $1" "$log" || fail "no line '$1': $(grep 'in-game probe' "$log" | drain_head -12)"; }
 
 # 1. CLEAN BOOT of Probe.gba: its cart tests run by themselves; A goes
 # back to the kernel, and A at its "Save to SD card?" lets the boot go on to the

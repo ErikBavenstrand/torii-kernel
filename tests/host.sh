@@ -3,6 +3,8 @@
 # AddressSanitizer and UndefinedBehaviorSanitizer, then runs the tests; any
 # sanitizer report fails them. Runs inside the torii-emu container.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 
 # Each file compiles once, in parallel, and is cached (tools/hostcc.py)
 python3 tools/hostcc.py dist/host/tests \
@@ -10,7 +12,7 @@ python3 tools/hostcc.py dist/host/tests \
   source/safefile_scan.c source/userdata.c source/screens/registry.c source/screens/carousel_ring.c source/screens/settings_layout.c \
   source/engine/motion.c source/engine/ease_lut.c source/engine/input.c \
   source/engine/pool.c source/engine/res.c source/engine/budget.c \
-  source/engine/text_layout.c source/engine/script.c source/engine/font_body.c source/engine/font_heading.c \
+  source/engine/text_layout.c source/engine/script.c source/engine/font_body.c source/engine/font_heading.c source/engine/font_extra.c \
   source/engine/asset.c source/engine/covercache.c source/engine/affine.c \
   source/ui/ui_core.c source/ui/ui_ring.c source/ui/rowcache.c source/ui/ui_theme.c source/ui/palette.c source/ui/keyq.c \
   source/ui/ui_reading.c source/ui/letter.c source/gamelist.c \
@@ -20,7 +22,7 @@ python3 tools/hostcc.py dist/host/tests \
 # when the kernel randomises mmap with more bits than it supports (CI's
 # x86 runners use 32; the workflows lower vm.mmap_rnd_bits to 28).
 set +e
-ASAN_OPTIONS=detect_leaks=1 UBSAN_OPTIONS=print_stacktrace=1 timeout 60 dist/host/tests 2>&1 | head -c 65536
+ASAN_OPTIONS=detect_leaks=1 UBSAN_OPTIONS=print_stacktrace=1 timeout 60 dist/host/tests 2>&1 | drain_head -c 65536
 status=${PIPESTATUS[0]}
 set -e
 # The kernel tests' assets are tools/asset.py's output, and the palette

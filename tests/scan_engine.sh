@@ -7,6 +7,8 @@
 # and closes (tests/hook_watch.lua). Runs inside the torii-emu container
 # after `just build`, `just emu-headless` and building tests/roms/hello.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
 # shellcheck source=tests/nav.sh
@@ -51,7 +53,7 @@ watch() {
     -L tests/hook_watch.lua -u 'hook watch done' -f 4000 >/dev/null 2>"$cart/run.log" || status=$?
   [ "$status" != 76 ] || fail "the kernel wrote to the boot loader"
   ! grep -q '^crash at frame' "$cart/run.log" || fail "crashed"
-  grep -q '^kernel error:' "$cart/run.log" && fail "errors: $(grep '^kernel error:' "$cart/run.log" | head -3)"
+  grep -q '^kernel error:' "$cart/run.log" && fail "errors: $(grep '^kernel error:' "$cart/run.log" | drain_head -3)"
   grep -q '^script: hook [0-9]* patch ' "$cart/run.log" || fail "the kernel did not hook the game"
   grep -q '^script: hook [0-9]* menu open$' "$cart/run.log" || fail "the menu did not open"
   grep -q '^script: hook [0-9]* menu closed$' "$cart/run.log" || fail "B did not close the menu"

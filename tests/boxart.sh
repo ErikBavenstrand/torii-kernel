@@ -7,6 +7,8 @@
 # show custom and CRC art.) Runs inside the torii-emu container after `just
 # build` and `just emu-headless`.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
 # shellcheck source=tests/nav.sh
@@ -53,7 +55,7 @@ boot() { # log [mgba-shot options]
   local log=$1
   shift
   OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin "$@" >"$log" 2>&1 || true
-  ! grep -qE 'assert failed|^crash at frame' "$log" || fail "a crash or failed assert: $(grep -E 'assert|crash' "$log" | head -2)"
+  ! grep -qE 'assert failed|^crash at frame' "$log" || fail "a crash or failed assert: $(grep -E 'assert|crash' "$log" | drain_head -2)"
 }
 
 crc_of() { python3 -c "import sys, zlib; print(f'{zlib.crc32(open(sys.argv[1], \"rb\").read()):08X}')" "$1"; }
@@ -108,7 +110,7 @@ mcopy -i "$cart/sd.img" tests/shots/data/art-night.bin ::/torii/art/custom/Code.
 # shellcheck disable=SC2046 # nav.sh's options
 boot "$cart/2.log" $(nav_game gba 1) -k @90:UP -k @94:- -f 900
 grep -q "kernel error: engine: cover $(id 2 "0x$crc"): the file is shorter than its header says" "$cart/2.log" ||
-  fail "the broken file's error wasn't logged: $(grep 'error' "$cart/2.log" | head -3)"
+  fail "the broken file's error wasn't logged: $(grep 'error' "$cart/2.log" | drain_head -3)"
 ! grep -q "box art: cover $(id 2 "0x$crc") shown" "$cart/2.log" || fail "the broken file showed"
 grep -qE "box art: cover [0-9A-F]{8} shown" "$cart/2.log" || fail "Code.gba's custom art didn't show after the broken one"
 echo "PASS: a broken art file leaves the placeholder and logs why; other covers still load"
@@ -136,7 +138,7 @@ mcopy -i "$cart/sd.img" "$cart/art.pak" ::/torii/art.pak
 # shellcheck disable=SC2046 # nav.sh's options
 boot "$cart/6.log" $(nav_game gba 1) -w "box art: cover $pack_id shown" -f 3000
 grep -q "box art: /torii/art.pak: 3 CRCs, 2 covers" "$cart/6.log" ||
-  fail "the pack's index wasn't read: $(grep 'box art' "$cart/6.log" | head -3)"
+  fail "the pack's index wasn't read: $(grep 'box art' "$cart/6.log" | drain_head -3)"
 grep -q "^kernel: box art: cover $pack_id shown" "$cart/6.log" ||
   fail "Zed.gba's cover didn't come from the pack: $(grep 'box art\|cover' "$cart/6.log" | tail -4)"
 # Reading the index and a cover at its offset keeps to the frame budget
@@ -176,7 +178,7 @@ mcopy -i "$slow/sd.img" "$slow/art.pak" ::/torii/art.pak
 OMEGA_SD_CYCLES=40000:8000 OMEGA_DIR=$slow emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_game gba 1) \
   -w "box art: cover $slow_id shown" -f 4000 >"$slow/run.log" 2>&1 || true
 grep -q "^kernel: box art: cover $slow_id shown" "$slow/run.log" || fail "no cover from the pack with a slow card"
-! grep -q "listing step" "$slow/run.log" || fail "a slow listing step: $(grep 'listing step' "$slow/run.log" | head -2)"
+! grep -q "listing step" "$slow/run.log" || fail "a slow listing step: $(grep 'listing step' "$slow/run.log" | drain_head -2)"
 worst=$(sed -n 's/^kernel: frame-cycles: games-artlist \([0-9]*\)$/\1/p' "$slow/run.log" | sort -n | tail -1)
 [ "${worst:-0}" -le 280896 ] || fail "a listing frame of $worst cycles with a slow card"
 echo "PASS: a game with no art file gets its cover from the art pack, and a slow card's listing keeps to the frame"
@@ -252,14 +254,14 @@ mcopy -i "$cart/sd.img" "$cart/short.pak" ::/torii/art.pak
 # shellcheck disable=SC2046 # nav.sh's options
 boot "$cart/8.log" $(nav_game gba 1) -k @90:UP -k @94:- -k @130:DOWN -k @134:- -f 900
 [ "$(grep -c "kernel error: box art: /torii/art.pak is damaged" "$cart/8.log")" = 1 ] ||
-  fail "the damaged pack wasn't logged once: $(grep 'art.pak' "$cart/8.log" | head -3)"
+  fail "the damaged pack wasn't logged once: $(grep 'art.pak' "$cart/8.log" | drain_head -3)"
 ! grep -qE "box art: cover [0-9A-F]{8} shown" "$cart/8.log" || fail "a damaged pack showed a cover"
 python3 -c "import sys; d = bytearray(open(sys.argv[1], 'rb').read()); d[4] = 99; open(sys.argv[1], 'wb').write(d)" "$cart/art.pak"
 mcopy -o -i "$cart/sd.img" "$cart/art.pak" ::/torii/art.pak
 # shellcheck disable=SC2046 # nav.sh's options
 boot "$cart/9.log" $(nav_game gba 1) -f 900
 grep -q "kernel error: box art: /torii/art.pak is another version" "$cart/9.log" ||
-  fail "another version's pack wasn't logged: $(grep 'art.pak' "$cart/9.log" | head -3)"
+  fail "another version's pack wasn't logged: $(grep 'art.pak' "$cart/9.log" | drain_head -3)"
 ! grep -qE "box art: cover [0-9A-F]{8} shown" "$cart/9.log" || fail "another version's pack showed a cover"
 echo "PASS: a damaged pack, or another version's, is no pack, and logged"
 
@@ -319,7 +321,7 @@ mcopy -i "$cart/sd.img" tests/shots/data/art-night.bin ::/torii/art/custom/Code.
 # shellcheck disable=SC2046 # nav.sh's options
 boot "$cart/4.log" $(nav_to gba) -f 900
 grep -q "nav: page gba ready" "$cart/4.log" || fail "the GBA page didn't open"
-! grep -q "box art:" "$cart/4.log" || fail "box art ran while off: $(grep 'box art' "$cart/4.log" | head -2)"
+! grep -q "box art:" "$cart/4.log" || fail "box art ran while off: $(grep 'box art' "$cart/4.log" | drain_head -2)"
 echo "PASS: with Box art off the card's art isn't read"
 
 # An empty custom art file hides the game's art: it keeps the placeholder

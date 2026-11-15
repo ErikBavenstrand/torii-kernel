@@ -9,6 +9,8 @@
 # roms/ has it. The in-game menu's Sleep row is in tests/menu.sh.
 # Runs inside the torii-emu container.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
 # shellcheck source=tests/nav.sh
@@ -50,8 +52,8 @@ sleep_game() {
   log=$(cat "$cart/log")
   grep -q '^crash at frame' <<<"$log" && fail "$name: crashed"
   local stopped woke
-  stopped=$(sed -n 's/^stop at frame \([0-9]*\)$/\1/p' <<<"$log" | head -1)
-  woke=$(sed -n 's/^wake at frame \([0-9]*\)$/\1/p' <<<"$log" | head -1)
+  stopped=$(sed -n 's/^stop at frame \([0-9]*\)$/\1/p' <<<"$log" | drain_head -1)
+  woke=$(sed -n 's/^wake at frame \([0-9]*\)$/\1/p' <<<"$log" | drain_head -1)
   [ -n "$stopped" ] && [ "$stopped" -ge "$sleep" ] && [ "$stopped" -lt $((sleep + 20)) ] ||
     fail "$name: L+R+SELECT at frame $sleep didn't sleep (stop at ${stopped:-none})"
   [ -n "$woke" ] || fail "$name: START+SELECT at frame $wake didn't wake it (a black screen nothing wakes)"

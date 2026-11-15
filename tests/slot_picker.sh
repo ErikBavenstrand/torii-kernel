@@ -12,6 +12,8 @@
 # Runs inside the torii-emu container after `just build` and `just
 # emu-headless`, and building tests/roms/hello.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
 # shellcheck source=tests/nav.sh
@@ -47,7 +49,7 @@ card() {
 boot() {
   OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin "$@" >/dev/null 2>"$cart/run.log" || true
   ! grep -q '^crash at frame' "$cart/run.log" || fail "the emulator caught a crash"
-  ! grep -q '^kernel error: ' "$cart/run.log" || fail "an error: $(grep '^kernel error: ' "$cart/run.log" | head -1)"
+  ! grep -q '^kernel error: ' "$cart/run.log" || fail "an error: $(grep '^kernel error: ' "$cart/run.log" | drain_head -1)"
 }
 
 logged() { grep -qF "kernel: $1" "$cart/run.log" || fail "no log line: $1"; }

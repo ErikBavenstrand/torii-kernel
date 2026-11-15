@@ -6,6 +6,8 @@
 # Runs inside the torii-emu container after `just build`,
 # `just emu-headless` and building tests/roms/savetest.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
 # shellcheck source=tests/nav.sh
@@ -118,7 +120,7 @@ shrunk_eeprom() {
   # The old file, untouched, is the history's first version
   mdir -i "$cart/sd.img" ::/torii/backups/Test.gba/Main/ 2>/dev/null | grep -i '0001-' >/dev/null || fail "eeprom512-shrunk: no version in the history"
   local name
-  name=$(mdir -b -i "$cart/sd.img" ::/torii/backups/Test.gba/Main/ | grep -i '0001-' | head -1)
+  name=$(mdir -b -i "$cart/sd.img" ::/torii/backups/Test.gba/Main/ | grep -i '0001-' | drain_head -1)
   mtype -i "$cart/sd.img" "$name" >"$hist"
   cmp -s "$hist" "$cart/old.sav" || fail "eeprom512-shrunk: the history's version isn't the old save"
   # A second power-on (A at "Save to SD card?" copies the game's save, the old blank
@@ -157,7 +159,7 @@ other_chip() {
   grep -q "save: type change notice shown for Test$" "$log" ||
     fail "eeprom8k-to-flash: the notice doesn't name the game: $(grep 'notice shown' "$log")"
   grep -q "launch: starting the game" "$log" || fail "eeprom8k-to-flash: the game didn't start after the notice"
-  name=$(mdir -b -i "$cart/sd.img" ::/torii/backups/Test.gba/Main/ | grep -i '0001-' | head -1)
+  name=$(mdir -b -i "$cart/sd.img" ::/torii/backups/Test.gba/Main/ | grep -i '0001-' | drain_head -1)
   [ -n "$name" ] || fail "eeprom8k-to-flash: no version in the history"
   mtype -i "$cart/sd.img" "$name" >"$cart/hist.sav"
   cmp -s "$cart/hist.sav" "$cart/old.sav" || fail "eeprom8k-to-flash: the history's version isn't the old save"

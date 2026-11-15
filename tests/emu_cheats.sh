@@ -15,6 +15,10 @@ set -euo pipefail
 local_carts "dist/cart-emu-cheats${1:+-$1}"
 
 cart=$carts/emu-cheats
+# Jagoomba's copy of the GB's WRAM (C000 on) and of C100 on, from its symbols
+xgb=$(python3 tests/elf_sym.py emulators/out/jagoombacolor.elf XGB_RAM)
+wram=$(printf '%08X' $((xgb)))
+wram100=$(printf '%08X' $((xgb + 0x100)))
 fail() {
   echo "FAIL: emu cheats: $*" >&2
   [ ! -f "$cart/kernel.log" ] || grep -E '^(kernel|crash)' "$cart/kernel.log" | tail -12 >&2
@@ -45,7 +49,7 @@ play() {
   [ "${dialog:-}" != 1 ] || ack=(-w "screen ready: dialog" -k @10:A -k @14:-)
   # shellcheck disable=SC2046 # nav.sh's options
   OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin $(nav_launch "$1" at=100) "${ack[@]}" \
-    -s 700:"$cart/game.png" -m 700:0x03005890:4 -m 700:0x03005990:4 -f 700 >"$cart/out.txt" 2>"$cart/kernel.log" || fail "the emulator failed"
+    -s 700:"$cart/game.png" -m "700:0x$wram:4" -m "700:0x$wram100:4" -f 700 >"$cart/out.txt" 2>"$cart/kernel.log" || fail "the emulator failed"
   grep -q '^crash at frame' "$cart/kernel.log" && fail "the emulator caught a crash"
   grep -q '^kernel error:' "$cart/kernel.log" && fail "errors: $(grep '^kernel error:' "$cart/kernel.log" | head -3)"
   grep -qF "kernel: launch: starting the game" "$cart/kernel.log" || fail "$1 wasn't started"
@@ -80,9 +84,9 @@ PY
 # the byte a GB game stored: $1F patched, $E0 not), and a line of its log
 expect() {
   local want=$1 name=$2 log=${3:-}
-  if [ -s "$cart/out.txt" ] && grep -q "^mem frame 700 03005890: " "$cart/out.txt" && [ "$kind" = gb ]; then
+  if [ -s "$cart/out.txt" ] && grep -q "^mem frame 700 $wram: " "$cart/out.txt" && [ "$kind" = gb ]; then
     local byte
-    byte=$(sed -n 's/^mem frame 700 03005890: [0-9A-F]* \([0-9A-F]*\).*/\1/p' "$cart/out.txt")
+    byte=$(sed -n "s/^mem frame 700 $wram: [0-9A-F]* \\([0-9A-F]*\\).*/\\1/p" "$cart/out.txt")
     if [ "$want" = red ]; then
       [ "$byte" = 1F ] || fail "$name: the game read $byte, not the patched 1F"
     else
@@ -139,8 +143,8 @@ grep -qF "cheat 0 (Ram): can't run here, left out" "$cart/kernel.log" || fail "g
 
 # --- GB and GBC GameShark (stage 3): the game (gb_rom.py poke, pokegbc) counts, at $C102, how
 # often it sees $55 where the cheat writes it, clearing it each time: a write made every
-# frame counts up to $F0, so it was applied each frame. WRAM is at 0x03005890 + (address - $C000)
-count() { sed -n 's/^mem frame 700 03005990: [0-9A-F]* [0-9A-F]* \([0-9A-F]*\).*/\1/p' "$cart/out.txt"; }
+# frame counts up to $F0, so it was applied each frame. WRAM is at XGB_RAM + (address - $C000)
+count() { sed -n "s/^mem frame 700 $wram100: [0-9A-F]* [0-9A-F]* \\([0-9A-F]*\\).*/\\1/p" "$cart/out.txt"; }
 expect_count() { # NAME WANT
   local got
   got=$(count)

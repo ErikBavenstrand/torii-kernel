@@ -11,6 +11,8 @@
 # Runs inside the torii-emu container after `just build`, `just
 # emu-headless` and building tests/roms/hello.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
@@ -60,18 +62,18 @@ cheat_screen -k @8:A -k @12:- -w "cheats: picked cheat 0" -k @8:UP -k @12:- \
   -k @40:B -k @44:- -w "cheats: back" -f 30000 >"$cart/screen.txt" 2>&1 ||
   fail "the screen didn't run: $(grep -a '^kernel' "$cart/screen.txt" | tail -3)"
 grep -q "cheats: /torii/cheats/Hello.cht: 2500 cheats in 10 windows, 1 picked, read whole and indexed" "$cart/screen.txt" ||
-  fail "the file read: $(grep -a 'cheats:' "$cart/screen.txt" | head -3)"
+  fail "the file read: $(grep -a 'cheats:' "$cart/screen.txt" | drain_head -3)"
 grep -q "cheats: /torii/cheats/Hello.cdx: index written (10 windows, 3 picks)" "$cart/screen.txt" ||
   fail "the save: $(grep -a 'cheats:' "$cart/screen.txt" | tail -3)"
 grep -q "cheats: /torii/cheats/Hello.cht: 2500 cheats, 1 greyed, 1 picked (.*), 2501 rows" "$cart/screen.txt" ||
-  fail "the list: $(grep -a 'cheats:.*rows' "$cart/screen.txt" | head -3)"
+  fail "the list: $(grep -a 'cheats:.*rows' "$cart/screen.txt" | drain_head -3)"
 echo "PASS: cheats-big: a file of 2500 cheats with no index is read whole once, indexed and listed as one; the cursor goes round it both ways"
 
 # The picks are the index's: the cheat file stays as it was
 mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | cmp -s - "$cart/Hello.cht" || fail "the cheat file changed"
 mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cdx >"$cart/index.cdx"
 for pick in 0 898 9C3; do
-  grep -q "^p $pick " "$cart/index.cdx" || fail "the index has no pick $pick: $(grep -a '^p ' "$cart/index.cdx" | head -3)"
+  grep -q "^p $pick " "$cart/index.cdx" || fail "the index has no pick $pick: $(grep -a '^p ' "$cart/index.cdx" | drain_head -3)"
 done
 echo "PASS: cheats-big: picks in the first and last windows are saved in the index alone"
 
@@ -79,11 +81,11 @@ echo "PASS: cheats-big: picks in the first and last windows are saved in the ind
 cheat_screen -k @8:B -k @12:- -w "cheats: back" -f 30000 >"$cart/again.txt" 2>&1 ||
   fail "the screen didn't run again: $(grep -a '^kernel' "$cart/again.txt" | tail -3)"
 grep -q "cheats: /torii/cheats/Hello.cht: 2500 cheats in 10 windows, 3 picked, by its index" "$cart/again.txt" ||
-  fail "the read by the index: $(grep -a 'cheats:' "$cart/again.txt" | head -3)"
+  fail "the read by the index: $(grep -a 'cheats:' "$cart/again.txt" | drain_head -3)"
 grep -q "cheats: /torii/cheats/Hello.cht: 2500 cheats listed from its cache" "$cart/again.txt" ||
-  fail "the list's cache: $(grep -a 'cheats:' "$cart/again.txt" | head -4)"
+  fail "the list's cache: $(grep -a 'cheats:' "$cart/again.txt" | drain_head -4)"
 grep -q "cheats: /torii/cheats/Hello.cht: 2500 cheats, 1 greyed, 3 picked" "$cart/again.txt" ||
-  fail "the list: $(grep -a 'cheats:' "$cart/again.txt" | head -4)"
+  fail "the list: $(grep -a 'cheats:' "$cart/again.txt" | drain_head -4)"
 echo "PASS: cheats-big: the file opens again by its index and its list"
 
 cp "$cart/kernel-nor.bin" "$cart/nor-before.bin"
@@ -116,7 +118,7 @@ grep -q '^cheat1500_desc = "Cheat 1501"$' "$cart/clean.cht" || fail "the cheats 
 # picks are the index's, written again for the file as it is now)
 mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cdx >"$cart/clean.cdx"
 for pick in 0 898 9C3; do
-  grep -q "^p $pick " "$cart/clean.cdx" || fail "pick $pick was lost: $(grep -a '^p ' "$cart/clean.cdx" | head -3)"
+  grep -q "^p $pick " "$cart/clean.cdx" || fail "pick $pick was lost: $(grep -a '^p ' "$cart/clean.cdx" | drain_head -3)"
 done
 grep -q "^file $(printf '%X' "$(stat -c %s "$cart/clean.cht")")\$" "$cart/clean.cdx" ||
   fail "the index's size isn't the file's: $(grep -a '^file' "$cart/clean.cdx")"
@@ -131,7 +133,7 @@ mdel -i "$cart/sd.img" ::/torii/recent.txt ::/torii/recent.txt.bak 2>/dev/null |
 cheat_screen -k @8:B -k @12:- -w "cheats: back" -f 30000 >"$cart/after-clean.txt" 2>&1 ||
   fail "the screen didn't run after the clean-up: $(grep -a '^kernel' "$cart/after-clean.txt" | tail -3)"
 grep -q "cheats: /torii/cheats/Hello.cht: 2499 cheats in 10 windows, 3 picked, by its index" "$cart/after-clean.txt" ||
-  fail "the cleaned file's open: $(grep -a 'cheats:' "$cart/after-clean.txt" | head -3)"
+  fail "the cleaned file's open: $(grep -a 'cheats:' "$cart/after-clean.txt" | drain_head -3)"
 echo "PASS: cheats-big: the file the kernel wrote opens by its index"
 
 # Edited on a PC, its size kept (one digit of a name in the last window): the
@@ -153,5 +155,5 @@ rm -f "$cart/sram.bin"
 cheat_screen -k @8:B -k @12:- -w "cheats: back" -f 30000 >"$cart/reindexed.txt" 2>&1 ||
   fail "the screen didn't run after the change: $(grep -a '^kernel' "$cart/reindexed.txt" | tail -3)"
 grep -q "cheats: /torii/cheats/Hello.cht: 2499 cheats in 10 windows, 3 picked, read whole and indexed" "$cart/reindexed.txt" ||
-  fail "the changed file's read: $(grep -a 'cheats:' "$cart/reindexed.txt" | head -3)"
+  fail "the changed file's read: $(grep -a 'cheats:' "$cart/reindexed.txt" | drain_head -3)"
 echo "PASS: cheats-big: a file changed under its index sets it aside when found, and is indexed anew, picks kept"

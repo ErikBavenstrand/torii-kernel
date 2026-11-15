@@ -11,6 +11,8 @@
 # Runs inside the torii-emu container after `just build` and `just
 # emu-headless`.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
 # shellcheck source=tests/nav.sh
@@ -111,7 +113,7 @@ rm -rf "$cart" && cp -r "$carts/info-new" "$cart"
 # shellcheck disable=SC2046
 boot info-last $(nav_info_page saves) -k @400:- -f 900
 mtype -i "$cart/sd.img" ::/torii/recent.txt | grep -x '@boot info' >/dev/null ||
-  fail "recent.txt's boot position on Saves: $(mtype -i "$cart/sd.img" ::/torii/recent.txt | head -1)"
+  fail "recent.txt's boot position on Saves: $(mtype -i "$cart/sd.img" ::/torii/recent.txt | drain_head -1)"
 boot info-last-2 -w "nav: home ready" -f 300
 logged "nav: start on 0: home-info"
 echo "PASS: Last place on an Info page comes back as home facing Info"
@@ -162,7 +164,7 @@ echo "PASS: tests/nav.sh's routes start from home's first item, whatever the car
 # home turned to the next item; a boot that opens the item's page and
 # comes back writes nothing
 new_cart last
-boot_line() { mtype -i "$cart/sd.img" ::/torii/recent.txt | head -1; }
+boot_line() { mtype -i "$cart/sd.img" ::/torii/recent.txt | drain_head -1; }
 # shellcheck disable=SC2046
 boot 1 $(nav_to gb) -k @400:- -f 900
 logged "safefile: writing /torii/recent.txt"
@@ -225,7 +227,7 @@ started "0: home-sd"
 # shellcheck disable=SC2046
 boot 7 -w "nav: home ready" -k @8:RIGHT -k @12:- -k @16:RIGHT -k @20:- -k @24:A -k @28:- -w "nav: page settings ready" \
   $(nav_press DOWN DOWN DOWN A RIGHT RIGHT RIGHT RIGHT RIGHT RIGHT RIGHT RIGHT RIGHT RIGHT B B) -w "nav: home ready" -f @30
-offered=$(grep -o 'settings: row 3 set to .*' "$log" | sed 's/settings: row 3 set to //' | head -10 | tr '\n' ',')
+offered=$(grep -o 'settings: row 3 set to .*' "$log" | sed 's/settings: row 3 set to //' | drain_head -10 | tr '\n' ',')
 [ "$offered" = "Recent,Favourites,GBA,GB,SD card,NOR,Settings,Info,Last place,Recent," ] || fail "Start on offered $offered"
 ! grep -q "nor: wrote the settings" "$log" || fail "B on Start on wrote the settings"
 # Start on GBA (RIGHT three times), saved as it is confirmed, B at once;

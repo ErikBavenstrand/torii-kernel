@@ -57,6 +57,61 @@ git log, not here.
   the screen hides Buttons, Edit code and + Add code for these games. Settings'
   clean-up leaves their files alone. (be4d50e8)
 
+## v0.9.25
+
+- **Added:** hi-colour GBC games (Donkey Kong Country's title, and the
+  others that rewrite the background palettes every few lines) show each
+  line's colours, as on a Game Boy Color, instead of the frame's patchy
+  middle-line palettes (jagoombacolor#20, #53). Jagoomba records the
+  palette writes the game makes during the picture and replays them line by
+  line from an HBlank interrupt, only on frames that have them. (3c49daae)
+
+## v0.9.24
+
+- **Fixed:** after Resume, Save state and Load state, games on Nintendo's
+  MP2000 (m4a) sound engine played the wrong part of their sound buffer for
+  up to 11 frames (Pokémon, Zelda, Mario Kart, Fire Emblem: all 49 m4a games
+  tested). The menu now leaves the sound off until the engine restarts it
+  where it belongs, at most that many frames later. (38020788)
+
+## v0.9.23
+
+- **Fixed:** a found cheat kept through a pointer, or a typed pointer code,
+  could write anywhere its pointer's word pointed (I/O, VRAM). The
+  interpreter now writes through a pointer only into EWRAM and IWRAM. (3f4c9e59)
+- **Fixed:** the in-game cheat search's 1.0 review. A pointer find is picked
+  only once it passed a Check; Check keeps the list when none pass and the
+  page can show the list from before it; Find asks before it replaces one.
+  Undo puts the compared values back, so a filter after it compares as
+  before the undone pass. The game's IWRAM and EWRAM the search borrows are
+  read back from cart SRAM before anything changes, and the hook's words
+  (a stack top in EWRAM) are left out of the search. New search and Save
+  state ask first; Keep again replaces a find; Negative numbers and BCD
+  convert the numbers typed, From A to B searches in order, and B on its
+  second number cancels both. All off stops the found cheats on now; the
+  menu's row counts what is left; greyed rows say why. The extension is
+  now two parts in cart SRAM page 0xF0, so the menu opens as fast.
+  (7c468dba, 63e21de8)
+- **Fixed:** found cheats were added again when the cheat file had them (a
+  power cut before the records were cleared), and refused or unsaved ones
+  only made log lines; the next launch wiped those that waited. A known
+  code isn't added twice, the boot after the game says what was added or
+  why not, and records the card refused wait with their game's path until
+  a boot files them. (866a4ae5, df1febdd, dea9b4a7)
+- **Changed:** the search's footers that ran past their width are shorter
+  in English and Swedish. (dafb230b)
+
+## v0.9.22
+
+- **Added:** file names in extended Latin (Polish, Czech, Turkish, Romanian,
+  Vietnamese...), Greek and Cyrillic, and the common punctuation and symbols
+  (– — “ ” … € ™ ★ ♪), draw as themselves instead of a box or a plain letter:
+  the kernel's fonts carry 1,675 more Galmuri glyphs (33 KB of ROM), headings
+  in a bold made from Galmuri11. No language pack is needed; a launch's
+  dialogs show them too, and the in-game menu still writes them as Latin-1.
+  (3ef2b982)
+- **Fixed:** a clang-tidy false alarm in `gamename.c` (a copy its caller ends)
+  is marked beside the code. (ebd51129)
 - **Changed:** the last 8 static-analysis findings (cppcheck's
   `constParameterCallback` on job steps and text providers, whose parameter
   types the callback types fix) are marked beside the code with their reason,

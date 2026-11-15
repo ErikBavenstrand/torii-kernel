@@ -8,6 +8,8 @@
 # after `just build`, `just emu-headless` and the test ROMs. KERNEL picks
 # another kernel file, e.g. an older build to see the cases fail.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 
 kernel=${KERNEL:-dist/ezkernelnew.bin}
 # shellcheck source=tests/carts.sh
@@ -73,7 +75,7 @@ EOF
 outside_data() {
   # (from 0x300000: the emulator copies the kernel file to 0 at each power-on)
   {
-    tail -c +$((0x300000 + 1)) "$cart/kernel-nor.bin" | head -c $((0x480000))
+    tail -c +$((0x300000 + 1)) "$cart/kernel-nor.bin" | drain_head -c $((0x480000))
     tail -c +$((0x7C0000 + 1)) "$cart/kernel-nor.bin"
   } | md5sum
 }
@@ -122,7 +124,7 @@ holds() {
 
 # erased OFFSET LENGTH: the game NOR reads 0xFF there
 erased() {
-  [ -z "$(tail -c +$(($1 + 1)) "$cart/game-nor.bin" | head -c $(($2)) | tr -d '\377' | head -c 1)" ]
+  [ -z "$(tail -c +$(($1 + 1)) "$cart/game-nor.bin" | drain_head -c $(($2)) | tr -d '\377' | drain_head -c 1)" ]
 }
 
 # kernel_wipe OFFSET...: erase the 64 KB kernel NOR sectors at OFFSET
@@ -252,8 +254,8 @@ if shard_case; then
   kernel_wipe 0x7A0000 0x780000
   cp "$cart/kernel-nor.bin" "$cart/wiped.bin"
   boot -f 300
-  cmp -s <(tail -c +$((0x780001)) "$cart/kernel-nor.bin" | head -c $((0x40000))) \
-    <(tail -c +$((0x780001)) "$cart/wiped.bin" | head -c $((0x40000))) ||
+  cmp -s <(tail -c +$((0x780001)) "$cart/kernel-nor.bin" | drain_head -c $((0x40000))) \
+    <(tail -c +$((0x780001)) "$cart/wiped.bin" | drain_head -c $((0x40000))) ||
     fail "the boot wrote the NOR list"
   write 3
   holds 0 A.gba || fail "A.gba was overwritten"
@@ -301,7 +303,7 @@ if shard_case; then
   boot -f 300
   grep -q "nor: saving an older kernel's list of 1 games in Torii's format" "$cart/$runs.log" || fail "the list wasn't moved"
   [ "$(grep -c "older kernel's copy A" "$cart/$runs.log")" = 1 ] || fail "the older list was logged more than once"
-  magic() { tail -c +$(($1 + 1)) "$cart/kernel-nor.bin" | head -c 4; }
+  magic() { tail -c +$(($1 + 1)) "$cart/kernel-nor.bin" | drain_head -c 4; }
   [ "$(magic 0x782100)" = TNL2 ] || fail "copy B has no trailer"
   [ "$(magic 0x7A2100)" = TNL2 ] || fail "copy A has no trailer"
   boot -f 300
@@ -370,7 +372,7 @@ if shard_case; then
   write 2
   dd if="$root/C.gba" of="$cart/game-nor.bin" bs=128K seek=2 conv=notrunc status=none
   older_list "$cart/kernel-nor.bin" "$(head -c 132 <(tail -c +$((0x7A0001)) "$cart/kernel-nor.bin") | od -v -A n -t x1 | tr -d ' \n')" \
-    "$(tail -c +$((0x7A0001 + 132)) "$cart/kernel-nor.bin" | head -c 132 | od -v -A n -t x1 | tr -d ' \n')" \
+    "$(tail -c +$((0x7A0001 + 132)) "$cart/kernel-nor.bin" | drain_head -c 132 | od -v -A n -t x1 | tr -d ' \n')" \
     "$(entry C.gba 0x40000 0x20000 "$root/C.gba")"
   write 4
   holds 0x40000 C.gba || fail "C.gba, added by an older kernel, was overwritten"

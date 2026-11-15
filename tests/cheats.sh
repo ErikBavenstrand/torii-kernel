@@ -16,6 +16,8 @@
 # Runs inside the torii-emu container after `just build`, `just emu-headless`
 # and building tests/roms/hello.
 set -euo pipefail
+# shellcheck source=tests/pipes.sh
+. tests/pipes.sh
 
 # shellcheck source=tests/carts.sh
 . tests/carts.sh
@@ -63,10 +65,10 @@ pick() {
 
 pick boot >"$cart/pick.txt" 2>&1 || fail "the cheat screen didn't run: $(grep -a '^kernel' "$cart/pick.txt" | tail -3)"
 grep -q "cheats: .*Hello.cht: 4 cheats, 1 greyed, 1 picked" "$cart/pick.txt" ||
-  fail "the screen read: $(grep -a 'cheats:' "$cart/pick.txt" | head -3)"
+  fail "the screen read: $(grep -a 'cheats:' "$cart/pick.txt" | drain_head -3)"
 # The popup never reads the file: no count before the screen has counted it
 grep -q "cheats: popup: -1 listed" "$cart/pick.txt" ||
-  fail "the popup counted: $(grep -a 'cheats: popup' "$cart/pick.txt" | head -1)"
+  fail "the popup counted: $(grep -a 'cheats: popup' "$cart/pick.txt" | drain_head -1)"
 ! sed '/screen ready: game-popup/q' "$cart/pick.txt" | grep 'safefile: .*Hello.cht\|cheats: .*Hello.cht: [0-9]* bytes' >/dev/null ||
   fail "the popup read the cheat file"
 grep -q "cheats: /torii/cheats/Hello.cht: 2 picked, written" "$cart/pick.txt" ||
@@ -75,7 +77,7 @@ mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht >"$cart/after.cht"
 # The file as it was but for cheat1's enable value, and the CRC line safefile adds
 sed 's/^cheat1_enable = false\r$/cheat1_enable = true\r/' "$cart/Hello.cht" >"$cart/want.cht"
 head -c "$(stat -c %s "$cart/want.cht")" "$cart/after.cht" | cmp -s - "$cart/want.cht" ||
-  fail "the write-back changed more than the enable line: $(diff <(cat -A "$cart/want.cht") <(cat -A "$cart/after.cht") | head -5)"
+  fail "the write-back changed more than the enable line: $(diff <(cat -A "$cart/want.cht") <(cat -A "$cart/after.cht") | drain_head -5)"
 tail -n 1 "$cart/after.cht" | grep '^#crc32 ' >/dev/null || fail "the written file has no CRC line"
 echo "PASS: cheats: the cheat screen picks a cheat and saves only its enable line"
 
@@ -85,7 +87,7 @@ echo "PASS: cheats: the cheat screen picks a cheat and saves only its enable lin
 # shellcheck disable=SC2046 # nav.sh's options
 boot $(nav_game_menu gba 0) -f 3000 >"$cart/count.txt" 2>&1 || fail "the popup didn't open: $(grep -a '^kernel' "$cart/count.txt" | tail -3)"
 grep -q "cheats: popup: 4 listed" "$cart/count.txt" ||
-  fail "after a power-off the popup counted: $(grep -a 'cheats: popup' "$cart/count.txt" | head -1)"
+  fail "after a power-off the popup counted: $(grep -a 'cheats: popup' "$cart/count.txt" | drain_head -1)"
 ! grep -q 'safefile: .*Hello.cht\|cheats: .*Hello.cht: [0-9]* bytes' "$cart/count.txt" || fail "the popup read the cheat file"
 cp "$cart/sd.img" "$cart/counted.img"
 mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | sed '$d' >"$cart/edited.cht"
@@ -95,7 +97,7 @@ mdel -i "$cart/sd.img" ::/torii/cheats/Hello.cht.bak 2>/dev/null || true
 # shellcheck disable=SC2046 # nav.sh's options
 boot $(nav_game_menu gba 0) -f 3000 >"$cart/count.txt" 2>&1 || fail "the popup didn't open: $(grep -a '^kernel' "$cart/count.txt" | tail -3)"
 grep -q "cheats: popup: -1 listed" "$cart/count.txt" ||
-  fail "the popup counted a changed file: $(grep -a 'cheats: popup' "$cart/count.txt" | head -1)"
+  fail "the popup counted a changed file: $(grep -a 'cheats: popup' "$cart/count.txt" | drain_head -1)"
 cp "$cart/counted.img" "$cart/sd.img"
 echo "PASS: cheats: the popup has the screen's count after a power-off, and none for a file changed since"
 
@@ -155,7 +157,7 @@ done
 boot $(nav_launch /Hello.gba addon) -w "BOOT WITH ADDON" "${dumps[@]}" -k @300:R+SELECT -k @340:- -k @360:A -k @400:- \
   -f 4000 >"$cart/interp.txt" 2>&1 || fail "the interpreter's launch didn't run: $(grep -a '^kernel' "$cart/interp.txt" | tail -3)"
 grep -q "cheats: .*Hello.cht: 13 picked, 13 run in game" "$cart/interp.txt" ||
-  fail "the launch read: $(grep -a 'cheats:' "$cart/interp.txt" | head -3)"
+  fail "the launch read: $(grep -a 'cheats:' "$cart/interp.txt" | drain_head -3)"
 at() { sed -n "s/^mem frame [0-9]* $2: //p" "$cart/interp.txt" | sed -n "$1p" | tr -d ' \n' | tr A-F a-f; }
 want() {
   local got
@@ -229,9 +231,9 @@ boot $(nav_launch /Hello.gba addon) -w "BOOT WITH ADDON" -m @240:0x080000A0:14 -
   -k @300:A -k @340:- -m @330:0x0203F700:2 -f 5000 >"$cart/patches.txt" 2>&1 ||
   fail "the ROM patches' launch didn't run: $(grep -a '^kernel' "$cart/patches.txt" | tail -3)"
 grep -q "cheats: .*Hello.cht: 12 picked, 1 run in game" "$cart/patches.txt" ||
-  fail "the ROM patches' launch read: $(grep -a 'cheats:' "$cart/patches.txt" | head -3)"
+  fail "the ROM patches' launch read: $(grep -a 'cheats:' "$cart/patches.txt" | drain_head -3)"
 grep -q "cheats: cheat 10 (Too much): its 300 ROM patches (3008 bytes kept) don't fit beside 7396 (46680 of 49152 bytes), left out" "$cart/patches.txt" ||
-  fail "the cheat past the kept room: $(grep -a 'cheats: cheat' "$cart/patches.txt" | head -3)"
+  fail "the cheat past the kept room: $(grep -a 'cheats: cheat' "$cart/patches.txt" | drain_head -3)"
 grep -q "cheats: 4097 ROM patches written into the game, some past its end left out" "$cart/patches.txt" ||
   fail "the ROM patches weren't all written: $(grep -a 'cheats:' "$cart/patches.txt" | tail -3)"
 cycles=$(sed -n 's/.*cheats: 4097 ROM patches written into the game.* (\([0-9]*\) cycles).*/\1/p' "$cart/patches.txt")
@@ -267,7 +269,7 @@ done
 boot $(nav_launch /Hello.gba addon) -w "BOOT WITH ADDON" "${dumps[@]}" -k @300:R -k @340:- -k @360:R -k @364:- \
   -k @400:L -k @420:- -f 4000 >"$cart/keys.txt" 2>&1 || fail "the keys' launch didn't run: $(grep -a '^kernel' "$cart/keys.txt" | tail -3)"
 grep -q "cheats: .*Hello.cht: 2 picked, 2 run in game" "$cart/keys.txt" ||
-  fail "the keys' launch read: $(grep -a 'cheats:' "$cart/keys.txt" | head -3)"
+  fail "the keys' launch read: $(grep -a 'cheats:' "$cart/keys.txt" | drain_head -3)"
 # counter N HALF: dump N's halfword (0: Hold L's, 1: Press R's), in decimal
 counter() {
   local v
@@ -315,9 +317,9 @@ boot $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -
   -w "cheats: back" -f 8000 >"$cart/big.txt" 2>&1 ||
   fail "the big file's screen didn't run: $(grep -a '^kernel' "$cart/big.txt" | tail -3)"
 grep -q "cheats: .*Hello.cht: 500 cheats listed, decoded in" "$cart/big.txt" ||
-  fail "the big file wasn't listed: $(grep -a 'cheats:' "$cart/big.txt" | head -3)"
+  fail "the big file wasn't listed: $(grep -a 'cheats:' "$cart/big.txt" | drain_head -3)"
 grep -q "cheats: .*Hello.cht: 500 cheats, 499 greyed" "$cart/big.txt" ||
-  fail "the big file read: $(grep -a 'cheats:' "$cart/big.txt" | head -3)"
+  fail "the big file read: $(grep -a 'cheats:' "$cart/big.txt" | drain_head -3)"
 # Until the screen's write-back: the screen's read alone
 [ "$(sed '/cheats: back/q' "$cart/big.txt" | grep -c 'safefile: .*Hello.cht')" -le 1 ] ||
   fail "the big file was read more than once"
@@ -327,7 +329,7 @@ popups=$(sed -n 's/.*cheats: popup: \(-\{0,1\}[0-9]*\) listed.*/\1/p' "$cart/big
 # and under pipefail that ended the script with no FAIL line, now and then)
 again=$(awk '/screen ready: game-popup/ { buf = "" } { buf = buf $0 "\n" } END { printf "%s", buf }' "$cart/big.txt")
 grep -q "cheats: .*Hello.cht: 500 cheats listed from its cache" <<<"$again" ||
-  fail "the second visit didn't take the list from its cache: $(grep -a 'cheats:' <<<"$again" | head -3)"
+  fail "the second visit didn't take the list from its cache: $(grep -a 'cheats:' <<<"$again" | drain_head -3)"
 ! grep -q "screen ready: progress" <<<"$again" || fail "a progress dialog on the second visit"
 echo "PASS: cheats: a file of 500 cheats is read once and listed once, picks at once, and opens again from its list; the popup counts it once the screen has"
 
@@ -375,7 +377,7 @@ for big in "600 100000" "1000 190000"; do
   pick boot -f 12000 >"$cart/huge.txt" 2>&1 ||
     fail "the $count-cheat file's screen didn't run: $(grep -a '^kernel' "$cart/huge.txt" | tail -3)"
   grep -q "cheats: .*Hello.cht: $count cheats, [0-9]* greyed, 2 picked" "$cart/huge.txt" ||
-    fail "the $count-cheat file read: $(grep -a 'cheats:' "$cart/huge.txt" | head -3)"
+    fail "the $count-cheat file read: $(grep -a 'cheats:' "$cart/huge.txt" | drain_head -3)"
   # The popup doesn't read it (reading 190 KB took 75 frames): its look at
   # the file takes far less than a frame (under half; 106,803 cycles at the
   # menu's WS0 3/1)
@@ -388,7 +390,7 @@ for big in "600 100000" "1000 190000"; do
   mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht >"$cart/after.cht"
   sed 's/^cheat0_enable = false$/cheat0_enable = true/' "$cart/Huge.cht" >"$cart/want.cht"
   head -c "$(stat -c %s "$cart/want.cht")" "$cart/after.cht" | cmp -s - "$cart/want.cht" ||
-    fail "the $count-cheat file's write-back changed more than the enable line: $(diff "$cart/want.cht" "$cart/after.cht" | head -5)"
+    fail "the $count-cheat file's write-back changed more than the enable line: $(diff "$cart/want.cht" "$cart/after.cht" | drain_head -5)"
   launch_big() {
     # shellcheck disable=SC2046 # nav.sh's options
     boot $(nav_launch /Hello.gba addon) -w "BOOT WITH ADDON" -m @240:0x0203F080:1 -m @240:0x0203F084:1 \
@@ -397,7 +399,7 @@ for big in "600 100000" "1000 190000"; do
   launch_big >"$cart/launch.txt" 2>&1 ||
     fail "the $count-cheat file's launch didn't run: $(grep -a '^kernel' "$cart/launch.txt" | tail -3)"
   grep -q "cheats: /torii/cheats/Hello.cht: 3 picked, 2 run in game" "$cart/launch.txt" ||
-    fail "the $count-cheat file's launch read: $(grep -a 'cheats:' "$cart/launch.txt" | head -3)"
+    fail "the $count-cheat file's launch read: $(grep -a 'cheats:' "$cart/launch.txt" | drain_head -3)"
   grep -q "cheats: 1 ROM patches written into the game" "$cart/launch.txt" ||
     fail "the $count-cheat file's ROM patch wasn't written: $(grep -a 'cheats:' "$cart/launch.txt" | tail -3)"
   bmem() { sed -n "s/^mem frame [0-9]* $1: //p" "$cart/launch.txt" | tr -d ' \n' | tr A-F a-f; }
@@ -531,7 +533,7 @@ for typed in "3203F030 0077|0203F030:1|77|CodeBreaker" "D5A7153C 73B76013|0203F0
   last=$(cheat_lines | tail -n 1)
   [ "$last" = "$code|1|true|" ] || fail "the $what code reads back as $last"
   mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | grep $'^cheat4_desc = "Code 1"\r$' >/dev/null ||
-    fail "the $what code's name: $(mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | grep -a cheat4_ | head -3)"
+    fail "the $what code's name: $(mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | grep -a cheat4_ | drain_head -3)"
   launch_dump -m "@240:0x$at" >"$cart/launch.txt" 2>&1 ||
     fail "the $what code's launch didn't run: $(grep -a '^kernel' "$cart/launch.txt" | tail -3)"
   got=$(sed -n "s/^mem frame [0-9]* ${at%%:*}: //p" "$cart/launch.txt" | tr -d ' \n' | tr A-F a-f)
@@ -567,7 +569,7 @@ echo "PASS: cheats: a code of the user's is edited from START's menu, in its pla
 cp "$cart/added.img" "$cart/sd.img"
 cp "$cart/clean/kernel-nor.bin" "$cart/"
 rm -f "$cart/sram.bin"
-before=$(cheat_lines | head -n 4)
+before=$(cheat_lines | drain_head -n 4)
 # shellcheck disable=SC2046 # nav.sh's options
 boot $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -k @48:- \
   -w "screen ready: cheats" -k @8:DOWN -k @12:- -k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:START -k @48:- \
@@ -745,7 +747,7 @@ boot $(nav_game_menu gba 0) -k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @44:A -
   -w "screen ready: cheats" -k @8:UP -k @12:- -k @24:A -k @28:- -k @60:B -k @64:- -w "cheats: back" -f 12000 \
   >"$cart/full.txt" 2>&1 || fail "the full file's screen didn't run: $(grep -a '^kernel' "$cart/full.txt" | tail -3)"
 grep -q "cheats: + Add code greyed: No room: the file is full" "$cart/full.txt" ||
-  fail "the full file's + Add code: $(grep -a 'cheats:' "$cart/full.txt" | head -3)"
+  fail "the full file's + Add code: $(grep -a 'cheats:' "$cart/full.txt" | drain_head -3)"
 ! grep -q "screen ready: keypad" "$cart/full.txt" || fail "A on a greyed + Add code opened the keypad"
 echo "PASS: cheats: a file with no number left greys + Add code up front, and A on it opens nothing"
 
@@ -770,7 +772,7 @@ mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht >"$cart/after.cht"
 sed 's/^cheat0_code = "3203F050+00??"\r$/cheat0_code = "3203F050 005A"\r/; s/^cheat0_enable = false\r$/cheat0_enable = true\r/' \
   "$cart/Fill.cht" >"$cart/want.cht"
 head -c "$(stat -c %s "$cart/want.cht")" "$cart/after.cht" | cmp -s - "$cart/want.cht" ||
-  fail "the fill changed more than its code and pick: $(diff <(cat -A "$cart/want.cht") <(cat -A "$cart/after.cht") | head -5)"
+  fail "the fill changed more than its code and pick: $(diff <(cat -A "$cart/want.cht") <(cat -A "$cart/after.cht") | drain_head -5)"
 launch_dump -m "@240:0x0203F050:1" >"$cart/launch.txt" 2>&1 ||
   fail "the filled-in code's launch didn't run: $(grep -a '^kernel' "$cart/launch.txt" | tail -3)"
 got=$(sed -n 's/^mem frame [0-9]* 0203F050: //p' "$cart/launch.txt" | tr -d ' \n' | tr A-F a-f)

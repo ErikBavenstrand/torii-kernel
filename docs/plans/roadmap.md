@@ -47,11 +47,16 @@ Each release's details are in `CHANGELOG.md`; the planning, ticket reports and r
 - **v0.9.19 Kerning and script fonts (2026-11-02):** kerning (13 left glyphs, 224 and 174 pairs in the body and heading fonts, picked by their ink: a variant of the left glyph a pixel narrower, one rule in `text_layout`, `text_width`, the labels, rename's wrapping, the copy's percentage and the in-game menu's lines); a language pack's script font (`font` in `[meta]`, `source/engine/script.h`; glyph indices are 16-bit; the pseudo-locale en-XA has numbered boxes for Greek, Cyrillic and kana, golden `lang-script`); frame figures leave out the log flush and the timing summary no longer pushes older lines out; the Swedish terms reviewed; `tests/cheats.sh` passed 5 runs in a row after the SIGPIPE fix.
 - **v0.9.20 Licences (2026-11-02):** `THIRD_PARTY_NOTICES.md` (each part's copyright and licence) and `licenses/`, attached to each release as `torii-licenses.zip`; the release binary is under the GNU GPL 3 or later (it contains minilzo); Info's Credits names the kernel base, FatFs, libgba and minilzo; the roadmap's baseline, slot and power-off items closed; Emerald's sleep confirmed on the real cart.
 - **v0.9.21 Analysis and slots (2026-11-02):** the static-analysis baseline from 97 findings to none (fixed in the code, or a false alarm marked beside it with its reason); Settings, Saves, Ask for a slot (off plays the active slot; SELECT with A still asks); a test for it.
-- **Unreleased, GB/GBC/NES cheats:** Game Genie (GB, GBC, NES) as ROM patches in the kernel, NES raw `AAAA:VV` and GB/GBC GameShark `01` and `90`-`97` as per-frame RAM writes through small patches in PocketNES and Jagoomba; the cheat screen and popup open for these games; libretro corpus counted (`tools/cheat_emu_stats.py`).
+- **Tracker items (2026-11-02):** `just gb-accuracy` runs Blargg's tests and the acid2 ROMs through Jagoomba (15 of 54 pass, all `cpu_instrs`; the rest is Jagoomba's accuracy, not fixed), `tests/gb_mode.sh` checks GBC/SGB/DMG mode and the default palette (jagoombacolor#42, #34); PocketNES#14 multiboot closed as nothing to do.
+- **v0.9.22 Extended Latin (2026-11-12):** the kernel draws file names beyond Latin-1 itself, with no language pack: Galmuri9's and Galmuri11's extended Latin (Polish, Czech, Turkish, Romanian, Vietnamese...), Greek, Cyrillic, punctuation and symbols, 1,675 glyphs in 33 KB of ROM (`font_extra.c`; headings get Galmuri11's made bold), in every screen and a launch's dialogs; the in-game menu folds them to Latin-1. Translations stay English and Swedish (a Korean pack was drafted and dropped: the owner wants none for now).
+- **v0.9.23 Cheat search's 1.0 review (2026-11-12):** pointer finds picked only after a Check, which marks rather than drops (the list kept when none pass, the list before the Check shown again, Find asks before it replaces one); the interpreter writes through a pointer only into EWRAM and IWRAM; Undo puts the snapshot's values back; the IWRAM a pass borrows and the EWRAM under the search's code read back from cart SRAM first; the hook's words out of the searched run (a stack top in EWRAM); New search and Save state ask first; a found code filed once, the boot says what it filed or why it couldn't, and records the card refused wait with their game; the numbers converted with Negative numbers and BCD, From A to B in order; All off stops the found cheats on now; the menu's row counts the candidates; `tests/search_more.sh` (Undo, 16 finds at 32 bits, the live block's three, Sleep and Reset mid-search, cart SRAM and card faults, a stack in EWRAM, a pointer to VRAM, a cut mid-pass). The overlay's extension is in two parts in cart SRAM page `0xF0`, so the menu still opens in 4 frames.
+- **Tests (2026-11-13):** every test pipeline ends in `drain_grep` or `drain_head` (`tests/pipes.sh`), never `grep -q` or `head`, whose early exit could SIGPIPE the writer under `pipefail` and fail a test now and then (`search_more midgame`, 1 run in 24; 72 of 72 after); `just lint` refuses the bare forms (`tools/pipe_check.py`).
 
+- **v0.9.24 Sound after the in-game menu (2026-11-13, 38020788):** games on Nintendo's MP2000 (m4a) engine got the wrong samples for up to `pcmDmaPeriod` - 1 frames after every Resume, Save state and Load state (all 49 m4a games in `roms/`: the stub turned the sound DMAs on at the buffer's start, mid-period); the stub now leaves them off for the engine's next re-arm (`m4a_hold`). `tests/m4a_sound.py` measures it from mGBA's DMA and FIFO state (`mgba-shot -a`), on a homebrew engine in `just test` and in every game's state trips in `just compat`.
+- **v0.9.25 Hi-colour GBC (2026-11-14, 3c49daae):** Jagoomba records BG palette writes made during the visible lines (`FF69_W`, line, GBA palette offset and the gamma-converted colour, up to 768 a frame in three 3 KB lists in EWRAM) and an HBlank IRQ replays them at each GBA line, only on frames that have them (jagoombacolor#20, #53; `docs/research/gbc-hicolor.md`). Donkey Kong Country's title now matches mGBA's GB core; `tests/gb_hicolor.sh` checks a homebrew ROM that rewrites a palette every line (576 colours a frame) against mGBA's GB core, at gamma 0 and with gamma on; `mgba-shot` runs GB ROMs in mGBA's own core.
 ## Open work, before 1.0
 
-**Everything below is not done.** When an item ships, move it to [Done](#done) (one line under its release) and delete it here; an item partly done keeps only what is left. Swept on 2026-10-28 from the code's TODOs, `docs/design`, `docs/research`, the release checklist, `tools/analyze-baseline.txt` and hand-over notes; checked again against git history on 2026-11-02, after v0.9.16. The groups were first planned as patches v0.9.1–v0.9.5, but the releases went to cheats instead, so they are themes now, not version numbers.
+**Everything below is not done.** When an item ships, move it to [Done](#done) (one line under its release) and delete it here; an item partly done keeps only what is left. Swept on 2026-10-28 from the code's TODOs, `docs/design`, `docs/research`, the release checklist, `tools/analyze-baseline.txt` and hand-over notes; checked again against git history on 2026-11-02, after v0.9.16, and on 2026-11-13, after v0.9.23. The groups were first planned as patches v0.9.1–v0.9.5, but the releases went to cheats instead, so they are themes now, not version numbers.
 
 1.0 is tagged when every item below is done or deferred and a full pass of `docs/release-checklist.md` on the real cart finds nothing new. Items marked **(1.0?)** were planned as 1.0 projects; the owner decides whether each one must ship before 1.0 or can come after it.
 
@@ -59,38 +64,57 @@ Each release's details are in `CHANGELOG.md`; the planning, ticket reports and r
 
 Code fixes that the emulator can test, plus the leftovers from v0.9.
 
-
-### Menus
-
-The UX reviews' open proposals (`docs/design/v0.5/ux-review.md`, `settings-ux-review.md`) and the owner's asks.
-
-- **The SD page's Play « »** stays beside Game info's Boot mode (decided in v0.9.18): its file info is a text dialog, and a Boot mode there needs an editable page. Play names default's way as the lists do.
+- None open.
 
 ### In game
 
-- **Sound after LOAD (1.0?):** games on Nintendo's MP2000 engine keep the PCM buffer's position in RAM, which could re-sync DMA1 at LOAD.
-- **Cheat search (shipped in v0.9.7–v0.9.10; [design](../design/v0.9/cheat-search.md)):** what is left of it. Reviewed 2026-10-31 (a code reviewer and an adversarial tester in the emulator); the review's fixes shipped. Open:
-  - **Contestable decisions:** it borrows the save-state buffer (no other cart SRAM has 288 KB), so a state not yet on the card blocks it and saving a state ends it; a game whose stack top is the BIOS's default (`0x03007F00`) gets its stack 32 bytes lower for the live block, others none (Street Fighter Alpha 3, top `0x03007EC0`, crashed with it: "on now" sets the value once there); the Cheat search row is on the Cheats page when the game has a cheat list (the menu has room for nine rows); the menu's lines past the seventh draw a frame later, with the footer.
-  - **Not done:** naming a found cheat in game (the overlay has no font or keyboard: rename it on the Cheats page); more than one Undo (the buffer's 288 KB leaves no room for a second copy: `cheat-search.md`); pointer chains (one level only); "on now" through a pointer (set once instead); a memory view around a candidate; VRAM, palette and OAM searches.
-  - **Cart check:** a pointer kept in Pokémon Emerald (money through gSaveBlock1Ptr) across a door.
-  - **Untested:** a card write that fails while filing (the records wait for the next boot); a 32-bit search with large values and 16 different addresses kept, in the emulator.
-
-### Fonts and scripts
-
-- **A real script font (1.0?):** the mechanism ships in v0.9.19 (a pack's `font` in `[meta]`, loaded into the 320 KB in PSRAM, tested with the numbered boxes of en-XA), but no pack has a font yet: it needs a full BDF with an open licence (Galmuri's Hangul and kana, say; the repository holds its Latin-1 subset only) and a translation to go with it. The in-game menu (`ingame.c`) and a launch's dialogs draw those characters as the replacement box, since a launch fills PSRAM.
+- **Cheat search (shipped in v0.9.7–v0.9.10; [design](../design/v0.9/cheat-search.md)):** the 1.0 review's fixes are done (Done); what stays is a cart check, and the rest is in Known limits.
+  - **Cart check:** a pointer kept in Pokémon Emerald (money through gSaveBlock1Ptr) across a door; the menu's opening and the search pages on the real cart with the two-part extension in cart SRAM page `0xF0`.
 
 ### Emulators and cheats
 
-- **(1.0?) Hi-colour GBC:** these games lose mid-frame palette writes (jagoombacolor#20, #53). A per-line palette path in Jagoomba needs about 18 KB and its last DMA channel (`docs/research/gbc-hicolor.md`).
-- **GB, GBC and NES cheats, what is left** (design and status `docs/plans/emulator-cheats.md`; stages 0-4 are in Unreleased, typing codes on the cart too): the rest of the real-cart check (2026-11-02, owner: Pokémon Red's GameShark HP poke held, and Crystal's Game Genie codes gave a Level 50 Mew; still to check: Zelda II and other NES codes, a banked game's compare-byte code, a battery save left clean, and speed and sound with 20 or more pokes), cart RAM cheats (greyed: Jagoomba's copy of the RAM reaches the save, so a poke would change it), and `8B` (one source). The hooks cost 0.02% of a GB frame empty and 3.4% with 63 pokes (PocketNES 0.03% and 1.3%), measured on the emulated cart.
+- **(1.0?) GB, GBC and NES cheats** (owner, 2026-10-25): libretro's GameShark and Game Genie files, with the codes passed to Jagoomba and PocketNES. **Built but not released** (owner, 2026-11-02: the quality can't be guaranteed yet): Game Genie as ROM patches, GameShark `01` and `90`-`97` and NES raw pokes as per-frame writes, typing codes on the cart; emulator-tested, with 84% of GB, 87% of GBC and 99.5% of NES cheats in libretro's files running, and a first real-cart pass (Pokémon Red's HP poke, Crystal's Game Genie). The work stays unpublished until a fuller real-cart check (Zelda II and other NES codes, a banked game, a save left clean, speed and sound with many pokes) passes and the owner says to ship it.
 - **(maybe) Live values in game** (owner, 2026-10-30: less useful than the rest): each cheat in the in-game list shows the value now at the address it writes ("Money 3,421"), with digits the kernel draws for the overlay. Encrypted values (Pokémon's money) would read as nonsense.
-- From the trackers: jagoombacolor#42 accuracy tests, #43 a GBC-compatible ROM run as DMG, #34 the default palette; PocketNES#14 multiboot.
+- From the trackers (checked 2026-11-02, `docs/research/gba-emulators.md`): jagoombacolor#43 stays open until someone has the issue's ROM (Super Connard, patched): Torii's mode logic is tested and right for `$143 = $80`/`$C0`. #34's remaining part is a taste call: a global default palette for games the GBC table doesn't know (grey today).
+
+### Known limits (accepted, no work planned)
+
+- **Hi-colour GBC** (`docs/research/gbc-hicolor.md`):
+  - A frame keeps up to 768 colour writes; past that the rest of its writes wait for the next frame's line 0 (no game in `roms/` comes near: Donkey Kong Country's title writes 38). Every-line rewrites of all eight palettes (2,304 colours) would need about 18 KB more of EWRAM, which the save code's workspace leaves no room for.
+  - Speed: recording costs about 90 GBA cycles a colour, and the replay about 150 a line: the homebrew test ROM (576 colours a frame) dropped from 148% of full speed unthrottled (889 GB frames in 600 GBA frames) to 88% (531), so with VSync on it now runs at about 88%. A real hi-colour game also runs its own logic, so it slows more; Donkey Kong Country's title (38 colours) went from 995 to 943. Games without mid-frame writes lose about 1% of unthrottled speed (Crystal 1,201 from 1,209).
+  - Jagoomba raises the STAT interrupt as a line starts, so a colour written in an HBlank handler can show a line or two before the Game Boy Color shows it.
+- **Cheat search:**
+  - It borrows the save-state buffer (no other cart SRAM has 288 KB), so a state not yet on the card blocks it and saving a state ends it (Save state asks first).
+  - A game whose stack top is the BIOS's default (`0x03007F00`) gets its stack 32 bytes lower for the live block, others none (Street Fighter Alpha 3, top `0x03007EC0`, crashed with it): there "on now" is "set now", set once and held from the next launch. Emerald, Mario Kart, GTA, Metroid and F-Zero log stack literal 0 and have no live block.
+  - One Undo; when a pass writes over more snapshot values than its 28 KB of Undo room holds, the filters against the last scan wait, after an Undo, for one against a number.
+  - Pointer chains (one level only); "on now" through a pointer (set once, and only after a Check); naming a found cheat in game (no font or keyboard: rename it on the Cheats page); a memory view around a candidate; VRAM, palette and OAM searches.
+  - A found code is looked for in a larger cheat file's last window only.
+  - The Cheat search row is on the Cheats page when the game has a cheat list (the menu has room for nine rows); the menu's lines past the seventh draw a frame later, with the footer.
+- **In-game menu:**
+  - The game's name shows above the rows only when they leave room. That's by design: the game is on screen behind the menu.
+  - A 32 MB ROM with no padding gets the in-game code over its last bytes, as the official kernel did.
+  - The screenshot's clock read can't see a game's write-only clock command when the port is unreadable.
+- **States:**
+  - After Resume, Save state and Load state, a game on the m4a engine is silent until the engine re-arms its sound DMAs: up to `pcmDmaPeriod` - 1 frames (6 in Pokémon's, 11 in Wolfenstein 3D's). Starting them where the engine has them needs the PCM buffer's address, which only the write-only DMA source holds; SoundInfo's `pcmBuffer` is it in most games but not in Camelot's (Golden Sun: The Lost Age, Mario Golf, Mario Power Tennis). Other engines (Metroid's, Mario & Luigi's, Nintendo EAD's in Super Mario Advance 3 and 4) still get their sound DMAs back at their source's start, as before.
+  - Write-only display registers can't be put back in games that keep no RAM copy of them; 44 compat games stay blank until the game redraws.
+  - The exact-ROM hook patches cover only the EU builds of GTA Advance, Super Monkey Ball Jr., LEGO Star Wars II and Tomb Raider: Legend; their other regions get no in-game menu (`docs/research/hook-coverage.md`).
+  - Sonic Advance and Moto Racer replace the IRQ hook, and HP Quidditch blocks the menu. These are compat's three known failures.
+- **Screenshots:** without the game's RAM copy of its registers, a scrolled tile screen sits shifted. The BG matrices, BLDY, MOSAIC and window bounds can't be read back, so fades and Mode 7 roads come out wrong. A shot taken without the cart's clock is named by the filing's time.
+- **Static analysis:** CI fails on any finding; `tools/analyze-baseline.txt` is empty. A finding that is a false alarm gets an inline `cppcheck-suppress` or `NOLINT` with its reason beside the code.
+- **Hardware:**
+  - The session record in cart RAM page `0xF0` doesn't survive a power cycle.
+  - EZ-Flash's loader installs only the first 3 MB of `ezkernelnew.bin` (`tools/omega_image.py` enforces it).
+  - `Save_savefile`'s second half runs frames with SRAM page 0x10 selected, and `FRAM_save_op` runs frames with a file open. Both are safe today and commented.
+
+## After 1.0
+
+Taken off the 1.0 list (owner, 2026-11-11).
 
 ### Licences
 
-- **Ask Jaga (jagoombacolor) and Dwedit (Goomba Color, PocketNES) to put a licence in their repositories**, or to say in writing that Torii may build and release their code with our patches. Neither repository has one, and the release's binary includes both (`THIRD_PARTY_NOTICES.md`, "Open points"). Nothing else in the licence audit is open.
+- **Ask Jaga (jagoombacolor) and Dwedit (Goomba Color, PocketNES) to put a licence in their repositories**, or to say in writing that Torii may build and release their code with our patches. Neither repository has one, and the release's binary includes both (`THIRD_PARTY_NOTICES.md`, "Open points"). Nothing else in the licence audit is open. Asked on 2026-11-15: [EvilJagaGenius/jagoombacolor#56](https://github.com/EvilJagaGenius/jagoombacolor/issues/56) and [Dwedit/PocketNES#16](https://github.com/Dwedit/PocketNES/issues/16) (PocketNES and Goomba Color); waiting for answers.
 
-### Research (doesn't block 1.0 unless a finding does)
+### Research
 
 - **Hardware probes** (`docs/research/omega-de-hardware.md`):
   - Is an SD write right after the FPGA's ROM copy safe?
@@ -101,23 +125,6 @@ The UX reviews' open proposals (`docs/design/v0.5/ux-review.md`, `settings-ux-re
   - The open register questions: the `0x09E00000` status values, `0x096C0000` auto-save, Mode B's slot, the frames at minor `0x17`, what `0x09700000` changes in the ROM map, and how the unlock sequence is checked.
   - A blue EZODE-B's raw version word and NOR IDs, if an owner of one can read them.
 - **Unverified:** "chip select high" as mid-read assumes the RTC port reads back its output pins. That holds in mGBA but hasn't been checked on the cart.
-
-### Known limits (accepted, no work planned)
-
-- **In-game menu:**
-  - The game's name shows above the rows only when they leave room. That's by design: the game is on screen behind the menu.
-  - A 32 MB ROM with no padding gets the in-game code over its last bytes, as the official kernel did.
-  - The screenshot's clock read can't see a game's write-only clock command when the port is unreadable.
-- **States:**
-  - Write-only display registers can't be put back in games that keep no RAM copy of them; 44 compat games stay blank until the game redraws.
-  - The exact-ROM hook patches cover only the EU builds of GTA Advance, Super Monkey Ball Jr., LEGO Star Wars II and Tomb Raider: Legend; their other regions get no in-game menu (`docs/research/hook-coverage.md`).
-  - Sonic Advance and Moto Racer replace the IRQ hook, and HP Quidditch blocks the menu. These are compat's three known failures.
-- **Screenshots:** without the game's RAM copy of its registers, a scrolled tile screen sits shifted. The BG matrices, BLDY, MOSAIC and window bounds can't be read back, so fades and Mode 7 roads come out wrong. A shot taken without the cart's clock is named by the filing's time.
-- **Static analysis:** CI fails on any finding; `tools/analyze-baseline.txt` is empty. A finding that is a false alarm gets an inline `cppcheck-suppress` or `NOLINT` with its reason beside the code.
-- **Hardware:**
-  - The session record in cart RAM page `0xF0` doesn't survive a power cycle.
-  - EZ-Flash's loader installs only the first 3 MB of `ezkernelnew.bin` (`tools/omega_image.py` enforces it).
-  - `Save_savefile`'s second half runs frames with SRAM page 0x10 selected, and `FRAM_save_op` runs frames with a file open. Both are safe today and commented.
 
 ## Process
 
