@@ -82,8 +82,8 @@ every game.
   and VBA/AnyGBA codes, all run the way the real devices run them, plus Torii code, our own
   format with tests and blocks. Game Genie and GameShark for Game Boy, Game Boy
   Color and NES games too.
-- **A hand-made cheat set for Pokémon Emerald**: 489 cheats, including a menu
-  you open in the overworld with L+R+B to heal, shop, use the PC or warp.
+- **Golden cheat sets**, a work in progress: hand-made cheat files that go
+  further than the usual lists.
 - **Cheat search.** Find a value in a running game (lives, money, a timer) and
   turn it into a cheat, Action Replay style.
 - **Box art.** Covers for every official GBA, GB and GBC game from an art pack
