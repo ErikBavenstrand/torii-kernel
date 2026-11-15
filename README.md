@@ -9,8 +9,8 @@
 
 <p align="center">
   <b>A new kernel for the EZ-Flash Omega Definitive Edition.</b><br>
-  Save states, cheats in every format, box art, themes and languages,<br>
-  on a menu that runs at 60 fps.
+  Every cheat format, a menu rebuilt from scratch,<br>
+  and a long list of fixes to the official kernel.
 </p>
 
 <p align="center">
@@ -50,48 +50,45 @@ every game.
 
 <table>
   <tr>
+    <td width="50%"><img src="docs/media/cheats.gif" width="100%" alt="Picking cheats and typing a code"></td>
     <td width="50%"><img src="docs/media/tour.gif" width="100%" alt="Browsing the game list with covers"></td>
-    <td width="50%"><img src="docs/media/ingame.gif" width="100%" alt="Saving a state from the in-game menu"></td>
   </tr>
   <tr>
-    <td align="center"><sub>Your library, with covers, favourites and recents</sub></td>
-    <td align="center"><sub>Save states from the in-game menu</sub></td>
+    <td align="center"><sub>Every cheat format: pick them, or type your own</sub></td>
+    <td align="center"><sub>A new menu, with covers, favourites and recents</sub></td>
   </tr>
   <tr>
-    <td><img src="docs/media/cheats.gif" width="100%" alt="Picking cheats and typing a code"></td>
     <td><img src="docs/media/language.gif" width="100%" alt="Switching the menu to Swedish"></td>
+    <td><img src="docs/media/ingame.gif" width="100%" alt="Saving a state from the in-game menu"></td>
   </tr>
   <tr>
-    <td align="center"><sub>Cheats: pick them, or type your own</sub></td>
     <td align="center"><sub>Switch language without restarting</sub></td>
+    <td align="center"><sub>Save states from the in-game menu</sub></td>
   </tr>
 </table>
 
 ## What you get
 
-- **A rebuilt in-game menu and save states.** Far more than the official
-  one: 8 states per save file, loadable later from Torii's menu, plus cheat
-  toggles, cheat search, screenshots, reset and sleep. Turn on Save states,
-  then hold L+R+START in any GBA game.
-- **Named save files.** Up to 16 per game, each with a name you choose: Main,
-  Speedrun, Hard mode, your sister's file. Pick one when the game starts.
-- **Saves you don't lose.** Every save is copied to the card with backups, and
-  deleted ones wait in a trash folder for 30 days. The copy survives a power
-  cut at any step.
 - **Every cheat format.** GameShark, Action Replay (v1/v2 and v3), CodeBreaker
-  and VBA/AnyGBA codes, all run the way the real devices run them, plus Torii code, our own
-  format with tests and blocks. Game Genie and GameShark for Game Boy, Game Boy
-  Color and NES games too.
+  and VBA/AnyGBA codes, every code type, run the way the real devices run
+  them, plus Torii code, our own format with tests and blocks. Type codes on
+  the cart, find new ones with the in-game cheat search, and use Game Genie and
+  GameShark codes for Game Boy, Game Boy Color and NES games too.
+- **A new menu, from scratch.** A 60 fps tile engine in place of the official
+  menu: a home carousel, game lists with box art and No-Intro names, light and
+  dark themes, favourites and recents, and help pages on the cart.
+- **A long list of bug fixes** from the official kernel: lost Game Boy saves,
+  wrong save types, settings and the NOR list lost in a power cut, rumble tied
+  to the clock, and more ([changelog](CHANGELOG.md)).
+- **Named save files.** Up to 16 per game, each with a name you choose: Main,
+  Speedrun, Hard mode, your sister's file. Every save is copied to the card with
+  backups, and the copy survives a power cut at any step.
+- **A reworked in-game menu.** 8 save states per save file, cheat toggles,
+  screenshots, reset and sleep.
 - **Golden cheat sets**, a work in progress: hand-made cheat files that go
   further than the usual lists.
-- **Cheat search.** Find a value in a running game (lives, money, a timer) and
-  turn it into a cheat, Action Replay style.
-- **Box art.** Covers for every official GBA, GB and GBC game from an art pack
-  you build once on a computer, and your own pictures for romhacks and homebrew.
-- **A menu worth looking at.** 60 fps tile engine, light and dark themes,
-  favourites, recents, A-Z jumps, your own names for games.
-- **Languages.** English and Swedish today, with packs anyone can make. File
-  names show in Latin, Greek, Cyrillic and Vietnamese scripts.
+- **Languages.** English and Swedish, switched live, with packs anyone can
+  make. File names show in Latin, Greek, Cyrillic and Vietnamese scripts.
 - **GB, GBC and NES built in**, with save slots and cheats.
 
 ## Install
