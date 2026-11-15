@@ -2,7 +2,7 @@
 
 Torii is a fork of EZ-Flash's `omega-de-kernel` (Apache 2.0, `LICENSE`). It is
 not made, endorsed or supported by EZ-Flash. The cart shows the same credits
-under Info, Credits.
+under Info, About.
 
 **The release binary (`ezkernelnew.bin`) is distributed under the GNU GPL 3 or
 later** (`licenses/GPL-3.0.txt`). It links minilzo (GPL 2 or later) inside both
@@ -43,7 +43,17 @@ Used on the user's machine or card, never committed or released:
 the fork. They are EZ-Flash's and have no licence of their own beyond the
 repository's Apache 2.0 file. The build copies the parts of `image.bin` the
 kernel still reads (the FPGA firmware and EZ-Flash's compressed data) into
-`ezkernelnew.bin`, as the official kernel ships them. `bitstreams/` (FPGA firmware cut from
+`ezkernelnew.bin`, as the official kernel ships them. The PDF is kept for
+reference and goes on EZ-Flash's request.
+
+## Test fixtures
+
+A few tests read small factual excerpts: `tests/cheats/gamehacking_gba_50.html`
+(a trimmed GameHacking.org list page), `tests/cheat_codes.toml` (published
+codes, each with its source), `tests/names/*.dat` (No-Intro-style entries
+with made-up CRCs) and `tools/golden/emerald.json` (species and item tables
+from the pret/pokeemerald decompilation, for the Emerald cheat set). None of
+them is in the release binary. `bitstreams/` (FPGA firmware cut from
 `image.bin`) is git-ignored.
 
 ## Open points

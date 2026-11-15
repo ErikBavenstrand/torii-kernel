@@ -106,19 +106,19 @@
 ---
 
 **Sources**
-1. [source/ui/ring.h, source/ui/ui_ring.c](/Users/erik.bavenstrand/Code/torii-kernel/source/ui/ring.h) · 2026-10 · primary (code)
-2. [source/ui/ui_list.c](/Users/erik.bavenstrand/Code/torii-kernel/source/ui/ui_list.c) · 2026-10 · primary (code)
-3. [source/engine/text.h, text.c, text_blit.s](/Users/erik.bavenstrand/Code/torii-kernel/source/engine/text_blit.s) · 2026-10 · primary (code)
-4. [tests/perf/budget.txt; tests/kernel/test_text.c](/Users/erik.bavenstrand/Code/torii-kernel/tests/perf/budget.txt) · 2026-10 · primary (measurements)
-5. [source/engine/gfx.h](/Users/erik.bavenstrand/Code/torii-kernel/source/engine/gfx.h) · 2026-10 · primary (code)
-6. [source/ui/ui_run.c, source/ui/ui_core.c (window clip)](/Users/erik.bavenstrand/Code/torii-kernel/source/ui/ui_run.c) · 2026-10 · primary (code)
-7. [docs/design/v0.4/spec.md; docs/design/v0.4/decisions.md (R5)](/Users/erik.bavenstrand/Code/torii-kernel/docs/design/v0.4/spec.md) · 2026-10-20 · primary (design)
+1. [source/ui/ring.h, source/ui/ui_ring.c](../../../source/ui/ring.h) · 2026-10 · primary (code)
+2. [source/ui/ui_list.c](../../../source/ui/ui_list.c) · 2026-10 · primary (code)
+3. [source/engine/text.h, text.c, text_blit.s](../../../source/engine/text_blit.s) · 2026-10 · primary (code)
+4. [tests/perf/budget.txt; tests/kernel/test_text.c](../../../tests/perf/budget.txt) · 2026-10 · primary (measurements)
+5. [source/engine/gfx.h](../../../source/engine/gfx.h) · 2026-10 · primary (code)
+6. [source/ui/ui_run.c, source/ui/ui_core.c (window clip)](../../../source/ui/ui_run.c) · 2026-10 · primary (code)
+7. [docs/design/v0.4/spec.md; docs/design/v0.4/decisions.md (R5)](../../../docs/design/v0.4/spec.md) · 2026-10-20 · primary (design)
 8. [GBATEK: memory map / LCD timing](https://problemkaputt.de/gbatek.htm) · n.d. · primary (read through a fetch summary)
 9. [GBATEK: DMA transfers](https://problemkaputt.de/gbatek-gba-dma-transfers.htm) · n.d. · primary
 10. [Tonc: DMA](https://gbadev.net/tonc/dma.html) · n.d. · secondary
 11. [GBATEK: LCD OBJ overview](https://problemkaputt.de/gbatek-lcd-obj-overview.htm) · n.d. · primary
 12. [butano bn_sprite_text_generator.h / .cpp](https://github.com/GValiente/butano/blob/master/butano/src/bn_sprite_text_generator.cpp) · master · primary (code)
 13. [Tonc: TTE](https://gbadev.net/tonc/tte.html) · n.d. · secondary
-14. [docs/research/architecture.md, fonts.md](/Users/erik.bavenstrand/Code/torii-kernel/docs/research/architecture.md) · 2026 · secondary (earlier research)
+14. [docs/research/architecture.md, fonts.md](../../../docs/research/architecture.md) · 2026 · secondary (earlier research)
 
 *deep · 2 rounds · 14 sources read · 1 sonnet researcher*

@@ -147,7 +147,7 @@ Hand edits on a PC: a `NAME` with no end line is taken as hand-edited when it is
 ---
 
 **Sources**
-1. [FatFs R0.15 ff.c, ffconf.h](/Users/erik.bavenstrand/Code/torii-kernel/source/ff15/ff.c) · R0.15 vendored · primary (code)
+1. [FatFs R0.15 ff.c, ffconf.h](../../../source/ff15/ff.c) · R0.15 vendored · primary (code)
 2. [Linux fs/fat/namei_vfat.c](https://raw.githubusercontent.com/torvalds/linux/master/fs/fat/namei_vfat.c) · master, fetched 2026-10-20 · primary
 3. [Linux fs/exfat/namei.c](https://raw.githubusercontent.com/torvalds/linux/master/fs/exfat/namei.c) · master, fetched 2026-10-20 · primary
 4. [Windows-driver-samples fastfat dirsup.c](https://github.com/microsoft/Windows-driver-samples/blob/main/filesys/fastfat/dirsup.c) · main · primary (sample, not the shipping driver; partial read)
@@ -160,12 +160,12 @@ Hand edits on a PC: a `NAME` with no end line is taken as hand-edited when it is
 10b. [EmulationStation FileSorts.cpp, Settings.cpp](https://github.com/RetroPie/EmulationStation/blob/master/es-app/src/FileSorts.cpp) · HEAD 2026-10-20 · primary
 11. [RetroArch manual_content_scan.c](https://github.com/libretro/RetroArch/blob/master/manual_content_scan.c) · HEAD 2026-10-20 · primary (grep only)
 12. [Torii cart test 2026-10-18, now in omega-de-hardware.md](../omega-de-hardware.md) · 2026-10-18 · primary (measured)
-13. [source/Ezcard_OP.c, omega-de-hardware.md](/Users/erik.bavenstrand/Code/torii-kernel/source/Ezcard_OP.c) · primary (code)
-14. [source/engine/jobs.h, sdread.h](/Users/erik.bavenstrand/Code/torii-kernel/source/engine/jobs.h) · primary (code)
+13. [source/Ezcard_OP.c, omega-de-hardware.md](../../../source/Ezcard_OP.c) · primary (code)
+14. [source/engine/jobs.h, sdread.h](../../../source/engine/jobs.h) · primary (code)
 15. [FatFs f_rename](https://elm-chan.org/fsw/ff/doc/rename.html) · primary
 16. [FatFs application note](https://elm-chan.org/fsw/ff/doc/appnote.html) · primary
 17. [FatFs f_sync](https://elm-chan.org/fsw/ff/doc/sync.html) · primary
-18. [source/ezkernelnew.c Recently_play_write](/Users/erik.bavenstrand/Code/torii-kernel/source/ezkernelnew.c) · primary (code)
-19. [source/crash.s, source/engine/frame.c](/Users/erik.bavenstrand/Code/torii-kernel/source/crash.s) · primary (code)
+18. [source/ezkernelnew.c Recently_play_write](../../../source/ezkernelnew.c) · primary (code)
+19. [source/crash.s, source/engine/frame.c](../../../source/crash.s) · primary (code)
 
 *deep · 2 rounds · 19 sources read · 3 sonnet researchers + own reading of the code*

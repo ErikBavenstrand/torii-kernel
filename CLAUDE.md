@@ -37,7 +37,7 @@ Torii is a custom kernel for the EZ-Flash Omega DE, forked from EZ-Flash's offic
 
 ## Formatting
 
-- Text files are UTF-8 with LF line endings; `just lint` checks. Only `*.bat` keep EZ-Flash's encoding and CRLF, and the emulator patches carry upstream's CRLF lines.
+- Text files are UTF-8 with LF line endings; `just lint` checks. Only the emulator patches carry upstream's CRLF lines.
 - Run `just format` after editing C files; `just lint` fails on unformatted ones.
   It formats every C file with `.clang-format`, except the vendored ones `.clang-format-ignore` lists.
 - `.git-blame-ignore-revs` lists the commit that reformatted the official source; run `git config blame.ignoreRevsFile .git-blame-ignore-revs` once so `git blame` skips it.
@@ -58,7 +58,7 @@ Reviews: one round of at most two agents. Use a code reviewer, plus an adversari
    Test scripts keep their carts on the container's disk: source `tests/carts.sh` and call `local_carts dist/cart-NAME` (on `dist/`, each power-on costs 0.5 s more).
    Test scripts run under `pipefail`, so a pipeline never ends in `grep -q` or `head`: they exit early, the writer can die of SIGPIPE, and the test fails now and then under load. Use `drain_grep` and `drain_head` from `tests/pipes.sh`; `just lint` (`tools/pipe_check.py`) refuses the bare forms.
    Unit-test kernel functions in `tests/kernel/` (`CHECK`, `CHECK_EQ` from `torii_test.h`; declare each test in `tests.h` and list it in `run.c`). They run inside a test build of the kernel, so they can call any kernel function.
-   Test hardware-free code in `tests/host/` too: it builds for the host under ASan and UBSan (`just test-host`), with `tests/host/gba_base.h` standing in for libgba's. Keep such code in its own file, as `source/sort.c` and `source/cheat.c` are.
+   Test hardware-free code in `tests/host/` too: it builds for the host under ASan and UBSan (`just test-host`), with `tests/host/gba_base.h` standing in for libgba's. Keep such code in its own file, as `source/cheatcode.c` and `source/cheatfile.c` are.
    For changes to launching, saves or the cart model, also run `just compat` (games you own, listed in `roms/games.toml`; missing ones are skipped).
    For changes to C code, also run `just analyze`. It fails only on findings missing from `tools/analyze-baseline.txt`; fix them, or for a false alarm mark it beside the code (`cppcheck-suppress`, `NOLINT`) with its reason. The baseline is empty; `just analyze-baseline` rewrites it.
 2. For anything visible, run `just shot FRAME KEYS...` and read `dist/shots/shot.png`.

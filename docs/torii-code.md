@@ -2,7 +2,7 @@
 
 Torii code is Torii's own cheat format: a superset of VBA's `address:value` lines and AnyGBA's extensions, with tests, blocks and more writes. A cheat file names it `cheatN_format = "Torii"`; `"VBA"`, its name before, reads the same, so VBA cheats run as they are. Without a format line, a line with any of `: | [ & # = ! < > * ~ @ { }` reads as Torii code, so it mixes with CodeBreaker and Action Replay lines in one cheat.
 
-Only Torii reads the lines below past VBA's and AnyGBA's. mGBA, VBA-M and the devices don't.
+Lines marked Torii in the table run only in Torii, not in mGBA, VBA-M or the devices.
 
 ## Lines
 
@@ -55,7 +55,7 @@ Tests run every frame, as the devices' conditional codes do. A ROM patch inside 
 
 The keypad's symbol key turns the digits into Torii code's symbols, two rows of them: `[ ] + ^ | & # @` and `= ! < > * ~ { }`. After any symbol but `]` and `^`, it turns back to the digits; type `<<`, `>>` and `@@` by pressing the symbol twice. A `{` without its `}`, a `}` without a `{`, or blocks five deep are named with their line under the code.
 
-## Where it lives
+## For developers: where it lives
 
 - Parsed by `source/cheatcode.c` (`raw_line`, `torii_line`), and lowered into the in-game table by `source/cheatlower.c`; `source/cheatcode.h` sums the syntax up.
 - Run each frame by `source/cheatrun.s`, as every format is.

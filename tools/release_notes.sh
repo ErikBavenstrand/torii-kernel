@@ -19,8 +19,9 @@ revisions may work, but haven't been tested.
    (`/GBA/Emerald.gba` reads `/torii/cheats/GBA/Emerald.cht`).
 
 If the update stops with `Bad NOR ID`, the cart's kernel NOR is a uniform-sector
-S29GL064A (ID `0x220C`), and EZ-Flash's loader installs no kernel on it, Torii's
-or the official one (`docs/recovery.md`).
+S29GL064A (ID `0x220C`), and EZ-Flash's loader refuses to install any kernel on
+it, Torii or the official one (see
+[docs/recovery.md](https://github.com/ErikBavenstrand/torii-kernel/blob/main/docs/recovery.md)).
 
 NOTES
 # The publish job downloads the build's files here first

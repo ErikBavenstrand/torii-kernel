@@ -19,10 +19,10 @@ the About page. Releases now attach the Pokémon Emerald cheat set as
 - **Changed:** GB and GBC GameShark codes cost about half as much: Jagoomba's
   per-frame writes run from VRAM instead of the game's PSRAM, about 106 cycles
   a poke instead of about 190 (counted alike), so 63 pokes take 2.4% of a
-  frame. Five owned games tested stay at full speed with them (VSync on); the
+  frame. Five games tested stay at full speed with them (VSync on); the
   hi-colour test ROM, already under full speed, loses 2%. (9e52edc4)
 
-- **Fixed:** the GB, GBC and NES cheats' review findings. Settings' clean-up
+- **Fixed:** GB, GBC and NES cheat handling. Settings' clean-up
   took every code of an orphaned GB, GBC or NES cheat file (its game renamed or
   deleted) for an unreadable GBA one; it now tells a file's console by its
   codes' shape and leaves such files alone. A NES six-letter Game Genie no
@@ -95,7 +95,7 @@ the About page. Releases now attach the Pokémon Emerald cheat set as
 - **Fixed:** a found cheat kept through a pointer, or a typed pointer code,
   could write anywhere its pointer's word pointed (I/O, VRAM). The
   interpreter now writes through a pointer only into EWRAM and IWRAM. (3f4c9e59)
-- **Fixed:** the in-game cheat search's 1.0 review. A pointer find is picked
+- **Fixed:** the in-game cheat search. A pointer find is picked
   only once it passed a Check; Check keeps the list when none pass and the
   page can show the list from before it; Find asks before it replaces one.
   Undo puts the compared values back, so a filter after it compares as
@@ -708,7 +708,7 @@ which healed nothing, and MOVES, which opened the Move Deleter (a9e37aa6).
   shows its own screen colour, and the record keeps the first mismatching
   word for the log; DMA is stopped twice and a backup checked twice
   (0e35d4e5, 374ab054).
-- **Fixed (before release, fifth cart test):** the real cart's SRAM page
+- **Fixed:** the real cart's SRAM page
   register ignores its low bit (8 KB steps), so odd pages landed on even
   ones and the menu's image overwrote itself; every user of cart SRAM now
   addresses the 64 KB window's even page, and the emulated cart does the
@@ -984,14 +984,14 @@ which healed nothing, and MOVES, which opened the Move Deleter (a9e37aa6).
   Backups kept; Clean up saves, was Library's Saves); a slot's popup no longer
   has Export .sav; Empty trash with nothing in it does nothing; the save
   pages' words are plainer (Move to a game, Made, Backup N, what A does)
-  (`docs/design/v0.5/settings-ux-review.md`, bb89ccd, 48b5e95).
+  (bb89ccd, 48b5e95).
 - **Changed:** a game list opens on the game played last that it holds (after
   a play session, A, A plays it again), and every page opens on the row it was
   left on earlier in the session; Recent's game popup has Remove, which takes
   a game off Recent and keeps its file (8d92e83).
 - **Changed:** one word per thing: the NOR page says Play like the others,
   Settings' History is Backups kept, the save pages say START menu
-  (`docs/design/v0.5/ux-review.md`, 8d92e83).
+  (8d92e83).
 - **Changed:** a new slot, a rename or a copy in a game that has a save no
   longer makes the next boot rebuild and rewrite the library index: its
   walk counts a game's save folder once (73df309).

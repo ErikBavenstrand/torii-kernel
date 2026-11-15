@@ -1,7 +1,7 @@
 # The in-game menu over Star Courier: L+R+START opens it, DOWN to Save
 # state, A opens the slots, A saves slot 1 and the game goes on; the menu
 # again, down to Load state, whose page offers slot 1.
-#! media stills=menu,save,load
+#! media stills=menu,save
 #! settings 2=1 14=1
 -w "nav: home ready"
 -P "@8:nav_test_path:/GBA/Star Courier.gba" -p @8:nav_test_action:0x7E000002

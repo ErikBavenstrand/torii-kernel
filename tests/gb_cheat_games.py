@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""libretro's GB and GBC cheats on the owner's games (roms/), through Torii and mGBA's GB core.
+"""libretro's GB and GBC cheats on your games (roms/), through Torii and mGBA's GB core.
 
 usage: gb_cheat_games.py CARTS CORPUS [GAME...]   (inside the torii-emu container)
 

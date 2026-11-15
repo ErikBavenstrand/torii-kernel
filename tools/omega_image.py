@@ -4,7 +4,7 @@
 # ///
 """Combine a built kernel with image.bin's parts into the Omega DE upgrade file.
 
-Replaces the Windows-only Link_kernel_image.exe. The shipped ezkernelnew.bin
+Replaces EZ-Flash's Windows-only Link_kernel_image.exe (not included). The shipped ezkernelnew.bin
 is the kernel padded with zero bytes to 0x100000, then the parts of
 EZ-Flash's image.bin the kernel still reads (the FPGA firmware and the LZ77
 timing sample), each at the address source/image_layout.h gives it, with

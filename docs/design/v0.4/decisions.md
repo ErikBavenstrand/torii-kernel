@@ -1,6 +1,6 @@
 # v0.4 decisions
 
-What v0.4 Browsing and v0.4.1 Art are, as built: the user's decisions from the planning interview, the design rounds and the cart test (2026-10-19 to 2026-10-21), with the research overrides and the changes the cart test asked for. The mockups and their numbers are in this folder ([README](README.md), [spec.md](spec.md)). The ticket reports and the conductor's log were deleted after v0.4.1; `git log` and the commits named in `CHANGELOG.md` have them.
+What v0.4 Browsing and v0.4.1 Art are, as built: the user's decisions from the planning interview, the design rounds and the cart test (2026-10-19 to 2026-10-21), with the research overrides and the changes the cart test asked for. The mockups and their numbers are in this folder ([README](README.md), [spec.md](spec.md)). `git log` and the commits named in `CHANGELOG.md` have the rest.
 
 **A first version to tune.** Expect the look, motion and layout to change after cart use, so keep them cheap to change: shared values are fields of the built-in themes in `source/ui/ui_theme.c`, values only one screen uses sit in one `static const struct <screen>_look` at the top of its file, and drawing code has no bare numbers. A tweak is a one-line change, then `just shots-update`.
 
@@ -55,7 +55,7 @@ Nothing is kept from the official kernel's keys or screens.
 
 ## Research overrides
 
-The build's research (`docs/research/v0.4/`) changed these, as the conductor's calls.
+The build's research (`docs/research/v0.4/`) changed these.
 
 - **R1** No folder-date check; a background re-walk notices changes (`research-v04-library.md`).
 - **R2** Two-copy safe writes instead of temporary file and rename (`research-v04-library.md`).

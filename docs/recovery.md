@@ -7,8 +7,8 @@ starts in EZ-Flash's safe mode and shows `No_Loader_found`. v0.2.3 can't
 write there (`docs/research/omega-de-hardware.md`, *Kernel NOR and the boot
 loader*).
 
-These are the steps that recovered a cart on 2026-10-18. Your saves on the
-card and your NOR games are untouched by them.
+These steps restore the loader. Your saves on the card and your NOR games
+are untouched by them.
 
 **Some carts can't take a kernel update at all.** If the cart's kernel NOR
 is a uniform-sector S29GL064A (NOR ID `0x220C`), EZ-Flash's loader stops
@@ -28,12 +28,14 @@ image has to be written to the card below its file system first.
 
 - A computer that can write an SD card's raw sectors. The steps below are
   for macOS, in the **Terminal app**: terminals inside other apps (an editor,
-  Claude's) can't open raw disks, even with `sudo`.
+  say) can't open raw disks, even with `sudo`. On Linux the same `dd`
+  commands work on the card's device (`/dev/sdX`, from `lsblk`) in place of
+  `/dev/rdiskN`.
 - The card the cart uses, with a kernel that's safe to install:
   EZ-Flash's official `ezkernelnew.bin` (1.06) or Torii v0.2.3 or later,
   copied to its root as `ezkernelnew.bin`. Copy it before the steps below.
 - EZ-Flash's loader image, `DE.BIN`, from
-  <https://www.ezflash.cn/zip/de.bin.zip>. The one used on 2026-10-18 has
+  <https://www.ezflash.cn/zip/de.bin.zip>. The known-good one has
   SHA-1 `0c13deff474cd6be924c0e0c81f0f8a64a0f2217` and is 13444 bytes.
 
 ## 1. Prepare DE.BIN
@@ -141,8 +143,8 @@ accepts `0x220C` is the only way to update it.
 ## Afterwards
 
 - The loader image stays at byte `0x200` on the card, harmless below the
-  file system. Keep it there on a test card (`docs/release-checklist.md`):
-  if a test bricks the cart, step 5 works at once.
+  file system. Leave it there: if the loader is ever erased again, step 5
+  works at once.
 - Torii's Diagnostics (Info, Diagnostics) reads the loader and logs
   its CRC and state ("boot loader present"), whether it is this DE.BIN, and
   warns if it's blank, erased or overwritten.

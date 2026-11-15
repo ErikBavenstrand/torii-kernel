@@ -17,7 +17,7 @@
   <a href="https://github.com/ErikBavenstrand/torii-kernel/releases/latest"><img src="https://img.shields.io/github/v/release/ErikBavenstrand/torii-kernel?label=release" alt="Latest release"></a>
   <a href="https://github.com/ErikBavenstrand/torii-kernel/releases"><img src="https://img.shields.io/github/downloads/ErikBavenstrand/torii-kernel/total" alt="Downloads"></a>
   <a href="https://github.com/ErikBavenstrand/torii-kernel/actions/workflows/ci.yml"><img src="https://github.com/ErikBavenstrand/torii-kernel/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="THIRD_PARTY_NOTICES.md"><img src="https://img.shields.io/badge/licence-GPL--3.0-blue" alt="Licence"></a>
+  <a href="#licence"><img src="https://img.shields.io/badge/licence-Apache--2.0%20%2F%20GPL--3.0-blue" alt="Licence"></a>
 </p>
 
 <p align="center">
@@ -69,8 +69,8 @@ every game.
 
 ## What you get
 
-- **Save states and an in-game menu.** Hold L+R+START in any GBA game: save or
-  load a state, toggle cheats, take a screenshot, reset, sleep, or go back to
+- **Save states and an in-game menu.** Turn on Save states, then hold
+  L+R+START in any GBA game: save or load a state, toggle cheats, take a screenshot, reset, sleep, or go back to
   the menu.
 - **Named save files.** Up to 16 per game, each with a name you choose: Main,
   Speedrun, Hard mode, your sister's file. Pick one when the game starts.
@@ -78,15 +78,15 @@ every game.
   deleted ones wait in a trash folder for 30 days. The copy survives a power
   cut at any step.
 - **Every cheat format.** GameShark, Action Replay (v1/v2 and v3), CodeBreaker
-  and VBA/AnyGBA codes, all run the way mGBA runs them, plus Torii code, our own
+  and VBA/AnyGBA codes, all run the way the real devices run them, plus Torii code, our own
   format with tests and blocks. Game Genie and GameShark for Game Boy, Game Boy
   Color and NES games too.
 - **A hand-made cheat set for Pokémon Emerald**: 489 cheats, including a menu
   you open in the overworld with L+R+B to heal, shop, use the PC or warp.
 - **Cheat search.** Find a value in a running game (lives, money, a timer) and
   turn it into a cheat, Action Replay style.
-- **Box art.** A cover for every official GBA, GB and GBC game, offline, and
-  your own pictures for romhacks and homebrew.
+- **Box art.** Covers for every official GBA, GB and GBC game from an art pack
+  you build once on a computer, and your own pictures for romhacks and homebrew.
 - **A menu worth looking at.** 60 fps tile engine, light and dark themes,
   favourites, recents, A-Z jumps, your own names for games.
 - **Languages.** English and Swedish today, with packs anyone can make. File
@@ -304,7 +304,7 @@ length sets the size: 2 digits a byte, 4 a halfword, 8 a word.
 
 ```
 02001234:63          byte 0x63 at 02001234
-0300A000:270F        halfword 9999 at 0300A000
+0300A000:270F        halfword 0x270F (9999) at 0300A000
 08001000:46C0        an address in the ROM (08...) is a patch, made once at launch
 ```
 
@@ -349,7 +349,7 @@ one of its symbols and Torii reads the line as Torii code.
 | Line | Does |
 |---|---|
 | `A:V` | write V at A (a `[P]+O` target follows a pointer) |
-| `A\|V` / `A&V` | set / clear bits |
+| `A\|V` / `A&V` | set V's bits / keep only V's bits |
 | `A#V` | add V |
 | `A=V` `A!V` `A<V` `A>V` | run the next line only if A equals / doesn't / is below / above V |
 | `@MASK` / `@@MASK` | only while buttons are held / on the frame they're pressed |
@@ -358,7 +358,7 @@ one of its symbols and Torii reads the line as Torii code.
 ```
 02024104=0001+02024106:0063
 ```
-While the halfword at 02024104 is 1, keep 02024106 at 99.
+While the halfword at 02024104 is 1, keep 02024106 at 0x63 (99).
 
 ```
 @0300{+0203A000#01+}{+0203A000:00+}
@@ -378,7 +378,7 @@ it.
   9-digit form only patches where the old byte matches, so it finds the right
   bank.
 - **GameShark**, `01VVLLHH`: writes byte VV to address HHLL every frame, in
-  work RAM (C000-DFFF) or high RAM (FF80-FFFE). `0163A0C1` keeps C1A0 at 0x63.
+  work RAM (C000-DFFF) or high RAM (FF80-FFFE). `0163A0C1` keeps C1A0 at 0x63 (99).
 
 </details>
 
@@ -388,7 +388,7 @@ it.
 - **Game Genie**, six or eight letters from `APZLGITYEOXUKSVN`: patches the ROM
   at launch.
 - **RAM codes**, `AAAA:VV`: writes VV to AAAA every frame, in the NES's 2 KB of
-  RAM (0000-07FF). `0075:09` keeps 0075 at 9.
+  RAM (0000-07FF). `0075:09` keeps 0075 at 0x09.
 
 </details>
 
@@ -540,10 +540,46 @@ open in a built-in viewer from the game's menu or the SD card page.
   Pokémon Emerald (`just names-update`).
 - **SD card page** to browse folders, with Write to NOR, Rename and Delete.
 - **NOR page** for the cart's 64 MB of game NOR.
-- **Clock**: set the time, 24-hour display, and separate switches for the
-  clock and rumble.
+- **Clock**: set the time, 24-hour display, and whether games can read it.
+- **Cart**: rumble, the LED, and the DS's mode B.
 - **Start on**: pick which home item faces you at power-on.
 - **Controls and Questions pages** under Info, so the help is on the cart.
+
+</details>
+
+## FAQ
+
+<details>
+<summary><b>Does it work on the original Omega, or other carts?</b></summary>
+
+No. Torii is built for the Omega Definitive Edition's hardware and won't run
+on anything else. Don't try to install it on another cart.
+
+</details>
+
+<details>
+<summary><b>Can I go back to the official kernel?</b></summary>
+
+Yes, at any time: copy EZ-Flash's `ezkernelnew.bin` to the card and hold R at
+power-on, the same way you installed Torii. See
+[Going back to the official kernel](#install).
+
+</details>
+
+<details>
+<summary><b>Does it work in a Nintendo DS?</b></summary>
+
+Yes, GBA games run in the DS's GBA mode as usual. For DS games, Settings →
+Cart → Mode B sets what the cart acts as in the DS's GBA slot: a Rumble Pak or
+extra RAM.
+
+</details>
+
+<details>
+<summary><b>Do cheats work on games written to NOR?</b></summary>
+
+Cheats that write to memory do. Cheats that patch the ROM (such as the Emerald
+set's menu) need the game loaded from the SD card.
 
 </details>
 
@@ -609,7 +645,14 @@ EZ-Flash's boot loader from a computer, and explains carts whose loader says
 </details>
 
 Found a bug? [Open an issue](https://github.com/ErikBavenstrand/torii-kernel/issues)
-with your logs and what you did.
+with your logs, your cart's board from Info → About, and what you did.
+
+## Contributing
+
+Bug reports and fixes are welcome: open an issue first for anything bigger
+than a small fix, so we can agree on it before you spend the time. The menu
+ships in English and Swedish for now; you can make a pack for your own
+language with the guide above.
 
 ## PC tools
 
@@ -640,12 +683,20 @@ included in Torii.
 
 ## Building from source
 
-Torii builds with devkitARM in Docker, so you need Docker and just (on macOS,
-[colima](https://github.com/abiosoft/colima)). Then:
+Torii builds with devkitARM in Docker. You need:
+
+- Docker (on macOS, [colima](https://github.com/abiosoft/colima): the recipes
+  start a VM of their own, `torii`, with Rosetta), [just](https://github.com/casey/just),
+  git, Python 3.11 or later and [uv](https://docs.astral.sh/uv/).
+- To run the emulator: CMake, pkg-config, SDL2 and Lua 5.4
+  (`brew install cmake pkgconf sdl2 lua@5.4`, or
+  `apt install cmake pkg-config libsdl2-dev liblua5.4-dev libedit-dev`).
+
+Then:
 
 ```bash
 just build    # dist/ezkernelnew.bin
-just play     # run it on an emulated Omega DE (needs CMake, pkg-config and SDL2)
+just play     # run it on an emulated Omega DE
 just test     # unit tests, golden screens and games through the kernel
 ```
 

@@ -1,7 +1,7 @@
 # The hero GIF: home turns from Recent to Game Boy Advance, the list with
 # covers opens, the cursor walks down a few games, START opens a game's
 # menu and B closes it, and back home.
-#! media stills=list,popup
+#! media stills=list
 #! settings 31=1
 -C 1792586096
 -w "nav: home ready"

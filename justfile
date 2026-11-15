@@ -69,7 +69,7 @@ repro: build
     #!/usr/bin/env bash
     set -euo pipefail
     rm -rf dist/repro && mkdir -p dist/repro
-    git ls-files -co --exclude-standard source tests/kernel include Makefile > dist/repro/files.txt
+    git ls-files -co --exclude-standard source tests/kernel Makefile > dist/repro/files.txt
     ls emulators/out/*.gba >> dist/repro/files.txt
     docker run --rm --platform linux/amd64 -u $(id -u):$(id -g) --tmpfs /work:exec,uid=$(id -u) -v "$PWD":/src -w /src -e LIBGBA=/opt/devkitpro/libgba {{kernel_image}} tools/repro.sh dist/repro dist/repro/files.txt
     {{just_executable()}} _package dist/repro/ezkernelnew dist/repro
@@ -580,7 +580,7 @@ _ready: _vm
 
 # Start the torii colima VM on macOS if it isn't running
 _vm:
-    @if [ "$(uname)" = Darwin ] && ! colima status -p torii >/dev/null 2>&1; then colima start -p torii --vm-type vz --mount-type virtiofs --vz-rosetta --cpu 8 --memory 8 && docker context use colima >/dev/null 2>&1 || true; fi
+    @if [ "$(uname)" = Darwin ] && ! colima status -p torii >/dev/null 2>&1; then colima start -p torii --vm-type vz --mount-type virtiofs --vz-rosetta --cpu 8 --memory 8 || true; fi
 
 # Remove build outputs (keeps the emulated cart in dist/cart)
 clean:
