@@ -4,6 +4,16 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
+## v1.0.0
+
+Torii's first stable release. Nothing in the kernel changed since v0.9.26 but
+the About page. Releases now attach the Pokémon Emerald cheat set as
+`torii-cheats.zip`.
+
+- **Changed:** Info's About says which cart Torii is tested on, a black Omega
+  DE, Revision B (LX16) with FPGA firmware 7, and that other revisions may work
+  but haven't been tested. (e3937a69)
+
 ## v0.9.26
 
 - **Changed:** GB and GBC GameShark codes cost about half as much: Jagoomba's
