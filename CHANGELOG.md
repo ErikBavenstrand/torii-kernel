@@ -4,7 +4,7 @@ Changes to the kernel (`source/`) since EZ-Flash's official 1.06 source
 (commit `12cb68b`), newest first. Tooling, tests and the emulator are in the
 git log, not here.
 
-## Unreleased
+## v0.9.26
 
 - **Changed:** GB and GBC GameShark codes cost about half as much: Jagoomba's
   per-frame writes run from VRAM instead of the game's PSRAM, about 106 cycles
