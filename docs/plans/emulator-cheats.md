@@ -104,12 +104,89 @@ tiny test ROM, mean cycles per call (a GB frame is 280,896 cycles):
 | PocketNES, test ROM | 63 pokes | 3,780 | 1.3% |
 
 About 150 cycles a poke in Jagoomba and 58 in PocketNES: the hook runs from ROM
-(PSRAM, wait states), and IWRAM has no room for it. A typical cheat of 5 pokes
+(PSRAM, wait states), and IWRAM has no room for it. Since 2026-11-15 it runs from VRAM
+(below), at about 106. A typical cheat of 5 pokes
 costs 0.27% of a GB frame. The first version, reading each field of an entry
 separately, cost 88 cycles empty and 9,960 with 63 pokes; two word loads an
 entry brought it to the above. The mean excludes the IRQs that land inside the
 call (the maximum, up to 32,000, is a sound or VBlank IRQ). Not measured on a
 real cart, whose PSRAM timing may differ.
+
+### With hi-colour, and the hook in VRAM (2026-11-15)
+
+- **Merged with main's hi-colour GBC** (3c49daae). The two Jagoomba patches touch
+  different code (the hook in `newframe_vblank`; hi-colour's `FF69_W` recording,
+  `hc_frame_start` and the HBlank replay) and were merged on the source, upstream's
+  CRLF kept, then saved with `just emulators-save-patch`. The cheats use no EWRAM
+  or IWRAM (table and code outside both), so hi-colour's figures stand: the save
+  heap's worst case (32 KB of SRAM compressed, `ewram_start` `0x020000CC` +
+  `0x1E000` + 48 + `0x8843`) ends at `0x0202693F`, 641 bytes below `END_OF_EXRAM`
+  `0x02026BC0`; `CANARY2` stays at `0x03007E78`. Hi-colour moved `XGB_RAM` from
+  `0x03005890` to `0x03005990` (`gbc_palette` left IWRAM); the tests read it from
+  the emulator's symbols.
+- **The hook runs from VRAM** (`.vram1`, 200 bytes; 368 of its 3,584 left): from
+  PSRAM its code fetches made a poke cost about 190 cycles; now about 106. Measured
+  with `tests/emu_cheat_speed.py --measure`: Jagoomba's `frame` 600 GBA frames apart
+  from 1,300 frames after the launch, 63 pokes (type `97` to DF00-DF3E, a bank these
+  games leave alone):
+
+| Game | VSync on, none | VSync on, 63 pokes | VSync off, none | VSync off, 63 pokes |
+|---|---|---|---|---|
+| Hi-colour test ROM (576 colours a frame) | 530 | 521 | 530 | 521 |
+| Pokémon Crystal | 600 | 600 | 1,222 | 1,175 |
+| Link's Awakening DX | 600 | 600 | 2,264 | 2,098 |
+| Donkey Kong Country | 600 | 600 | 1,142 | 1,099 |
+| Wario Land 3 | 600 | 600 | 1,884 | 1,769 |
+| Dr. Mario | 600 | 600 | 2,776 | 2,500 |
+
+  From ROM the same 63 pokes gave 511 (test ROM) and 1,134, 1,966, 1,061, 1,668
+  and 2,315 with VSync off. Every game stays at full speed with VSync on; the
+  test ROM, which can't reach full speed with its 576 colours, loses 1.7%.
+- **Sound.** The hook writes no sound register. GBA sound registers sampled every
+  20 frames for 600 frames matched with 63 pokes and without a cheat file in Dr.
+  Mario, Pokémon Crystal and Link's Awakening DX; Donkey Kong Country's differed, as
+  did two of its WRAM bytes, and so did Dr. Mario's against a cheat file with every
+  pick off: the launch's own time (reading the file) moves the game's phase, so an
+  exact comparison isn't a test. The cart's check is by ear.
+
+### The proof (2026-11-15)
+
+- **GB and GBC** (`tests/gb_cheat_proof.sh`, `gb_cheat_rom.py`, `gb_cheat_proof.py`):
+  a test ROM of 8 banks on MBC1, MBC3 or MBC5 (GB, or GBC with WRAM bank 3 mapped)
+  records, a little after each VBlank, three bytes of every bank, two of bank 0 and
+  ten watched RAM bytes (a write found is recorded and counted, then cleared). 34
+  cases run in mGBA's GB core with mGBA's cheat device (`mgba-shot -E`) and through
+  Torii; both must match a model of the device on the bus. Torii matches it in every
+  case but the checksum byte it skips on purpose. mGBA matches it but where its
+  shortcuts differ, each predicted and checked: a compare patches the first bank that
+  holds it (and never the last: its search stops one short), a code without a compare
+  the bank mapped when it applies, and `9x` codes the mapped WRAM bank. mGBA's ROM
+  patch also re-keyed a compare patch every other frame and then patched the mapped
+  bank too; our mGBA patch fixes that (`src/core/cheats.c`, `Torii:`).
+- **Real GB and GBC games** (`tests/gb_cheat_games.sh`): libretro's runnable codes
+  (up to 40 pokes and 8 Game Genie cheats a game) on 16 owned games. Every poke that
+  holds in mGBA at frames 900-903 holds in Torii (Pokémon Red 39 of 40 in both, Crystal
+  39 of 40, Wario Land 3 17 of 40: the rest are bytes the game itself rewrites between
+  the VBlank and the read, in both). Every Game Genie patch the device would make is
+  counted in Torii's log and up to 48 patched and 48 untouched bytes read back from
+  the game's copy in PSRAM (Yellow 259 patches, Super Mario Bros. Deluxe 252).
+- **NES** (`tests/nes_cheat_proof.sh`, `nes_cheat_rom.py`): no reference emulator,
+  so a model of the device; 21 cases on NROM, UxROM, MMC1 and MMC3 test ROMs (6 and 8
+  letters on switchable, fixed and second-to-last banks; raw pokes to RAM, a mirror,
+  PRG-RAM; a raw write to the ROM refused), read from PocketNES's `NES_RAM`. Torii's
+  static patch matches the bus except on MMC3, where a bank shows a patch in both
+  8 KB windows (8000-9FFF and A000-BFFF): the bus patches the read's window alone.
+  No NES game is in `roms/`.
+- **Saves** (`tests/emu_cheat_saves.sh`): GB 32 KB and 8 KB and NES save games run
+  with and without Game Genie patches and pokes picked; the saves are the same bytes.
+- **A pick turned off** (`tests/emu_cheats.sh`): the next launch on the same cart
+  writes no poke and makes no patch.
+- **Typing** (`tests/emu_cheat_typing.sh`): a code typed key by key on the keypad
+  for a GB, a GBC (`93` bank code) and a NES (raw) game is saved picked and runs at
+  the next launch.
+- **Coverage** (`tools/cheat_emu_coverage.py`, 2026-11-15): GB 84.4% (11,189 of
+  13,259 distinct cheats), GBC 87.4% (6,221 of 7,116), NES 99.5% (31,301 of 31,448),
+  unchanged.
 
 ## What the code does today
 
