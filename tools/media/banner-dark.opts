@@ -1,0 +1,9 @@
+# The README's banner, dark theme: home turns right through every item
+# and arrives back at Recent, so the GIF loops without a seam. Cropped to
+# the carousel.
+#! settings 31=1
+#! media crop=20:145 hold=0
+-C 1792586096
+-w "nav: home ready"
+-H @1:@452
+-k @2:RIGHT -k @6:- -k @47:RIGHT -k @51:- -k @92:RIGHT -k @96:- -k @137:RIGHT -k @141:- -k @182:RIGHT -k @186:- -k @227:RIGHT -k @231:- -k @272:RIGHT -k @276:- -k @317:RIGHT -k @321:- -k @362:RIGHT -k @366:- -k @407:RIGHT -k @411:-

@@ -1,0 +1,12 @@
+# The in-game menu's Screenshot row twice, then the game's popup offers
+# Screenshots and the viewer opens the newest.
+#! media stills=taken
+#! settings 2=1 14=1
+-w "nav: home ready"
+-P "@8:nav_test_path:/GBA/Star Courier.gba" -p @8:nav_test_action:0x7E000002
+-w "launch: starting the game"
+-k @300:L+R+START -k @306:-
+-w "screen ready: ingame"
+-k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:DOWN -k @48:- -k @56:A -k @60:-
+-w "ingame: screenshot dumped"
+-s @30:taken.png

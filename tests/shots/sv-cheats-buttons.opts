@@ -1,7 +1,7 @@
 # cheats-buttons.opts in Swedish: lang/sv.ini's pack set in Settings (slot 0, its id
 # 0x564E), so every string the scenario shows is Swedish, at its width.
 # The cheat screen's edits of an activation and a guide (source/screens/
-# cheats.c, docs/plans/cheat-guides.md) on a Hello.cht with guides, in the
+# cheats.c) on a Hello.cht with guides, in the
 # light theme: START on Moon jump opens the menu, Guide first, Buttons
 # after Edit code and Rename (menu); Buttons shows From the code ticked, its
 # code's Hold A beside it (page); A on Press, L+R+START held: refused, as

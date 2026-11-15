@@ -1,351 +1,524 @@
-# Torii
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset="docs/media/banner-light.gif">
+    <img src="docs/media/banner-dark.gif" width="480" alt="Torii's home screen turning through its items">
+  </picture>
+</p>
 
-A custom kernel for the EZ-Flash Omega Definitive Edition, in the making.
-Named after the shrine gate you pass through into another world, like every
-game you launch. Not affiliated with EZ-Flash.
+<h1 align="center">Torii</h1>
 
-It starts from EZ-Flash's official 1.06 source, with its bugs fixed, a new
-menu drawn by a 60 fps tile engine, and the groundwork under it: a
-reproducible build, an emulated cart to run the kernel on, and tests.
+<p align="center">
+  <b>A new kernel for the EZ-Flash Omega Definitive Edition.</b><br>
+  Save states, cheats in every format, box art, themes and languages,<br>
+  on a menu that runs at 60 fps.
+</p>
 
-## Download
+<p align="center">
+  <a href="https://github.com/ErikBavenstrand/torii-kernel/releases/latest"><img src="https://img.shields.io/github/v/release/ErikBavenstrand/torii-kernel?label=release" alt="Latest release"></a>
+  <a href="https://github.com/ErikBavenstrand/torii-kernel/releases"><img src="https://img.shields.io/github/downloads/ErikBavenstrand/torii-kernel/total" alt="Downloads"></a>
+  <a href="https://github.com/ErikBavenstrand/torii-kernel/actions/workflows/ci.yml"><img src="https://github.com/ErikBavenstrand/torii-kernel/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="THIRD_PARTY_NOTICES.md"><img src="https://img.shields.io/badge/licence-GPL--3.0-blue" alt="Licence"></a>
+</p>
 
-Get `ezkernelnew.bin` from the
-[latest release](https://github.com/ErikBavenstrand/torii-kernel/releases/latest),
-or from the `ezkernelnew` download of any
-[CI run](https://github.com/ErikBavenstrand/torii-kernel/actions). Copy it to
-the root of the cart's SD card, hold R while switching the GBA on, and confirm
-the update.
+<p align="center">
+  <a href="#install">Install</a> ·
+  <a href="#features">Features</a> ·
+  <a href="#troubleshooting">Troubleshooting</a> ·
+  <a href="CHANGELOG.md">Changelog</a>
+</p>
 
-## The menu
+Torii replaces the menu on your Omega DE. It starts from EZ-Flash's official
+1.06 source, fixes the bugs that cost people their saves, and adds the things
+the stock kernel never had: save states, an in-game menu, a cheat engine that
+reads every common code format, box art, slots and backups for every save, and
+a menu you can read in your own language.
 
-Home is a carousel of the places on the card: **Recent** and **Favourites**
-(while they hold games), one item per console the card has games for (GBA,
-GBC, GB, NES), **SD card**, **NOR**, **Settings** and **Info**. LEFT and
-RIGHT turn it, A opens the item facing you, and B on any page goes back to
-it. Info's Controls page lists every key.
+Torii is the name of the gate at a Shinto shrine, the one you walk through into
+another world. That felt right for something you pass through on the way to
+every game.
 
-- **Game lists** (a console, Recent, Favourites): UP/DOWN move,
-  LEFT/RIGHT jump to the next or previous first letter, A plays the game
-  as Settings' GBA boot mode says (with the addons Settings turns on, or
-  clean), and START opens its menu: Play, Favourite, Clean boot, Boot with
-  addon, Rename (a name of your own, kept in `/torii/names.txt`; the file
-  stays), Game info (the save type, and a boot mode of the game's own) and
-  Delete (the save stays). Hold L as you press A, or as you pick a way to
-  start in the game's menu, and it starts with the GBA's boot screen; L and
-  R do nothing else here. A floppy mark beside the size means the game has
-  a save. Games show your own name if you gave one (Rename, or
-  `just names-add`), else No-Intro's name with `just names-update`, else
-  their cleaned file names. No-Intro names a game only by its CRC: a
-  romhack or translation keeps its own file name and the placeholder art,
-  never its base game's.
-  Settings' Game view shows a list, or a list with box art (`just art-pack`
-  once, then `just art-add` for romhacks; `just art-scrape`).
-- **Cheats:** every GBA game on the card has Cheats in its menu; one with
-  a cheat file, `/torii/cheats/<its path less the extension>.cht`
-  (`/GBA/Golden Sun.gba` has `/torii/cheats/GBA/Golden Sun.cht`), shows how
-  many the file holds. Its screen lists them with a tick on the picked ones: A
-  picks or drops one, and B saves the picks into the file (only the
-  `cheatN_enable` lines change) and goes back. However large the file, it
-  lists as one: under the headings its `cheatN_folder` lines give (L and R
-  jump between them), each run of variants (the same cheat with other
-  values) one row that opens its choices; the list is built once and kept
-  beside the file (`.cdc`), so it opens at once. **+ Add code**, the last row,
-  opens a hex keypad: type a code's lines (L and R move between them, Line
-  starts one, `:` is for VBA's `address:value`, and the key between Line and
-  Del shows AnyGBA's `[ ] + ^ |`), and the keypad shows the
-  format it reads as (8+4 digits CodeBreaker, 16 GameShark or Action Replay
-  v3 by how plausible each decoding is, `address:value` VBA) and what the
-  code does, or why it doesn't read; SELECT sets a format instead. START
-  saves it, the keyboard names it, and it goes at the end of the file
-  (made if the game had none), picked, as `cheatN_user = true`, with
-  `cheatN_format = "..."` when you set the format; START's Add code puts it
-  under the heading the cursor is in (`cheatN_folder`). START's menu edits
-  any cheat's code (a database cheat edited becomes your own,
-  `cheatN_user`, so `just cheats` keeps it beside the database's), renames
-  it, sets its buttons, puts it under a heading, an existing one or a new
-  one, or deletes it. A greyed
-  code with digits to fill in (`00??`) opens the keypad with them marked,
-  and saving replaces that code in place. Every launch with addons
-  applies them, and the in-game menu's Cheats list turns each one off and
-  on (Back to Torii keeps those as the picks); a clean boot applies none. The file is in libretro's format
-  (`just cheats` writes one for each game, or drop one in, named after the
-  ROM) with CodeBreaker, GameShark, Action Replay v3 and VBA codes (with
-  [AnyGBA](https://github.com/hoanglt1223/anygba)'s raw extensions: a
-  pointer target `[P]+O:V`, `V^KEY` to XOR the value with a game's own key,
-  `TARGET|V` to set bits), and
-  every kind of code runs: writes, fills and slides, pointers, add/or/and,
-  conditions with ELSE blocks and button codes, each frame as mGBA runs them,
-  and ROM patches written into the game once at launch. The device's own
-  button (GameShark's and Action Replay's) is R and SELECT held together;
-  slowdown codes do nothing. The picked cheats share a budget, about a tenth
-  of a frame and 5 KB, and greyed rows say why a cheat can't be picked: one past
-  what is left doesn't fit, a code with digits to fill in (`00??`) needs
-  editing, an unreadable one is left alone, and one that can't run on this
-  cart (a write to the ROM under a condition, or an add, or or and on the
-  ROM) is too. ROM patches need the game in PSRAM: a game written to NOR
-  keeps its picked cheats' codes but not their ROM patches, and a patch over
-  the kernel's own code in the game is left out. An enable value of `true`
-  or `1` is a pick. A file over 192 KB (196,608 bytes) of text is left alone:
-  the game has no Cheats. A launch writes at most 128 of the picked
-  cheats' ROM patches. A file with a NUL byte in it reads as a cut-off
-  write, so the kernel takes its `.bak` copy or, with none, no file at all.
-  The in-game menu's Load state and Reset game put the cheats back to the
-  launch's picks. Its Cheat search finds a game's value (lives, money)
-  as an Action Replay's code finder does: it remembers the game's memory,
-  narrows it down by what the value did (went up or down, by an amount or
-  not, changed, the same, equals, more or less than a number, or from one
-  number to another; signed or not; against the last scan or the first) at
-  8, 16 or 32 bits, BCD scores too, with an undo; a pointer scan follows
-  a value that moves in memory, and keeps the one found as
-  a cheat, on at once; Back to Torii adds it to the cheat file as "Found"
-  and its address. The
-  cheat file moves, renames and is deleted with its game (before the game,
-  so a power cut never leaves it behind).
-- **SD card:** the card's folders as they are, folders first. A opens a
-  folder or starts a game (L held: a hard reset), LEFT/RIGHT page, B goes
-  up a folder, START opens the file's menu (Launch, Clean boot or Boot
-  with addon, Write to NOR, favourites, Rename, which renames the
-  file with its save, Delete, File info). Torii's own folders and files it
-  can't start stay hidden unless Settings' Show all files is on.
-- **NOR:** what the cart's 64 MB game NOR holds, its games (A starts one,
-  START opens Launch, Game info, Delete) and Format all.
-- **Settings:** one page of sections (Look, Clock, Games, Cart, Hotkeys,
-  Library, System). A changes the selected value in place and A again
-  keeps and saves it (B puts it back), L/R jump between sections. Look has
-  the light and dark themes.
-- **Info:** Controls, In game (the hotkeys and the in-game menu), Saves,
-  Cheats, Questions, About (the cart, the card, the credits), and
-  Diagnostics.
+> [!WARNING]
+> Torii is for the **EZ-Flash Omega Definitive Edition** only. Don't flash it
+> to the original Omega or any other cart. Never install v0.2.1 or v0.2.2: they
+> can erase the cart's boot loader ([recovery](docs/recovery.md)).
 
-At power-on the carousel faces the item you were last on, such as GBA.
-Settings' Start on picks an item to face instead, from those home shows;
-if that item is gone (no NES games any more, say), the carousel faces the
-item you were last on. A library index of the card's games (`/torii/library.idx`)
-is rebuilt in the background when the card changes; `/torii` also keeps
-`recent.txt`, `favorites.txt` and the logs.
+<table>
+  <tr>
+    <td width="50%"><img src="docs/media/tour.gif" width="100%" alt="Browsing the game list with covers"></td>
+    <td width="50%"><img src="docs/media/ingame.gif" width="100%" alt="Saving a state from the in-game menu"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Your library, with covers, favourites and recents</sub></td>
+    <td align="center"><sub>Save states from the in-game menu</sub></td>
+  </tr>
+  <tr>
+    <td><img src="docs/media/cheats.gif" width="100%" alt="Picking cheats and typing a code"></td>
+    <td><img src="docs/media/language.gif" width="100%" alt="Switching the menu to Swedish"></td>
+  </tr>
+  <tr>
+    <td align="center"><sub>Cheats: pick them, or type your own</sub></td>
+    <td align="center"><sub>Switch language without restarting</sub></td>
+  </tr>
+</table>
 
-## Languages
+## What you get
 
-The menu speaks English and Swedish. To switch, get `torii-lang.zip` from the
-same release as the kernel, unzip it, copy its `.lng` files into `/torii/lang`
-on the SD card (make the folder if it isn't there), and pick a language in
-Settings, System, Language: the menu changes at once. Use the packs of the kernel's own release: one whose strings differ from the kernel's
-is left out (English shows), but one only reworded since may read wrong.
+- **Save states and an in-game menu.** Hold L+R+START in any GBA game: save or
+  load a state, toggle cheats, take a screenshot, reset, sleep, or go back to
+  the menu.
+- **Saves you don't lose.** Every save is copied to the card with backups, up
+  to 16 slots per game, and a trash folder that keeps deleted saves for 30 days.
+  The copy survives a power cut at any step.
+- **Every cheat format.** GameShark, Action Replay (v1/v2 and v3), CodeBreaker
+  and VBA/AnyGBA codes, all run the way mGBA runs them. Game Genie and
+  GameShark for Game Boy, Game Boy Color and NES games too.
+- **Cheat search.** Find a value in a running game (lives, money, a timer) and
+  turn it into a cheat, Action Replay style.
+- **Box art.** A cover for every official GBA, GB and GBC game, offline, and
+  your own pictures for romhacks and homebrew.
+- **A menu worth looking at.** 60 fps tile engine, light and dark themes,
+  favourites, recents, A-Z jumps, your own names for games.
+- **Languages.** English and Swedish today, with packs anyone can make. File
+  names show in Latin, Greek, Cyrillic and Vietnamese scripts.
+- **GB, GBC and NES built in**, with save slots and cheats.
 
-To translate Torii into another language that Latin-1 covers:
+## Install
 
-1. Copy `lang/en.ini` to `lang/<code>.ini` (`de`, `pt-BR`...), and set its
-   `[meta]` `code` to that code and `name` to the language's own name for itself.
-2. Translate each text after its `=`, keeping `{1}`-`{9}`, `\n`, `\t` and the
-   `.one`/`.other` pairs; `tools/lang.py`'s top explains the format, and
-   `lang/sv.ini` is a finished example. Set `[format]`'s separators and date
-   order, and `[month]`'s names. A key you leave out shows in English.
-3. Run `just lang` (or `just build`): it checks the file against English and
-   writes `dist/lang/<code>.lng`. Copy that to `/torii/lang` on the card, or
-   run `just play` with it in the emulated card's `/torii/lang`, and look
-   at each screen: a text that runs longer than English's is cut with "...".
+1. Download `ezkernelnew.bin` from the
+   [latest release](https://github.com/ErikBavenstrand/torii-kernel/releases/latest).
+2. Copy it to the root of your SD card.
+3. Hold **R** while you switch the GBA on, and confirm the update.
 
-## Your games, names, box art and cheats
+That's it. Your games, saves and NOR games stay where they are. Put games
+(`.gba`, `.gbc`, `.gb`, `.nes`) anywhere on the card, in any folders you like;
+Torii finds them on its next start. The card can be FAT32 or exFAT.
 
-**Adding games.** Copy `.gba`, `.gbc`, `.gb` and `.nes` files anywhere on
-the card, in folders if you like; the menu finds them on its next start. To
-also name them, fetch their box art and write their cheats in one step, run
-`just card /Volumes/OMEGA ~/Games/*.gba` (or give a folder) from this repo.
+<details>
+<summary><b>Updating to a newer version</b></summary>
 
-**On the cart, no PC needed.** START on a game opens its menu:
+Do the same again: copy the new `ezkernelnew.bin` over the old one and hold R
+at power-on. Settings, favourites, names and everything else in `/torii` carry
+over. If you use a language pack, copy the packs from the same release too
+(see [Languages](#languages)).
 
-- **Rename** gives the game a name of your own in the lists (its file stays
-  as it is); deleting the whole name gives it its original name back.
-- **Cheats** lists its cheats: A turns one on or off, `+ Add code` types a
-  new one, SELECT shows a cheat's guide and details (A there edits the
-  guide), and START's menu edits, renames, moves under a heading, sets the
-  buttons of or deletes it. Cheats that can't work on Torii are greyed with the reason; Settings'
-  **Clean up cheats** removes them from every game.
-- **Delete** removes the game and its cheat file; its saves stay.
+</details>
 
-The SD card page's Rename renames the file itself, taking its saves, cheats
-and box art with it.
+<details>
+<summary><b>Going back to the official kernel</b></summary>
 
-**Box art for a romhack or your own picture.** Put a picture (PNG, JPEG...)
-named after the game's file, say `Pokemon Prism.png` for
-`Pokemon Prism.gbc`, in the card's `/torii/art/custom-src`, then run
-`just card /Volumes/OMEGA` (or `just art-add /Volumes/OMEGA`). Official
-games get theirs from `just card` or, once for every game, `just art-pack`.
-Settings' Game view **List + art** shows it.
+Download EZ-Flash's `ezkernelnew.bin` (1.06) from
+[their repository](https://github.com/ez-flash/omega-de-kernel), copy it to the card's root and
+hold R at power-on. Torii's `/torii` folder can stay; the official kernel
+ignores it. Saves Torii copied to `/torii/saves` stay there, so copy the ones
+you want back next to their games as `.sav` files.
 
-**Cheats** come from GameHacking.org through `just card --fetch-cheats` (or
-`just cheats --gamehacking`), which needs your browser once per batch of
-new games; after that, `just card` writes them from this PC's cache.
+</details>
 
-## Setup
+<details>
+<summary><b>What Torii keeps on the card</b></summary>
 
-- Docker and [just](https://github.com/casey/just). On macOS, install
-  [colima](https://github.com/abiosoft/colima): the recipes start a VM of
-  their own, `torii`, that shares the repo over virtiofs, so containers see
-  edits at once (colima's default sshfs shows them up to 20 seconds late).
-- To run the emulator: CMake, pkg-config and SDL2
-  (`brew install cmake pkgconf sdl2 lua@5.4`, or `apt install cmake pkg-config libsdl2-dev liblua5.4-dev libedit-dev`).
+Everything lives in `/torii`. Keep the folder when you move to a new card.
 
-## Use
-
-| Command | Result |
+| Path | What's in it |
 |---|---|
-| `just build` | `dist/ezkernelnew.bin`, the file you flash to the cart |
-| `just sd /Volumes/OMEGA [game.gba...]` | copies the kernel (and games) to a real SD card and ejects it; hold R while switching on to install |
-| `just logs /Volumes/OMEGA` | copies the kernel's logs off a real SD card into `dist/logs/torii.log`, naming the code addresses in crash dumps (see below); `--tag v0.2.1` names them with that release's symbols |
-| `just card /Volumes/OMEGA [game.gba or folder...]` | sets up a card's games in one step: copies the games or folders given (to the card's root, or `--to FOLDER`; a game already there is left alone; the card needs the kernel or `/torii` on it, or `--new-card`), then runs `names-update`, `art-add` (when `/torii/art/custom-src` has pictures; the folder is made so there is a place for them), `art-scrape`, `cheats` and `library-report`, going on past a step that fails and listing each step's outcome. `--offline` downloads nothing, `--no-art` and `--no-cheats` skip those steps, `--fetch-cheats` runs `cheats --gamehacking`, `--dry-run` changes nothing |
-| `just names-update /Volumes/OMEGA` | writes the game names database to a real SD card: `/torii/names.db` from the No-Intro dats of [libretro-database](https://github.com/libretro/libretro-database) (CC BY-SA 4.0; downloaded once to the git-ignored `dist/dats`, never bundled) and the CRCs of the card's games in `/torii/crc.txt`, so the lists show No-Intro names. A game is named only by its CRC: a romhack, a translation or a patched dump the dats don't list keeps its file name. Use a kernel from v0.4.2 on: an older one forgets each CRC whose date this PC sees hours off the cart (a file dated in winter, in summer) |
-| `just names-add /Volumes/OMEGA names.tsv` | gives many games names of your own at once: each line of the file is a game's file name (with or without its extension, any case), a tab and its name (an empty name removes it); every game on the card with that file name gets it, in `/torii/names.txt`, where Rename keeps the names it gives. It prints the lines that named no game; `--dry-run` writes nothing |
-| `just art-add /Volumes/OMEGA` | makes box art for many games at once: put pictures (PNG, JPEG, ...) named after your games' file names, with or without the extension (`Pokemon - Glazed.png` for `Pokemon - Glazed.gba`), in the card's `/torii/art/custom-src` (or give another folder after the card), and each becomes its game's custom art, `/torii/art/custom/<file name>.bin` (cropped to a square, 80x80, 15 colours dithered). It prints which picture went to which game and the pictures that matched none; a second run converts only pictures that changed (`--force` all, `--dry-run` none). Custom art wins over matched art, so it is how a romhack gets a box of its own. An empty `/torii/art/custom/<file name>.bin` hides a game's art (the placeholder shows); delete it to show the art again. Use pictures you may use, and don't publish box art |
-| `just art-add "Game.gba" picture.jpg /Volumes/OMEGA` | the same for one game, from any picture, as `/torii/art/custom/Game.gba.bin`; the game lists' "List + art" view shows it. The view also shows matched art the card holds as `/torii/art/<CRC32>.bin` (`just art-scrape`) |
-| `just art-scrape /Volumes/OMEGA` | fetches box art for the card's games from [libretro-thumbnails](https://thumbnails.libretro.com) and writes it as `/torii/art/<CRC32>.bin`, matching each game by CRC (computed as `names-update` does, into `/torii/crc.txt`) to its No-Intro name in the dats; custom art and art already on the card stay, and a game whose CRC `/torii/art.pak` covers is skipped (the kernel shows the pack's cover). A game the dats don't list (a romhack) gets none, unless it is a GBA game whose file name is the title of the game its header's code names (a patched dump). It deletes the art v0.4.1's scraper gave romhacks (their base game's box, under the romhack's own CRC); `--keep-stale` only lists it. Custom art is never touched. It also deletes the placeholders v0.4's first builds made, `/torii/art/box-gba.bin` and so on, for every console whatever `--console` says: a game without art shows the kernel's own drawn box for its console. One request at a time, half a second apart; pictures are cached in the git-ignored `dist/art-cache`, so a second run downloads only what's new. It prints how many games per console have art. `--dry-run` shows what it would fetch, `--offline` uses only the cache, `--console GBA` limits it. Box art has no licence grant: it is fetched on your PC for your card; never commit or publish it |
-| `just cheats /Volumes/OMEGA` | writes cheat files for the card's GBA games from [GameHacking.org](https://gamehacking.org)'s mGBA exports: `/torii/cheats/<rom path without extension>.cht` (`/GBA/RPG/Golden Sun.gba` gets `/torii/cheats/GBA/RPG/Golden Sun.cht`), in libretro's format. A game gets the export whose CRC32 is its own (from `/torii/crc.txt`, else computed), never one guessed by title or region, and the file's first line, `# for crc32 XXXXXXXX`, names that dump. Each cheat keeps its device (Action Replay, GameShark) as `cheatN_format`; unnamed cheats, cheats of over 256 lines, duplicates, master codes and cheats the kernel can't use are left out, and encrypted codes are written decrypted. A file too big for one read (over about 160 KB or 1,000 cheats; up to 15,000 cheats and 2.25 MB) gets an index beside it, `<rom path without extension>.cdx`, which the kernel reads it in windows of 250 cheats by; a kernel of v0.9 or before refuses a file over 192 KB. A cheat that isn't picked has no enable line. `--gamehacking` fetches what the cache lacks in your own browser: it writes a harvester script (copied to the clipboard), opens gamehacking.org's GBA list and tells you to paste the script into the browser's console; the script crawls the index pages and exports what the card needs, 5 seconds apart (`--delay S`; the site's robots.txt asks for 30, and Torii's owner has GameHacking's approval for less), showing its progress on the page, and downloads what it got as `torii-gamehacking-*.json` bundles, which the tool imports from `~/Downloads` (`--downloads`) as they arrive (`--import FILE` by hand; `--only CRC,...` for a few games, and `CRC=ID`, with the dump's `gamehacking.org/game/ID`, exports it without crawling the index). A romhack or modified dump GameHacking doesn't list gets its base game's cheats, named "... (base game)", only when exactly one dump fits its header's game code and version, that dump's ROM is on the card, and at least 90% of the base is the same in the hack (`--similar`); a cheat that patches ROM bytes the hack changed is left out (`--base-game` takes every hack, and drops all ROM patches when the base ROM isn't on the card). `dist/cheats/custom/<CRC32>.cht`, a libretro file of your own, wins over GameHacking. Updating a file keeps its picks (matched by code, and by what the cheat does once a code is written anew), `cheatN_format`, names given on the cart (`cheatN_renamed`), placeholders filled in on the cart and your own codes (`cheatN_user`, or picked); `/CHEAT`, EZ-Flash's old cheat folder, is never touched. It prints each game: written, updated, unchanged, base game, no cheats on GameHacking, not fetched yet, hack too different, base dump not on card or ambiguous base. The cheats are fetched on your PC for your own card, cached in the git-ignored `dist/cheats`, and never bundled with Torii; `--dry-run` writes nothing on the card |
-| `just play [game.gba...]` | runs the kernel on an emulated cart, first copying any games given onto its SD card unless they are already there |
-| `just dev` | like `play`, rebuilding whenever `source/` changes |
-| `just test` | host and kernel unit tests, then homebrew games through the kernel: boot, every save type across power cycles, crash reports and save states |
-| `just art-pack /Volumes/OMEGA` | run once: builds `/torii/art.pak`, box art for every No-Intro GBA, GBC and GB game (NES too when the card has NES games, or with `--console`) that [libretro-thumbnails](https://thumbnails.libretro.com) has, about 15 MB, so an official game you put on the card later gets its cover on the cart with no PC. The kernel tries custom art first, then `/torii/art/<CRC32>.bin`, then the pack; a romhack is in no dat, so it still needs `just art-add`. Each picture is stored once, however many CRCs (regions, revisions) share it. 256 requests at a time over kept-alive connections, each picture converted on every core as it arrives; pictures, conversions and the names the server lacks are cached in the git-ignored `dist/art-cache`, so a run that stops (Ctrl-C, the server asking for fewer requests) still writes what it has, and the next run picks up where it left off; it shows progress and the time left. The first run makes about 9,700 requests and takes about 35 seconds on a 14-core Mac, with a cache of about 1.6 GB; `--offline` uses only the cache. Box art is the publishers' work: the pack stays on your card; never commit or publish it |
-| `just library-report /Volumes/OMEGA` | lists the card's games that need attention, offline and reading the card only: games without a name (a CRC the dats don't list: a romhack, a translation, a bad dump; `just names-add`), without a CRC yet (the cart identifies them on its next walk, or `just names-update`), without box art (none in `/torii/art/custom`, `/torii/art` or `/torii/art.pak`, with why: not in the dats, no thumbnail, not fetched yet; `just art-add`), and possible wrong matches (a No-Intro name far from the file's name). Then a line per console: games, named, with art. `--write-templates` writes `names-todo.txt` (in `just names-add`'s format, the names to edit) and `art-todo.txt` into the current folder (or `--out DIR`), never onto the card |
-| `just cart-add game.gba` | copies a file onto the emulated SD card |
-| `just game-add PATH...` | copies games you own (files or whole folders) into the git-ignored `roms/` and lists them in `roms/games.toml` |
-| `just test-host` | builds the hardware-free kernel code (sorting, cheat files and codes) for Linux in the tools container with AddressSanitizer and UndefinedBehaviorSanitizer and runs `tests/host` (also part of `just test`) |
-| `just test-kernel` | builds a test kernel that runs the unit tests in `tests/kernel` at boot (also part of `just test`) |
-| `just compat` | plays each listed game through the kernel and checks it boots, gets the right save type and clock, and keeps its saves; prints a table and writes `dist/compat/index.html` with screenshots |
-| `just size` | kernel size against the 1 MB kernel area, IWRAM and EWRAM, plus the largest symbols; fails if anything is over |
-| `just stack` | the largest stack frames and a static estimate of the deepest call chains |
-| `just lint` / `just format` | checks the C (clang-format), Python, shell scripts and CI workflows / formats the C files in place |
-| `just analyze` | static analysis of `source/` with cppcheck, clang-tidy and GCC's `-fanalyzer`; fails only on findings missing from `tools/analyze-baseline.txt` (`just analyze-baseline` rewrites it) |
-| `just font` / `just font-preview` | converts the menu fonts in `assets/fonts` to C in `source/engine` (`tools/font.py`; committed) / redraws the font candidates' preview sheets in `docs/research/fonts` |
-| `just palette` | converts the menu's colours, `docs/design/v0.4/palette.json`, to C in `source/ui/palette.c` (`tools/palette.py`; committed) |
-| `just compile-commands` | writes `compile_commands.json` for the kernel and its unit tests, so clangd (editors, agents) can jump to definitions and show errors; `.clangd` adapts the GCC flags for clang |
+| `saves/`, `backups/`, `trash/` | Your saves, their backups, and deleted slots (30 days) |
+| `states/`, `screenshots/` | Save states and BMP screenshots |
+| `cheats/` | One `.cht` file per game, named after the game's path |
+| `art/`, `art.pak` | Covers: matched art, your own (`art/custom`), and the art pack |
+| `lang/` | Language packs (`.lng`) |
+| `names.db`, `names.txt`, `crc.txt` | Game names from No-Intro, and the ones you gave |
+| `recent.txt`, `favorites.txt` | Your recents and favourites |
+| `logs/` | Logs, when Logging is on |
 
-`just --list` shows the rest.
+</details>
 
-A game that shows another game's name or box: the kernel keeps a game's CRC
-in `/torii/crc.txt` as long as its file's size and date match, so a different
-file of the same size with an older date copied over it keeps the old CRC.
-Delete `/torii/crc.txt` and the kernel reads every game again in the
-background (about 1.6 s per MB, over a few boots).
+## Features
 
-The build uses devkitARM r54, the closest available release to the r53
-EZ-Flash used, so the compiled kernel isn't bit-for-bit their file. To flash
-exactly the official kernel, use the `ezkernelnew.bin` in the repo root.
+### Save states and the in-game menu
 
-The build is reproducible: the same source gives the same `ezkernelnew.bin`
-on any machine, which `just repro` (and CI) checks by rebuilding from a
-shuffled copy in another folder. Each kernel carries a build ID, the CRC32
-of its ROM, which its log lines show; releases attach `ezkernelnew.sym` and
-`ezkernelnew.elf`, and `just logs` names crash addresses only with symbols
-of the same ID.
+<p>
+  <img src="docs/media/ingame-menu.png" width="32%" alt="The in-game menu">
+  <img src="docs/media/ingame-save.png" width="32%" alt="Save state slots">
+  <img src="docs/media/screenshot-taken.png" width="32%" alt="A screenshot taken in game">
+</p>
 
-## Logs and Diagnostics
+Hold **L+R+START** in a GBA game to open the menu. It opens in two frames and
+gives the game back exactly as it was. From there you can save and load states
+(8 per save slot), turn cheats on and off, run a cheat search, take up to five
+screenshots, reset the game, or put the console to sleep.
 
-To bring back a report from a real cart, set Logging (Settings, System) to
-Errors, Info or Debug. The kernel then writes what it does to
-`/torii/logs` on the card: every boot, every launch with the patches it
-applied, errors, and how the previous session ended. Off, the default, it
-writes nothing. A kernel crash is kept in cart RAM and logged at the next
-boot, even with Logging off. With Logging on, the in-game menu has a DEBUG
-entry that saves the game's registers and memory for the next boot's log.
+<details>
+<summary><b>How to use it</b></summary>
 
-Info's Diagnostics row (or L+R+SELECT held while switching on) runs
-**Diagnostics**: the unit tests, hardware probes and timings, then a few
-questions; [docs/release-checklist.md](docs/release-checklist.md) lists
-them. Read the results with `just logs`.
+1. Turn on **Settings → Games → Save states**.
+2. Start a game. GBA games need to start *with addons*, which is the default
+   (Settings → Games → GBA boot mode).
+3. Hold L+R+START. Pick **Save state**, then a slot.
+4. Choose **Back to Torii** when you're done. That's when states and
+   screenshots are written to the card.
 
-## The emulated cart
+States and screenshots stay in the cart until Back to Torii, so switching off
+before that loses them. The game's own save is never at risk. To load a state
+later, open the game's menu in Torii (START on the game) and pick
+**Load state**. Change the hotkeys in **Settings → Hotkeys**.
 
-`emu/` adds a model of the Omega DE cart to the mGBA emulator: SD card, NOR,
-PSRAM, game loading, saves (SRAM, Flash and EEPROM) and the clock. The real
-kernel boots on it, launches games and writes saves back to SD. The cart's SD
-card, NOR and SRAM live in `dist/cart/` and persist between runs.
+</details>
 
-Keys: arrows, X = A, Z = B, A = L, S = R, Enter = Start, Backspace = Select.
-The window opens at 4×; `just scale=3 play` changes it.
+### Saves you can trust
 
-Kernel code can log with `tlog("...")` (`source/tlog.h`), which writes to
-mGBA's debug console: the lines show in the terminal under `just play` and as
-`kernel: ...` from the headless runner.
+<p>
+  <img src="docs/media/saves-slots.png" width="48%" alt="A game's save slots">
+  <img src="docs/media/saves-backups.png" width="48%" alt="Backups of a save slot">
+</p>
 
-Run with `OMEGA_TRACE=1` to log what the kernel and games do with the cart
-(register writes, launches with their save type, SD reads and writes, mode
-switches, clock use) to stderr.
+Each game gets up to 16 save slots, so you can keep a second playthrough or a
+friend's file without overwriting yours. Every time a save is copied to the
+card, the previous one becomes a backup you can restore with one press. Deleted
+slots wait in a trash folder for 30 days.
 
-`just compat` tests the games in `roms/games.toml`: one game per set of
-requirements (system, save chip, kernel save mode, ROM size, clock, other
-hardware), since Ruby and Sapphire, say, need the same of the kernel; `just
-compat --all` tests every game. Each game boots through the kernel while the
-test presses START and A; the screen must change, the save type must match
-the ROM, a clock game must find the clock on, and the save must reach
-`/torii/saves` and come back on relaunch (a test pattern stands in when the game
-doesn't save on its own). `dist/compat/index.html` shows the results, what
-changed since each game's previous run, coverage by requirement, and
-screenshots. Add your games with `just game-add ~/path/to/roms`: it copies
-the ROMs (not their saves) into the git-ignored `roms/` and lists them in
-`roms/games.toml`, which stays local too; tests read only `roms/`. Mark ROMs
-to leave out with `skip = "why"`.
+The copy from the cart to the card is written so that a power cut at any moment
+leaves you with either the old save or the new one, never a broken file. Torii
+also fixes the official kernel's save bugs: small `.sav` files losing data,
+32 KB Game Boy saves (Pokémon Gold, Silver, Crystal and Yellow) lost at power-off,
+wrong save types for Doom, Doom II and the Classic NES Series, and a read
+error writing over a good save.
 
-When code running headlessly hits an illegal opcode or jumps somewhere that
-can't run code, `mgba-shot` stops with exit status 3 and prints a crash report:
-the registers and the code addresses on the stack, named from
-`dist/ezkernelnew.sym` (or the ROM's own `.sym`). `just compat` counts a
-crash as a failure.
+<details>
+<summary><b>Slots, backups and the trash</b></summary>
 
-To step through the kernel:
+- START on a game → **Saves** lists its slots. A plays a slot and makes it the
+  one Play uses. RIGHT shows its backups.
+- **+ New slot** starts an empty save, copies the active one, or imports a
+  `.sav` file.
+- A game with two or more slots asks which to play when it starts. Turn that
+  off in Settings → Saves → Ask for a slot; holding SELECT as you press A still
+  asks.
+- Settings → Saves → Backups kept sets how many backups each slot keeps.
+- Settings → Saves → Clean up saves finds saves whose game is gone and empties
+  the trash.
 
-- `just debug` opens the window and waits; `just gdb` in a second terminal
-  attaches gdb with the kernel's symbols and source (`break main`,
-  `continue`, `next`, `bt`, `watch`).
-- `just debug-shot -f 600` does the same headlessly, taking `mgba-shot`
-  options (keys, screenshots); `just gdb -batch -ex 'break tlog' -ex
-  continue -ex bt` scripts a session.
-- `just debug-cli` uses mGBA's own debugger in the terminal instead
-  (`break main`, `watch/w ADDR`, `x/4 ADDR`, `trace 20`, `help`). `just
-  build` writes `dist/ezkernelnew.sym`, which mGBA loads for symbol names.
+</details>
 
-Save states include the cart: its registers, data port, PSRAM and SRAM (the
-NOR chips and SD card are left as they are, like disks). With `mgba-shot`,
-`-x FRAME:PATH` saves one and `-l PATH` starts from one, so a test can jump
-straight to a point in a game.
+### Cheats
 
-To drive the emulator from a script or an AI agent, `just play-remote` (window)
-and `just remote` (headless, at real speed) load `tools/remote.lua`, which
-takes one command per line on `127.0.0.1:8888`: `press A`, `wait 60`,
-`r32 0x02000000`, `screenshot dist/s.png`, `save dist/s.ss` and more (listed
-at the top of the script). For example:
+<p>
+  <img src="docs/media/cheats-list.png" width="32%" alt="A game's cheat list">
+  <img src="docs/media/cheats-choices.png" width="32%" alt="A cheat with several choices">
+  <img src="docs/media/cheats-typed.png" width="32%" alt="Typing a CodeBreaker code">
+</p>
+
+Torii runs every kind of GBA code: writes, fills, slides, pointers, conditions
+with else blocks, button codes and ROM patches. The keypad tells you the
+format it detected and what the code does before you save it. Long lists stay
+tidy: headings you can jump between with L and R, and runs of the same cheat
+with different values folded into one row of choices.
+
+| Device | Formats |
+|---|---|
+| GBA | GameShark / Action Replay v1 and v2, Action Replay v3, CodeBreaker, VBA `address:value`, AnyGBA's extensions, [Torii code](docs/torii-code.md) |
+| Game Boy, Game Boy Color | Game Genie, GameShark |
+| NES | Game Genie, `address:value` |
+
+<details>
+<summary><b>Getting cheat files</b></summary>
+
+Each game's cheats are in `/torii/cheats`, in a file named after the game,
+in libretro's `.cht` format: `/GBA/Golden Sun.gba` reads
+`/torii/cheats/GBA/Golden Sun.cht`. Any RetroArch cheat file works if you
+rename it.
+
+To fill a whole card at once, the [PC tools](#pc-tools) write cheat files
+for every GBA game from [GameHacking.org](https://gamehacking.org), matched
+to your exact ROM by its CRC:
 
 ```bash
-printf 'press START\nwait 30\nscreenshot dist/s.png\n' | nc 127.0.0.1 8888
+just cheats /Volumes/OMEGA
 ```
 
-Any mGBA Lua script also runs with `MGBA_SCRIPT=script.lua` in the window or
-`mgba-shot -L script.lua` headlessly.
+</details>
 
-Not modelled yet: the in-game menu's real-time saves, and firmware updates.
+<details>
+<summary><b>Typing a code on the cart</b></summary>
 
-## Research and plans
+1. START on a game → **Cheats** → **+ Add code** (the last row).
+2. Type the code with the D-pad and A. L and R move between lines; **Line**
+   starts a new one.
+3. The line under the code says the format it detected and what the code
+   does. SELECT forces a format if the guess is wrong.
+4. START saves it, then name it with the keyboard.
 
-`docs/research/omega-de-hardware.md` describes how the cart works: the
-upgrade file, the FPGA firmware, the cart registers, game loading and saves.
-`docs/design/` holds the menu's design (`engine.md`, `v0.4/`), and
-`docs/plans/roadmap.md` what is done, what is still open, and what comes next.
+A cheat with blanks in it (`00??`) opens the keypad with the blanks marked.
+A greyed cheat says why it can't run on this cart.
+
+</details>
+
+<details>
+<summary><b>Cheat search</b></summary>
+
+<p>
+  <img src="docs/media/search-started.png" width="24%" alt="Search started">
+  <img src="docs/media/search-equals.png" width="24%" alt="Narrowing by a value">
+  <img src="docs/media/search-list.png" width="24%" alt="The values left">
+  <img src="docs/media/search-kept.png" width="24%" alt="Keeping a value as a cheat">
+</p>
+
+Say you want infinite lives and no code exists for your game.
+
+1. Turn on Save states (the search uses their memory), start the game, and
+   open the in-game menu. Pick **Cheat search** → **Start search**.
+2. Lose a life. Open the search again and pick **Went down**, or
+   **Equals 2** if you know the number.
+3. Repeat until only a few values are left, then **Show them**.
+4. Pick one, set it to 9 and **Keep it**. It's on right away, and after Back to
+   Torii it's in the game's cheat list as "Found".
+
+It also handles 8, 16 and 32-bit values, signed numbers, BCD scores, undo, and
+pointer scans for values that move around in memory.
+
+</details>
+
+### Box art and your own pictures
+
+<p>
+  <img src="docs/media/tour-list.png" width="48%" alt="The game list with a cover, dark theme">
+  <img src="docs/media/light-list.png" width="48%" alt="The game list with a cover, light theme">
+</p>
+
+Turn on **Settings → Look → Game view → List + art** to see covers next to your
+games. Official games are matched by CRC, so the cover is right even when the
+file name isn't. Romhacks, translations and homebrew get whatever picture you
+give them.
+
+<details>
+<summary><b>Covers for every official game</b></summary>
+
+Build the art pack once with the [PC tools](#pc-tools). It holds a cover for
+every No-Intro GBA, GB and GBC game (about 15 MB) and lives on your card, so
+games you add later get their cover without a PC:
+
+```bash
+just art-pack /Volumes/OMEGA
+```
+
+</details>
+
+<details>
+<summary><b>Your own picture for a game</b></summary>
+
+1. Put a picture (PNG, JPEG, anything common) named after the game's file in
+   `/torii/art/custom-src` on the card: `Pokemon Prism.png` for
+   `Pokemon Prism.gbc`.
+2. Run `just art-add /Volumes/OMEGA`.
+
+It's cropped to a square and converted to the GBA's colours. Your picture wins
+over any matched cover.
+
+</details>
+
+### Game Boy, Game Boy Color and NES
+
+<p>
+  <img src="docs/media/consoles-gbc-list.png" width="32%" alt="The Game Boy Color list">
+  <img src="docs/media/consoles-gb.png" width="32%" alt="Home facing Game Boy">
+  <img src="docs/media/consoles-nes.png" width="32%" alt="Home facing NES">
+</p>
+
+GB and GBC games run on [Jagoomba Color](https://github.com/EvilJagaGenius/jagoombacolor),
+NES games on [PocketNES](https://github.com/Dwedit/PocketNES), both built into
+the kernel. They start straight away (no boot menu), keep their settings and
+palette between launches, get save slots like GBA games, and take Game Genie
+and GameShark codes. Hold L and R together in game for the emulator's own menu
+and its save states.
+
+### Languages
+
+<p>
+  <img src="docs/media/language-swedish.png" width="48%" alt="Settings in Swedish">
+  <img src="docs/media/light-home.png" width="48%" alt="Home in the light theme">
+</p>
+
+The menu speaks English and Swedish, and switches the moment you pick one.
+Game and file names show in their own script: Latin, Greek, Cyrillic and
+Vietnamese are built in.
+
+<details>
+<summary><b>Installing a language</b></summary>
+
+1. Download `torii-lang.zip` from the same release as your kernel.
+2. Copy its `.lng` files to `/torii/lang` on the card (make the folder if
+   needed).
+3. Pick the language in **Settings → System → Language**.
+
+Use packs from the same release as the kernel. Any text a pack doesn't have
+shows in English.
+
+</details>
+
+<details>
+<summary><b>Making a language pack</b></summary>
+
+1. Copy [`lang/en.ini`](lang/en.ini) to `lang/<code>.ini` (`de`, `pt-BR`...),
+   and set `code` and `name` under `[meta]`.
+2. Translate each text after its `=`. Keep `{1}`-`{9}`, `\n` and the
+   `.one`/`.other` pairs as they are. [`lang/sv.ini`](lang/sv.ini) is a
+   finished example, and the top of [`tools/lang.py`](tools/lang.py) explains
+   the format.
+3. Run `just lang` to check it and build `dist/lang/<code>.lng`.
+4. Copy the pack to `/torii/lang` and look at every screen. Text that runs too
+   long is cut with "...".
+
+A pack can also bring a font for a script the menu doesn't cover.
+
+</details>
+
+### Themes and settings
+
+<p>
+  <img src="docs/media/theme.gif" width="48%" alt="Switching from the dark to the light theme">
+  <img src="docs/media/viewer-first.png" width="48%" alt="The built-in screenshot viewer">
+</p>
+
+Light paper or dark graphite, previewed live as you change it. Settings is one
+scrolling page, grouped into Look, Clock, Games, Saves, Cart, Hotkeys, Library
+and System, with L and R to jump between groups. Screenshots you take in game
+open in a built-in viewer from the game's menu or the SD card page.
+
+<details>
+<summary><b>Everything else</b></summary>
+
+- **Favourites and recents** on the home carousel; R on a game toggles a favourite.
+- **Rename** any game with the on-screen keyboard. The file stays as it is.
+- **No-Intro names** for official games, so `pkmn_e.gba` lists as
+  Pokémon Emerald (`just names-update`).
+- **SD card page** to browse folders, with Write to NOR, Rename and Delete.
+- **NOR page** for the cart's 64 MB of game NOR.
+- **Clock**: set the time, 24-hour display, and separate switches for the
+  clock and rumble.
+- **Start on**: pick which home item faces you at power-on.
+- **Controls and Questions pages** under Info, so the help is on the cart.
+
+</details>
+
+## Troubleshooting
+
+<details>
+<summary><b>The in-game menu doesn't open</b></summary>
+
+It only opens in GBA games started *with addons*: check Settings → Games → GBA
+boot mode, and the game's own Boot mode under its Game info. Settings →
+Hotkeys → In-game menu set to **Auto** opens it only when save states are on
+or cheats are picked. A game written to NOR keeps the hotkeys it was written
+with.
+
+</details>
+
+<details>
+<summary><b>A save isn't on the card</b></summary>
+
+Games save to the cart first. Torii copies the save to the card the next time
+it starts, after you play. If you answered No to *Save to SD card?*, it stays
+in the cart until the next start.
+
+</details>
+
+<details>
+<summary><b>Cheats do nothing</b></summary>
+
+They run only when the game starts with addons (see above). Cheats that patch
+the ROM don't run in games written to NOR.
+
+</details>
+
+<details>
+<summary><b>A game won't start</b></summary>
+
+- *File fragmented*: copy the game to the card again.
+- *Path too long*: move the game to a shorter folder.
+- A ROM over 32 MB has to be written to NOR (START on it in the SD card page).
+
+</details>
+
+<details>
+<summary><b>Logs and Diagnostics</b></summary>
+
+- **Logs:** set **Settings → System → Logging** to Errors, Info or Debug.
+  Torii then writes what it does to `/torii/logs`. Attach those files when you
+  report a bug. A crash is kept in cart memory and logged at the next start,
+  even with Logging off.
+- **Diagnostics:** Info → Diagnostics, or hold **L+R+SELECT** while switching
+  on, even when the menu won't start. It runs Torii's self-tests and hardware
+  checks.
+
+</details>
+
+<details>
+<summary><b>The cart starts in safe mode, or says <code>No_Loader_found</code> or <code>Bad NOR ID</code></b></summary>
+
+See [docs/recovery.md](docs/recovery.md). It walks through restoring
+EZ-Flash's boot loader from a computer, and explains carts whose loader says
+`Bad NOR ID`, which can't take any kernel update.
+
+</details>
+
+Found a bug? [Open an issue](https://github.com/ErikBavenstrand/torii-kernel/issues)
+with your logs and what you did.
+
+## PC tools
+
+Optional helpers that run on your computer and prepare a card: names, covers
+and cheats for everything on it in one go. They need
+[just](https://github.com/casey/just) and [uv](https://docs.astral.sh/uv/),
+and a clone of this repository.
+
+```bash
+just card /Volumes/OMEGA ~/Games/*.gba
+```
+
+copies the games, then names them, converts your pictures, fetches covers and
+writes cheat files. Each step also runs on its own:
+
+| Command | Does |
+|---|---|
+| `just names-update CARD` | No-Intro names for the card's games |
+| `just names-add CARD names.tsv` | Your own names for many games at once |
+| `just art-pack CARD` | Covers for every official GBA, GB and GBC game |
+| `just art-add CARD` | Your pictures in `/torii/art/custom-src` as covers |
+| `just cheats CARD` | Cheat files from GameHacking.org |
+| `just library-report CARD` | Games still missing a name or cover |
+| `just logs CARD` | Reads a card's logs into `dist/logs/torii.log` |
+
+Covers and cheats are downloaded on your computer for your own card. None are
+included in Torii.
+
+## Building from source
+
+Torii builds with devkitARM in Docker, so you need Docker and just (on macOS,
+[colima](https://github.com/abiosoft/colima)). Then:
+
+```bash
+just build    # dist/ezkernelnew.bin
+just play     # run it on an emulated Omega DE (needs CMake, pkg-config and SDL2)
+just test     # unit tests, golden screens and games through the kernel
+```
+
+The build is reproducible, and every change is tested on an emulated Omega DE
+built into mGBA. `just --list` shows every command, and
+[docs/research/omega-de-hardware.md](docs/research/omega-de-hardware.md)
+documents the cart. The README's pictures come from `just media`, on homebrew
+stand-ins with made-up names.
 
 ## Credits
 
-The menu's Game Boy Advance, Game Boy Color and Game Boy pictures
-(`assets/ui/sprites/gba.png`, `gbc.png`, `gb.png`) are redrawn on the
-outlines of [KyleBing's retro game console icons](https://github.com/KyleBing/retro-game-console-icons),
-licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The menu's
-fonts are [Galmuri](https://github.com/quiple/galmuri), under the SIL Open
-Font License (`assets/fonts/galmuri`).
+- [EZ-Flash](https://www.ezflash.cn) for the Omega DE and the 1.06 kernel source Torii is built on.
+- [Jagoomba Color](https://github.com/EvilJagaGenius/jagoombacolor) by Jaga and [PocketNES](https://github.com/Dwedit/PocketNES) by Dwedit, from Goomba.
+- [Galmuri](https://github.com/quiple/galmuri) by Lee Minseo, the menu's fonts (SIL OFL).
+- [KyleBing's retro game console icons](https://github.com/KyleBing/retro-game-console-icons) (CC BY 4.0), the outlines of the console pictures.
+- [FatFs](http://elm-chan.org/fsw/ff/), libgba, minilzo and [mGBA](https://mgba.io).
 
-## Licences
+## Licence
 
-Torii's own code is Apache 2.0 (`LICENSE`), as is EZ-Flash's kernel it builds
-on. The release binary also contains minilzo (GPL 2 or later), libgba (LGPL
-2 or later), FatFs, Jagoomba Color and PocketNES, so it is distributed under
-the GNU GPL 3 or later. [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md)
-lists every part with its author and licence, `licenses/` holds the texts
-(each release attaches them as `torii-licenses.zip`), and Info, Credits shows
-the credits on the cart. Torii is not made or endorsed by EZ-Flash. No game,
-BIOS, box art or cheat database is in the repository or a release.
+Torii's own code is Apache 2.0, like EZ-Flash's kernel. The release binary
+also contains GPL and LGPL code, so it is distributed under the GNU GPL 3 or
+later. [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) lists every part and
+its licence. Torii isn't made or endorsed by EZ-Flash, and no games, BIOS, box
+art or cheat databases are included.

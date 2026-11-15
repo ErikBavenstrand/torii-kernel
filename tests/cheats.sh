@@ -248,7 +248,7 @@ pat() { sed -n "s/^mem frame [0-9]* $2: //p" "$cart/patches.txt" | sed -n "$1p" 
 [ "$(pat 2 0203F700)" = 7700 ] || fail "the menu cheat's write didn't run with A held: $(pat 2 0203F700)"
 echo "PASS: cheats: a launch keeps ROM patches as runs and writes them all, leaves out a cheat past their room whole and takes a smaller one after it, and a 2,048-patch cheat's key test runs"
 
-# Activation from cheatN_keys (v0.10, docs/plans/cheat-guides.md): a cheat
+# Activation from cheatN_keys (v0.10): a cheat
 # whose keys say Hold L adds 1 to its counter only while L is held; one
 # whose keys say Press R adds 1 once a press, however long R is held
 cp "$cart/clean/sd.img" "$cart/sd.img"
@@ -604,7 +604,7 @@ mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | grep $'^cheat1_renamed = tru
 [ "$(cheat_lines)" = "$before" ] || fail "after the rename the cheats read: $(cheat_lines | tr '\n' ' ')"
 echo "PASS: cheats: a database cheat is renamed from START's menu, marked so \`just cheats\` keeps the name"
 
-# --- Activations and guides (docs/plans/cheat-guides.md) -------------------------
+# --- Activations and guides -------------------------
 # cheat_file: the card's Hello.cht, CRs dropped
 cheat_file() { mtype -i "$cart/sd.img" ::/torii/cheats/Hello.cht | tr -d '\r'; }
 # The cheat screen on Hello's cheats, the cursor on cheat 1, then KEYS...,

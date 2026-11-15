@@ -1,6 +1,6 @@
 # v0.8 in-game menu: the sprite overlay
 
-The design for v0.8's in-game menu (roadmap, *v0.8 In-game menu*), from the review of today's
+The design for v0.8's in-game menu, from the review of today's
 menu in [docs/research/ingame-menu.md](../../research/ingame-menu.md). It is built in phases:
 P0 proves what the cart does in game mode, P1 replaces the Mode 3 menu of the time (historical: gone since P1) with the overlay
 and its first actions, P2 adds per-cheat toggles, P3 save-state slots, P4 screenshots and P5

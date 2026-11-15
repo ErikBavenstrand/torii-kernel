@@ -1,8 +1,8 @@
 // Cheats for the games the built-in emulators run (GB, GBC and NES): the
 // decoders of the codes libretro's database holds for them, and the patches
 // they make in the game's image in PSRAM before the emulator starts.
-// Hardware-free, as tests/host runs it. docs/plans/emulator-cheats.md is the
-// design; docs/research/cheats.md the formats and the corpus's counts.
+// Hardware-free, as tests/host runs it.
+// docs/research/cheats.md has the formats and the corpus's counts.
 //
 // Game Genie codes are ROM patches, made once at launch, whose compare byte
 // (the 9-digit GB form, the 8-letter NES one) picks the bank they belong to.

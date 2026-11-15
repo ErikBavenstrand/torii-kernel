@@ -189,6 +189,15 @@ test: test-host build emu-headless test-roms _test-kernel-build
 shots *scenarios: build emu-headless test-roms _test-kernel-build
     {{emu_docker}} python3 tests/shots.py "$@"
 
+# Record the README's screenshots and GIFs (docs/media) on the emulated cart, from tools/media/*.opts;
+# name scenes to record only those
+[positional-arguments]
+media *scenes: build emu-headless test-roms
+    uv run tools/media.py art
+    {{kernel_docker}} make -C tools/media/rom OUT=/src/dist/media
+    {{emu_docker}} python3 tools/media.py run "$@"
+    uv run tools/media.py pack
+
 # Re-record the golden screens (tests/shots/hashes.txt and png/) and print what changed;
 # name scenarios to re-record only those, e.g. `just shots-update settings1`
 [positional-arguments]

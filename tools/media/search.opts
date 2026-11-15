@@ -1,0 +1,50 @@
+# The in-game cheat search over Pocket Planets: Start remembers the game's
+# memory, Equals 5 narrows it down, the list shows what is left, and one
+# is kept as a cheat.
+#! settings 2=1
+#! media stills=started,equals,list,kept
+-w "nav: home ready"
+-P "@8:nav_test_path:/GBA/Pocket Planets.gba" -p @8:nav_test_action:0x7E000002
+-w "launch: starting the game"
+-k @300:L+R+START -k @306:-
+-w "screen ready: ingame"
+-k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:A -k @48:-
+-w "screen ready: ingame-search"
+-s @4:idle.png
+-k @10:A -k @14:-
+-w "search: started"
+-w "screen ready: ingame-search"
+-s @4:started.png
+-k @10:DOWN -k @14:- -k @22:DOWN -k @26:- -k @34:DOWN -k @38:- -k @46:DOWN -k @50:- -k @58:DOWN -k @62:- -k @70:DOWN -k @74:- -k @82:A -k @86:- -k @94:UP -k @98:- -k @106:UP -k @110:- -k @118:UP -k @122:- -k @130:UP -k @134:- -k @142:UP -k @146:-
+-s @162:edit.png
+-k @168:A -k @172:-
+-w "left"
+-s @6:equals.png
+-k @12:B -k @16:- -k @40:B -k @44:-
+-k @100:A -k @104:-
+-k @160:L+R+START -k @166:-
+-w "screen ready: ingame"
+-k @20:DOWN -k @24:- -k @32:DOWN -k @36:- -k @44:A -k @48:-
+-w "screen ready: ingame-search"
+-k @10:DOWN -k @14:- -k @22:DOWN -k @26:- -k @34:DOWN -k @38:- -k @46:DOWN -k @50:- -k @58:DOWN -k @62:- -k @70:DOWN -k @74:- -k @82:A -k @86:- -k @94:DOWN -k @98:- -k @106:A -k @110:-
+-w "left"
+-s @6:four.png
+-k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @36:DOWN -k @40:- -k @48:DOWN -k @52:- -k @60:DOWN -k @64:-
+-s @80:undo.png
+-k @86:DOWN -k @90:- -k @98:DOWN -k @102:- -k @110:A -k @114:-
+-s @130:signed.png
+-k @136:DOWN -k @140:- -k @148:A -k @152:-
+-s @168:bcd.png
+-k @174:A -k @178:- -k @186:UP -k @190:- -k @198:UP -k @202:- -k @210:UP -k @214:- -k @222:UP -k @226:-
+-k @234:UP -k @238:- -k @246:A -k @250:- -k @258:UP -k @262:-
+-s @278:between.png
+-k @284:B -k @288:- -k @296:DOWN -k @300:- -k @308:A -k @312:-
+-w "screen ready: ingame-search-list"
+-s @4:list.png
+-k @10:A -k @14:-
+-w "screen ready: ingame-search-pick"
+-s @4:pick.png
+-k @10:A -k @14:-
+-s @36:kept.png
+-k @42:DOWN -k @46:- -k @54:DOWN -k @58:- -k @66:A -k @70:-
+-s @140:pointers.png

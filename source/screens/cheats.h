@@ -15,7 +15,7 @@
 // none); it is greyed, with why, when the file has no room. A on a greyed
 // code with digits to fill in opens the keypad with it.
 //
-// Each row shows how its cheat is activated (docs/plans/cheat-guides.md):
+// Each row shows how its cheat is activated:
 // a Hold or Press cheat's first button as a dim tag at its right, and the
 // cursor's cheat's sentence ("Hold L+SELECT") on the hint bar. SELECT opens
 // a cheat's Guide page: its name, its activation (or why it is greyed) in a

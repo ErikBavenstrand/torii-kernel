@@ -2,7 +2,5 @@
 # binary files itself.
 * text=auto eol=lf
 
-# Windows scripts keep their CRLF line endings, and the emulator patches
-# carry the CRLF lines of the files they change.
-*.bat -text
+# The emulator patches carry the CRLF lines of the files they change.
 emulators/patches/*.patch -text

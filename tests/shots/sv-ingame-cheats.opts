@@ -2,7 +2,7 @@
 # its id 0x564E), the activations' sentences and the marquee at their widths.
 #! settings 0=22094
 #! sd-file /torii/lang/sv.lng 0 dist/lang/sv.lng
-# The in-game cheat list (v0.8 P2, docs/plans/cheat-guides.md) over
+# The in-game cheat list (v0.8 P2) over
 # Hello.gba with tests/shots/data/ingame-hello.cht: only the picks are
 # listed (the master code and Not picked aren't), the first cheat under the
 # cursor. The footer shows the cursor's cheat's activation, unless it can't

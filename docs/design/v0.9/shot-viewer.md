@@ -1,6 +1,6 @@
 # The screenshot viewer (v0.9.2)
 
-The owner's ask (roadmap v0.9.2, 2026-10-27): a Screenshots entry in each game's popup opens that game's shots from `/torii/screenshots` in a built-in full-screen viewer that steps with LEFT and RIGHT; the SD card page opens any `.bmp` in the same viewer.
+The owner's ask (v0.9.2, 2026-10-27): a Screenshots entry in each game's popup opens that game's shots from `/torii/screenshots` in a built-in full-screen viewer that steps with LEFT and RIGHT; the SD card page opens any `.bmp` in the same viewer.
 
 ## Which shots are a game's
 

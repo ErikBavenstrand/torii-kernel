@@ -1,8 +1,7 @@
 """Fail if a tracked text file is not UTF-8 with LF line endings (just lint).
 
-Windows scripts (*.bat) keep their original encoding and CRLF line endings,
-as .gitattributes says, and the emulator patches (emulators/patches/) carry
-the CRLF lines of the upstream files they change.
+The emulator patches (emulators/patches/) carry
+the CRLF lines of the upstream files they change, as .gitattributes says.
 """
 
 import subprocess
@@ -10,7 +9,6 @@ import sys
 from pathlib import Path
 
 SKIP_PREFIXES = ("emulators/patches/",)
-SKIP_SUFFIXES = (".bat",)
 
 
 def main() -> int:
@@ -22,11 +20,7 @@ def main() -> int:
         if not line:
             continue
         info, _, path = line.decode().partition("\t")
-        if (
-            "-text" in info
-            or path.startswith(SKIP_PREFIXES)
-            or path.endswith(SKIP_SUFFIXES)
-        ):
+        if "-text" in info or path.startswith(SKIP_PREFIXES):
             continue
         data = Path(path).read_bytes()
         if b"\0" in data[:8000]:

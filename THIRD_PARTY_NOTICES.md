@@ -39,10 +39,11 @@ Used on the user's machine or card, never committed or released:
 
 ## Not Torii's
 
-`ezkernelnew.bin`, `image.bin`, `Link_kernel_image.exe` and
-`EZ-FLASH OMEGA DE DOCUMENT.pdf` at the root came with the fork. They are
-EZ-Flash's, are not part of a Torii release, and have no licence of their own
-beyond the repository's Apache 2.0 file. `bitstreams/` (FPGA firmware cut from
+`image.bin` at the root and `docs/research/ez-flash-omega-de.pdf` came with
+the fork. They are EZ-Flash's and have no licence of their own beyond the
+repository's Apache 2.0 file. The build copies the parts of `image.bin` the
+kernel still reads (the FPGA firmware and EZ-Flash's compressed data) into
+`ezkernelnew.bin`, as the official kernel ships them. `bitstreams/` (FPGA firmware cut from
 `image.bin`) is git-ignored.
 
 ## Open points
@@ -52,6 +53,6 @@ which they descend from. Their source is public, Jagoomba's README welcomes
 reuse of its changes, and EZ-Flash and Simple DE ship builds of them. But no
 text grants the right to redistribute or modify them, so Torii's release of
 them rests on the authors' evident intent, not on a licence. Only Jaga and
-Dwedit can settle it; the roadmap tracks the request.
+Dwedit can settle it.
 
 This is what Torii's maintainer found, not legal advice.

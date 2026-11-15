@@ -332,7 +332,7 @@ u32 Loadsavefile(TCHAR *filename)
 }
 //---------------------------------------------------------------------------------
 // Torii: the copy of cart SRAM to a .sav, made so a good save survives a
-// power cut or a full card at any step (v0.5, docs/plans/roadmap.md):
+// power cut or a full card at any step (v0.5):
 //   1. Save_check: a blank chip, or one identical to the file, writes nothing;
 //      one that doesn't look like the file asks first (pending_save_copy).
 //   2. Save_savefile writes <save>.tmp, f_sync, f_close, reads it back from the

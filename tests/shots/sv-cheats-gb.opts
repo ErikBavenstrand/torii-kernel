@@ -1,5 +1,5 @@
 # cheats-gb.opts in Swedish: lang/sv.ini's pack set in Settings (slot 0, its id 0x564E).
-# A GB game's cheat screen (source/screens/cheats.c, docs/plans/emulator-cheats.md)
+# A GB game's cheat screen (source/screens/cheats.c)
 # over tests/shots/data/cheat-gb.cht: the game popup has a Cheats row (popup);
 # the Game Genie codes list, one picked, the GameShark one greyed (RAM codes
 # don't run yet) and a wildcard one unreadable, with no + Add code row (screen);

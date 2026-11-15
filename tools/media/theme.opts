@@ -1,0 +1,10 @@
+# Settings' Theme previewed live: RIGHT wipes the page from dark to light.
+#! media stills=-
+-w "nav: home ready"
+-k @8:LEFT -k @12:- -k @16:LEFT -k @20:- -k @24:A -k @28:-
+-w "screen ready: settings"
+-s @20:dark.png
+-k @30:A -k @34:-
+-H @30:@120
+-k @60:RIGHT -k @64:-
+-s @110:light.png

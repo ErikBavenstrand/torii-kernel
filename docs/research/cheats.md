@@ -1,6 +1,6 @@
 # Cheats: formats, database and the kernel
 
-Research for v0.7 (2026-10-25), before the design in `docs/plans/roadmap.md`.
+Research for v0.7 (2026-10-25).
 
 ## Findings
 
@@ -12,7 +12,7 @@ Research for v0.7 (2026-10-25), before the design in `docs/plans/roadmap.md`.
 - 🟢 Lookup: `/CHEAT/<rom name>.cht`, else `/CHEAT/GameID2cht.bin` → `/CHEAT/Eng/<bucket>/<id>.cht` (EZ's pack). It needs the header's game code [1].
 - 🟢 Picks are made on the cheat screen at each launch and never stored. Cheats is one global setting [1].
 - 🟢 The limit is 600 writes of 8 bytes each in a 0x2000-byte patch area (handler 0xD04). An overflow is dropped silently [1].
-- 🟢 The table `pCHEAT` takes 4.8 KB of EWRAM, and the screen borrows `pReadCache` (about 2,000 lines). `docs/research/architecture.md` still says there is no cap [1].
+- 🟢 The table `pCHEAT` takes 4.8 KB of EWRAM, and the screen borrows `pReadCache` (about 2,000 lines).
 - 🟢 The v0.3 freeze is real: each pick re-reads the whole file a byte at a time [1].
 - 🟡 The "dropped spaces" bug looks fixed already: `tests/cheats.sh` checks inner spaces. Not run [1].
 - 🟢 GB, GBC and NES games get no cheats: `Game_pick` returns before the lookup. PocketNES has its own cheat finder [1].
@@ -43,7 +43,7 @@ Research for v0.7 (2026-10-25), before the design in `docs/plans/roadmap.md`.
 - ❔ How RetroArch scopes a type-9 key across cheats. (The other `D` lines in libretro's files are encrypted lines, not other `D` types; see v0.7.1 below.)
 - ❔ EnHacklopedia's device notes: real ROM-patch slot limits, and slowdown codes on a flash cart.
 
-## GB, GBC and NES codes (stage 0 of docs/plans/emulator-cheats.md, 2026-11-02)
+## GB, GBC and NES codes (2026-11-02)
 
 `tools/cheat_emu_stats.py` counts libretro-database's `cht/Nintendo - Game Boy`,
 `... Game Boy Color` and `... Nintendo Entertainment System` folders (commit

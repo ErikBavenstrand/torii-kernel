@@ -1,0 +1,23 @@
+# Home turned to each console, and the Game Boy Color list with covers.
+#! media stills=gbc-list,gb,nes
+#! settings 31=1
+-p 30:nav_test_action:2113929225
+-w "nav: test hook 9 "
+-w "nav: home ready"
+-k @8:RIGHT -k @12:- -k @24:RIGHT -k @28:-
+-w "home: facing gba"
+-s @20:gba.png
+-k @30:RIGHT -k @34:-
+-w "home: facing gbc"
+-s @20:gbc.png
+-k @30:RIGHT -k @34:-
+-w "home: facing gb"
+-s @20:gb.png
+-k @30:RIGHT -k @34:-
+-w "home: facing nes"
+-s @20:nes.png
+-k @30:LEFT -k @34:- -k @50:LEFT -k @54:-
+-w "home: facing gbc"
+-k @20:A -k @24:-
+-w "nav: page gbc ready"
+-s @120:gbc-list.png

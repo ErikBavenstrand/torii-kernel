@@ -100,11 +100,6 @@ RULES = [
     ),
     (["roms/games.example.toml"], {LINT}, "example config"),
     (
-        ["*.bat", "Link_kernel_image.exe", "ezkernelnew.bin"],
-        {LINT},
-        "EZ-Flash's files, not built",
-    ),
-    (
         ["tests/host/gba_base.h"],
         {LINT, TEST_HOST, ANALYZE},
         "host tests, and cppcheck reads it",

@@ -1,5 +1,5 @@
-# Runs of variants on the Cheats screen (source/screens/cheats.c,
-# docs/plans/cheat-variants-run-once.md) over tests/shots/data/choices.cht:
+# Runs of variants on the Cheats screen (source/screens/cheats.c)
+# over tests/shots/data/choices.cht:
 # the four "Wild Pokemon - ..." cheats fold into one row named by what their
 # names share, its pick's own part at its right, and Max money and No money
 # into one named by its first, with its count (list); on the run's row A

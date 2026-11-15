@@ -1,5 +1,5 @@
-# The cheat screen's activations and guides (source/screens/cheats.c,
-# docs/plans/cheat-guides.md) on a Hello.cht with guides and a keys line,
+# The cheat screen's activations and guides (source/screens/cheats.c)
+# on a Hello.cht with guides and a keys line,
 # in the light theme: Infinite lives, always on, has every key in the hint
 # bar (list); Moon jump's code holds A: its row's tag and its sentence
 # beside the keys (hold); SELECT opens its Guide page, the sentence in a

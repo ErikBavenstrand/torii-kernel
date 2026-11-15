@@ -1,4 +1,4 @@
-// How a cheat is activated (docs/plans/cheat-guides.md): a compact u16 that
+// How a cheat is activated: a compact u16 that
 // the cheat file's cheatN_keys line sets, or that the decoded code implies.
 //
 //	bits 0-9    the buttons, as KEYINPUT's bits (KEY_A bit 0 ... KEY_L bit 9),

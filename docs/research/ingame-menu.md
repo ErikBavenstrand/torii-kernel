@@ -13,7 +13,7 @@ Research for v0.8 (2026-10-25).
 - 🟢 The patch area is 0x1000 bytes, or 0x2000 with cheats (600-cheat cap). It sits at the ROM's trimmed end and is clamped to 32 MB: a full 32 MB ROM leaves no room [3].
 - 🟢 The hotkey masks (L+R+Start for the menu, L+R+Select for sleep) are patched in from Settings. The menu can't be turned off; sleep can [1][3].
 - 🟢 (Before v0.8) The menu draws in Mode 3 on BG2 with an 8x10 font covering A–V only, in fixed colours. It backs up 0x12C00 bytes of VRAM to SRAM pages 0x20/0x30 [1][5].
-- 🟢 It resets BG2PA–PD and BG2X/Y, which are write-only, and never restores them. That is the roadmap's "BG2 affine" item; a tile layer on BG0, BG1 or BG3 avoids it [1][2][6].
+- 🟢 It resets BG2PA–PD and BG2X/Y, which are write-only, and never restores them. a tile layer on BG0, BG1 or BG3 avoids it [1][2][6].
 - 🟢 SAVE writes EWRAM, IWRAM, palette, VRAM, OAM, IO, the registers and a flag to pages 0x40–0xAF, then busy-waits 0x50000 loops. It never touches the SD registers [1].
 - 🟢 LOAD's flag check is commented out (`@;bne errorRTS`), so an empty state (all 0xFF) is loaded: the crash [1].
 - 🟢 LOAD restores only DMA1's control register, and sound comes back by hand. EZ-Flash notes the sound can turn to noise after a load [1][2].

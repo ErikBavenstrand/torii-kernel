@@ -1,0 +1,65 @@
+# Star Courier's cheats: the list with a heading and a run of variants,
+# whose choices open on A; then + Add code (UP from the top) and a
+# CodeBreaker code typed on the keypad, read and explained as it is typed.
+#! media stills=list,choices,typed
+#! settings 28=1
+-p 30:nav_test_action:2113929225
+-w "nav: test hook 9 "
+-w "nav: home ready"
+-k @8:RIGHT -k @12:- -k @24:RIGHT -k @28:- -k @44:A -k @48:-
+-w "nav: page gba ready"
+-k @8:DOWN -k @12:- -k @16:DOWN -k @20:- -k @24:DOWN -k @28:- -k @32:DOWN -k @36:- -k @40:DOWN -k @44:- -k @52:DOWN -k @56:-
+-k @80:START -k @84:-
+-w "screen ready: game-popup"
+-k @12:DOWN -k @16:- -k @24:DOWN -k @28:- -k @36:DOWN -k @40:-
+-k @56:A -k @60:-
+-w "screen ready: cheats"
+-s @20:list.png
+-H @1:@140
+-k @30:DOWN -k @34:- -k @46:DOWN -k @50:- -k @62:DOWN -k @66:- -k @78:DOWN -k @82:-
+-k @100:A -k @104:-
+-s @130:choices.png
+-k @150:DOWN -k @154:- -k @170:A -k @174:-
+-H @150:@260
+-s @200:picked.png
+-k @230:UP -k @234:- -k @246:UP -k @250:- -k @262:UP -k @266:- -k @278:UP -k @282:- -k @294:UP -k @298:-
+-H @260:@330
+-k @320:A -k @324:-
+-w "screen ready: keypad"
+-H @1:@330
+-k @12:DOWN -k @16:-
+-k @20:A -k @24:-
+-k @28:UP -k @32:-
+-k @36:RIGHT -k @40:-
+-k @44:RIGHT -k @48:-
+-k @52:A -k @56:-
+-k @60:LEFT -k @64:-
+-k @68:LEFT -k @72:-
+-k @76:A -k @80:-
+-k @84:A -k @88:-
+-k @92:RIGHT -k @96:-
+-k @100:A -k @104:-
+-k @108:RIGHT -k @112:-
+-k @116:A -k @120:-
+-k @124:RIGHT -k @128:-
+-k @132:A -k @136:-
+-k @140:RIGHT -k @144:-
+-k @148:A -k @152:-
+-k @156:LEFT -k @160:-
+-k @164:LEFT -k @168:-
+-k @172:LEFT -k @176:-
+-k @180:LEFT -k @184:-
+-k @188:A -k @192:-
+-k @196:A -k @200:-
+-k @204:RIGHT -k @208:-
+-k @212:RIGHT -k @216:-
+-k @220:RIGHT -k @224:-
+-k @228:RIGHT -k @232:-
+-k @236:RIGHT -k @240:-
+-k @244:RIGHT -k @248:-
+-k @252:A -k @256:-
+-k @260:LEFT -k @264:-
+-k @268:LEFT -k @272:-
+-k @276:LEFT -k @280:-
+-k @284:A -k @288:-
+-s @300:typed.png

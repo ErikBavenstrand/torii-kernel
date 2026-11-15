@@ -1,0 +1,24 @@
+# Star Courier's save slots and the backups of its Main slot.
+#! media stills=slots,backups
+#! sd-file "/torii/saves/GBA/Star Courier.gba/Main.sav" 0x10000 /dev/null
+#! sd-file "/torii/saves/GBA/Star Courier.gba/Speedrun.sav" 0x10000 /dev/null
+#! sd-file "/torii/saves/GBA/Star Courier.gba/Hard mode.sav" 0x10000 /dev/null
+#! sd-file "/torii/saves/GBA/Star Courier.gba/game.ini" 0 tests/shots/data/game-saves-game.ini
+#! sd-file "/torii/backups/GBA/Star Courier.gba/Main/0001-20261020-201512.sav" 0x10000 /dev/null
+#! sd-file "/torii/backups/GBA/Star Courier.gba/Main/0002-20261022-183005.sav" 0x10000 /dev/null
+#! sd-file "/torii/backups/GBA/Star Courier.gba/Main/0003-20261023-091542.sav" 0x10000 /dev/null
+-p 30:nav_test_action:2113929225
+-w "nav: test hook 9 "
+-w "nav: home ready"
+-k @8:RIGHT -k @12:- -k @24:RIGHT -k @28:- -k @44:A -k @48:-
+-w "nav: page gba ready"
+-k @8:DOWN -k @12:- -k @16:DOWN -k @20:- -k @24:DOWN -k @28:- -k @32:DOWN -k @36:- -k @40:DOWN -k @44:- -k @52:DOWN -k @56:-
+-k @80:START -k @84:-
+-w "screen ready: game-popup"
+-k @12:DOWN -k @16:-
+-k @28:A -k @32:-
+-w "screen ready: game-saves"
+-s @30:slots.png
+-k @70:RIGHT -k @74:-
+-w "screen ready: game-saves-backups"
+-s @30:backups.png

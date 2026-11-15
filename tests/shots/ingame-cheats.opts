@@ -1,4 +1,4 @@
-# The in-game cheat list (v0.8 P2, docs/plans/cheat-guides.md) over
+# The in-game cheat list (v0.8 P2) over
 # Hello.gba with tests/shots/data/ingame-hello.cht: only the picks are
 # listed (the master code and Not picked aren't), the first cheat under the
 # cursor. The footer shows the cursor's cheat's activation, unless it can't

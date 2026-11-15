@@ -1,0 +1,22 @@
+# Settings' Language row: picking Svenska switches the whole menu at once.
+#! media stills=swedish
+#! settings 28=1
+-w "nav: home ready"
+-k @8:LEFT -k @12:- -k @16:LEFT -k @20:- -k @24:A -k @28:-
+-w "screen ready: settings"
+-k @8:L -k @12:-
+-w "settings: row 30"
+-k @8:DOWN -k @12:-
+-w "settings: row 31"
+-H @1:@60
+-k @20:A -k @24:- -k @40:RIGHT -k @44:-
+-w "settings: row 31 set to"
+-H @1:@40
+-k @30:A -k @34:-
+-w "screen ready: settings"
+-H @1:@60
+-s @50:swedish.png
+-k @60:B -k @64:-
+-w "nav: home ready"
+-H @1:@60
+-s @50:home.png

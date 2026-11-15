@@ -1,6 +1,6 @@
 # Menu fonts for v0.3
 
-Researched on 2026-10-19 for the v0.3 renderer (`docs/plans/roadmap.md`): a body font on a 12 px
+Researched on 2026-10-19 for the v0.3 renderer: a body font on a 12 px
 line and a heading font on a 16 px line, 1bpp with a width table, covering Latin-1.
 `tools/font.py` converts them to C, and `tools/font_preview.py` draws the sheets below
 (`just font-preview`).
