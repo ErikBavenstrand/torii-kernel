@@ -286,17 +286,18 @@ index 37dfe72..2b38bfb 100644
  	cpu->prefetch[0] = cpu->prefetch[1];
  	cpu->gprs[ARM_PC] += WORD_SIZE_THUMB;
 diff --git a/src/core/cheats.c b/src/core/cheats.c
-index fe34b03..504dd7d 100644
+index fe34b03..7abac63 100644
 --- a/src/core/cheats.c
 +++ b/src/core/cheats.c
-@@ -105,7 +105,9 @@ static void _patchROM(struct mCheatDevice* device, struct mCheatSet* cheats) {
+@@ -105,7 +105,10 @@ static void _patchROM(struct mCheatDevice* device, struct mCheatSet* cheats) {
  	size_t i;
  	for (i = 0; i < mCheatPatchListSize(&cheats->romPatches); ++i) {
  		struct mCheatPatch* patch = mCheatPatchListGetPointer(&cheats->romPatches, i);
 -		int segment = -1;
-+		// Torii: start from the segment a compare found before; with -1 here,
-+		// every other refresh re-keyed the patch and also patched the mapped bank
-+		int segment = patch->segment;
++		// Torii: a compare patch starts from the segment it found before; with
++		// -1 here, every other refresh re-keyed it and also patched the mapped
++		// bank. Others keep -1 (GBA ROM patches leave segment unset)
++		int segment = patch->check ? patch->segment : -1;
  		if (patch->check && patch->segment < 0) {
  			const struct mCoreMemoryBlock* block = mCoreGetMemoryBlockInfo(device->p, patch->address);
  			if (!block) {

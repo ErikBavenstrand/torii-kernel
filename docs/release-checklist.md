@@ -180,8 +180,8 @@ timing or a real game's saves. Do these on the cart with Logging on Debug.
 ### GB, GBC and NES cheats
 
 One real-cart pass so far (2026-11-02: Pokémon Red's GameShark HP poke, Crystal's
-Game Genie). The emulator proves the rows marked *(emulator: ...)* on every `just
-test`; on the cart they still need a look, as PSRAM and VRAM timing and the sound
+Game Genie). The emulator proves the rows marked *(emulator: ...)* (`just test`
+runs those tests; the owned games' parts when `roms/` has them); on the cart they still need a look, as PSRAM and VRAM timing and the sound
 are the cart's. Put a game of each console on the card, with its cheats as
 `/torii/cheats/<rom path without extension>.cht`
 (`just cheats` fetches GBA only; copy libretro's files, or type a code: the
@@ -197,7 +197,7 @@ game's popup, Cheats, + Add code). With Logging on Debug, each launch logs
 | NES raw poke | a `0754:00`-style code from libretro's NES list: the value holds while you play, and turning the pick off and launching again plays without it *(emulator: `nes_cheat_proof.sh`, `emu_cheats.sh`'s pick turned off)* |
 | GameShark, GB | a `01VVAAAA` code (infinite lives or money) in a GB game: the value holds for minutes of play; the log lists it as applied |
 | GameShark, GBC | the same in a GBC game, and one `90`-`97` WRAM-bank code if the game's list has one |
-| Speed and sound | a busy scene with no cheats, then with 20 or more RAM pokes picked: no new slowdown, no crackle (each poke costs about 106 cycles of a 280,896 frame in Jagoomba, 60 in PocketNES) *(emulator: `emu_cheat_speed.sh`, 63 pokes at full speed in five owned games with VSync on; sound by ear only)* |
+| Speed and sound | a busy scene with no cheats, then with 20 or more RAM pokes picked: no new slowdown, no crackle (each poke costs about 106 cycles of a 280,896 frame in Jagoomba, 60 in PocketNES) *(emulator: `emu_cheat_speed.sh`, 63 pokes at full speed with VSync on in five owned games, measured by hand with `--measure`; `just test` checks the hi-colour ROM loses under 3%; sound by ear only)* |
 | The save stays clean | play a GB game with a battery save with a poke picked, save in game, then power off and launch it with no cheats: its save has none of the cheat's changes *(emulator: `emu_cheat_saves.sh`, test games' saves the same bytes with cheats)* |
 | Greyed codes | codes of kinds that don't run here (cart RAM, `8B`, ROM or I/O writes) show greyed with the reason, and the game starts anyway |
 | Typing a code | + Add code in a GB, GBC and NES game: the keypad takes digits and hyphens (GB), or hex and `:` with the GG key's letters (NES); a wrong code is refused with its message *(emulator: `emu_cheat_typing.sh` types and runs one for each console)* |

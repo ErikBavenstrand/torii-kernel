@@ -50,7 +50,8 @@ new_cart() {
 re_cht() {
   local file=$1
   OMEGA_DIR=$cart emu/build-linux/mgba-shot dist/ezkernelnew.bin -w "screen ready: dialog" \
-    -k @10:A -k @16:- -u "nor: wrote an empty pending-save record" -f 2000 >/dev/null 2>&1 || true
+    -k @10:A -k @16:- -u "nor: wrote an empty pending-save record" -f 2000 >/dev/null 2>"$cart/kernel.log" || true
+  grep -qF "nor: wrote an empty pending-save record" "$cart/kernel.log" || fail "$file: the power-on before the next launch didn't settle the last game's save"
   printf '%b' "$2" >"$cart/game.cht"
   mcopy -o -i "$cart/sd.img" "$cart/game.cht" "::/torii/cheats/${file%.*}.cht"
 }

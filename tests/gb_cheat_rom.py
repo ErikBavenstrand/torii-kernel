@@ -9,7 +9,7 @@ program reads what the cheats could change and writes it to WRAM at C000
 (RESULTS, below), then waits for the next frame:
 
 - ROM: the bytes at 4010, 4011 and 4012 of each bank 1-7 (switched in through
-  2000), and bank 0's at 0310 and 0380 (0380 is one the emulators' checksum
+  2000), and bank 0's at 0710 and 0780 (0780 is one the emulators' checksum
   samples). Each bank has its own byte at 4010 (BANK_BYTE), banks 2 and 5
   share one at 4011 (TWIN) that the others don't, and every bank has 99 at 4012.
 - RAM: each watched address (C100, C180, FF90, D100, and on a GBC D100 in

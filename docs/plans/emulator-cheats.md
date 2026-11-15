@@ -320,7 +320,7 @@ struct torii_cheats {
   Patch instead (`Torii:` marks, `just emulators-save-patch pocketnes`): a second loop over the ROM table
   in `do_cheats` (the same writes), and the `timeout.s` test becomes `num_cheats | torii_count`.
   Mapping: `addr & 0x7FF` for `< 0x2000`; `0x800 + (addr - 0x6000)` for 6000-7FFF.
-- 🟡 **Jagoomba.** No cheat code exists. Hook: the GB frame's vertical blank in `timeout.s`, right after
+- 🟡 **Jagoomba.** (The plan; built otherwise: the hook is in lcd.s's `newframe_vblank` and, since 2026-11-15, in `.vram1`, as the Status says.) No cheat code exists. Hook: the GB frame's vertical blank in `timeout.s`, right after
   `bl newframe_vblank` (`timeout.s:~218`, once a GB frame: `FF41_R_vblank`, `line145_to_end` follow), a
   call into a new C function `torii_run_cheats()` in `.text` (ROM, not IWRAM: at most 64 entries of about
   20 cycles is 1,300, under 0.5% of the 280,896-cycle frame; `.vram1` has 1.3 KB free if it ever needs to

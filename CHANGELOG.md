@@ -9,8 +9,8 @@ git log, not here.
 - **Changed:** GB and GBC GameShark codes cost about half as much: Jagoomba's
   per-frame writes run from VRAM instead of the game's PSRAM, about 106 cycles
   a poke instead of about 190 (counted alike), so 63 pokes take 2.4% of a
-  frame. Every owned game tested stays at full speed with them, hi-colour
-  frames included. (9e52edc4)
+  frame. Five owned games tested stay at full speed with them (VSync on); the
+  hi-colour test ROM, already under full speed, loses 2%. (9e52edc4)
 
 - **Fixed:** the GB, GBC and NES cheats' review findings. Settings' clean-up
   took every code of an orphaned GB, GBC or NES cheat file (its game renamed or
