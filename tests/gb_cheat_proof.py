@@ -297,7 +297,9 @@ def cht(case: Case, mgba: bool = False) -> str:
     return "\n".join(lines)
 
 
-def sh(*args: str, check: bool = False, env: dict | None = None) -> subprocess.CompletedProcess:
+def sh(
+    *args: str, check: bool = False, env: dict | None = None
+) -> subprocess.CompletedProcess:
     return subprocess.run(args, capture_output=True, text=True, check=check, env=env)
 
 
