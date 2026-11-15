@@ -401,15 +401,15 @@ info/frames 3-3 7965DF42532BB5D6
 info/frames 4-4 E13CFD5587C60712
 info/frames 5-6 28A85A94A228FC13
 info/frames 7-20 741A7A65700A0B53
-info-about/about 1BCCD2148F0E45AB
-info-about/about-2 6F35A559BBD5F047
-info-about/about-end B3725D765034E1CB
+info-about/about D567CC31E545FCB7
+info-about/about-2 E6775E8A6CB1802B
+info-about/about-end 55C6A38FE23AE87D
 info-about/cheats FE10755B48191B4F
 info-about/help 7709670D29AB463D
 info-about/ingame A761B693C85E61DD
 info-about/saves 50CC0B19FFD01A0B
-info-counting/about-2 6A6FDC5C5FE48D07
-info-no-free/about-end 43A085E09F2AACF1
+info-counting/about-2 66463B573D02B9C3
+info-no-free/about-end 94562A9E69D18793
 info-read/back 90A8AE8509C792EF
 info-read/controls 085FB729B4B5C0D4
 info-read/last 87A3B3BD809C5B95
@@ -876,9 +876,9 @@ sv-home/frames 7-7 F13C27181335FC8C
 sv-home/frames 8-8 93144CC6E7F0A48A
 sv-home/frames 9-9 4697C423C322F92D
 sv-home/frames 10-12 0B2C673E7DF2D87B
-sv-info-about/about 4E749825E4F88906
-sv-info-about/about-2 18132DCFC8FED6CE
-sv-info-about/about-end 32316FB368EBEE28
+sv-info-about/about 49678591ADB1563C
+sv-info-about/about-2 C9F3D7858A76D5A6
+sv-info-about/about-end 7C8BCE9520D9EFC8
 sv-info-about/cheats 1759BD1189D118BE
 sv-info-about/help 1B30145884B6D974
 sv-info-about/ingame 7BCA4F3624E8A550

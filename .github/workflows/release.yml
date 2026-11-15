@@ -1,6 +1,7 @@
 # Publishes a GitHub Release when a version tag (v0.1.0, ...) is pushed: the
 # kernel is built, checked to be reproducible and tested, then ezkernelnew.bin
-# and torii-lang.zip (the language packs, tools/lang.py) are attached with
+# torii-lang.zip (the language packs, tools/lang.py) and torii-cheats.zip
+# (the cheat sets in cheats/) are attached with
 # install steps and the newest CHANGELOG.md section as notes
 # (tools/release_notes.sh), and with ezkernelnew.sym and ezkernelnew.elf, which
 # `just logs --tag` and gdb read for crash dumps from this build.
@@ -64,6 +65,8 @@ jobs:
         run: tools/release_notes.sh > release-notes.md
       - name: Bundle the licences
         run: zip -X -r dist/torii-licenses.zip LICENSE THIRD_PARTY_NOTICES.md licenses
+      - name: Bundle the cheat sets
+        run: zip -X -j dist/torii-cheats.zip cheats/gba/*.cht
       - name: Create the release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
@@ -71,6 +74,7 @@ jobs:
             dist/ezkernelnew.bin
             dist/torii-lang.zip
             dist/torii-licenses.zip
+            dist/torii-cheats.zip
             dist/ezkernelnew.sym
             ezkernelnew.elf
           body_path: release-notes.md

@@ -39,8 +39,14 @@ every game.
 
 > [!WARNING]
 > Torii is for the **EZ-Flash Omega Definitive Edition** only. Don't flash it
-> to the original Omega or any other cart. Never install v0.2.1 or v0.2.2: they
-> can erase the cart's boot loader ([recovery](docs/recovery.md)).
+> to the original Omega or any other cart.
+
+> [!NOTE]
+> **Tested on:** a black Omega DE, Revision B (LX16 FPGA, firmware 7). That's
+> the cart Torii is developed and checked on, and where it's known to be safe.
+> Other revisions, such as Revision A (LX9) or the blue EZODE-B, may well work,
+> but haven't been tested. Torii won't write FPGA firmware to a board it doesn't
+> recognise. Info → About shows which board you have.
 
 <table>
   <tr>
@@ -66,12 +72,17 @@ every game.
 - **Save states and an in-game menu.** Hold L+R+START in any GBA game: save or
   load a state, toggle cheats, take a screenshot, reset, sleep, or go back to
   the menu.
-- **Saves you don't lose.** Every save is copied to the card with backups, up
-  to 16 slots per game, and a trash folder that keeps deleted saves for 30 days.
-  The copy survives a power cut at any step.
+- **Named save files.** Up to 16 per game, each with a name you choose: Main,
+  Speedrun, Hard mode, your sister's file. Pick one when the game starts.
+- **Saves you don't lose.** Every save is copied to the card with backups, and
+  deleted ones wait in a trash folder for 30 days. The copy survives a power
+  cut at any step.
 - **Every cheat format.** GameShark, Action Replay (v1/v2 and v3), CodeBreaker
-  and VBA/AnyGBA codes, all run the way mGBA runs them. Game Genie and
-  GameShark for Game Boy, Game Boy Color and NES games too.
+  and VBA/AnyGBA codes, all run the way mGBA runs them, plus Torii code, our own
+  format with tests and blocks. Game Genie and GameShark for Game Boy, Game Boy
+  Color and NES games too.
+- **A hand-made cheat set for Pokémon Emerald**: 489 cheats, including a menu
+  you open in the overworld with L+R+B to heal, shop, use the PC or warp.
 - **Cheat search.** Find a value in a running game (lives, money, a timer) and
   turn it into a cheat, Action Replay style.
 - **Box art.** A cover for every official GBA, GB and GBC game, offline, and
@@ -164,17 +175,20 @@ later, open the game's menu in Torii (START on the game) and pick
 
 </details>
 
-### Saves you can trust
+### Named save files and backups
 
 <p>
   <img src="docs/media/saves-slots.png" width="48%" alt="A game's save slots">
   <img src="docs/media/saves-backups.png" width="48%" alt="Backups of a save slot">
 </p>
 
-Each game gets up to 16 save slots, so you can keep a second playthrough or a
-friend's file without overwriting yours. Every time a save is copied to the
-card, the previous one becomes a backup you can restore with one press. Deleted
-slots wait in a trash folder for 30 days.
+Each game can keep up to 16 save files, called slots, and you name each one.
+Start a second playthrough, keep a file at the last boss, or share the cart
+with someone else, without anyone overwriting anyone. When a game has more than
+one, Torii asks which to play as it starts.
+
+Every time a save is copied to the card, the previous one becomes a backup you
+can restore with one press. Deleted slots wait in a trash folder for 30 days.
 
 The copy from the cart to the card is written so that a power cut at any moment
 leaves you with either the old save or the new one, never a broken file. Torii
@@ -189,7 +203,8 @@ error writing over a good save.
 - START on a game → **Saves** lists its slots. A plays a slot and makes it the
   one Play uses. RIGHT shows its backups.
 - **+ New slot** starts an empty save, copies the active one, or imports a
-  `.sav` file.
+  `.sav` file, and asks for its name.
+- START on a slot → **Rename** names it again.
 - A game with two or more slots asks which to play when it starts. Turn that
   off in Settings → Saves → Ask for a slot; holding SELECT as you press A still
   asks.
@@ -237,6 +252,29 @@ just cheats /Volumes/OMEGA
 
 </details>
 
+#### Included: Pokémon Emerald
+
+Torii comes with one cheat file made by hand, for **Pokémon Emerald (USA,
+Europe)**, CRC32 `1F1C08FB`. Its 489 cheats are built from the
+[pokeemerald](https://github.com/pret/pokeemerald) decompilation rather than
+copied from old lists, and grouped under headings:
+
+| Heading | What's in it |
+|---|---|
+| Menu | Hold L+R+B in the overworld for a menu of your own: heal the party, PC, shop, warp, gift Pokémon, trade evolutions without a trade, legendaries again, event tickets |
+| Money | Max money, coins, Battle Points and Soot Sack ash; shop items cost 1 |
+| Pokémon | Shiny, perfect IVs, any nature, gender or ability, Pokérus, fast eggs |
+| Battle | One-hit KO, infinite HP and PP, EXP x2 to x255, every ball catches |
+| Wild | Pick any species (386) or level for wild Pokémon, or no encounters |
+| Overworld | Instant text, run indoors, fly anywhere, walk through walls |
+| Safari & Contests | Endless Safari Zone, max Pokéblocks, max contest score |
+
+Download `torii-cheats.zip` from the
+[latest release](https://github.com/ErikBavenstrand/torii-kernel/releases/latest)
+and copy the `.cht` file to `/torii/cheats`, renamed to match your ROM:
+`/GBA/Emerald.gba` reads `/torii/cheats/GBA/Emerald.cht`. It's made for that
+exact dump, so check your ROM's CRC32 on a computer first.
+
 <details>
 <summary><b>Typing a code on the cart</b></summary>
 
@@ -249,6 +287,108 @@ just cheats /Volumes/OMEGA
 
 A cheat with blanks in it (`00??`) opens the keypad with the blanks marked.
 A greyed cheat says why it can't run on this cart.
+
+</details>
+
+#### Writing your own codes
+
+Any code you find online can be typed as it's printed; the keypad works out the
+format. If you want to write codes yourself, these are the shapes Torii reads.
+Addresses are in hex.
+
+<details>
+<summary><b>VBA (<code>address:value</code>)</b></summary>
+
+The simplest format: write a value to an address every frame. The value's
+length sets the size: 2 digits a byte, 4 a halfword, 8 a word.
+
+```
+02001234:63          byte 0x63 at 02001234
+0300A000:270F        halfword 9999 at 0300A000
+08001000:46C0        an address in the ROM (08...) is a patch, made once at launch
+```
+
+Join lines with `+` to make one cheat out of several.
+
+</details>
+
+<details>
+<summary><b>CodeBreaker</b></summary>
+
+Eight digits, a space, four digits. The first digit is the type, the rest of
+the first half the address:
+
+```
+32001000 0063        3: write the byte 63 to 02001000
+82001002 270F        8: write the halfword 270F to 02001002
+72001004 0001        7: run the next line only while 02001004 holds 0001
+D0000020 0004        D: run the next line only while SELECT is held
+```
+
+Encrypted CodeBreaker codes (after a `9...` key line) work as printed.
+
+</details>
+
+<details>
+<summary><b>GameShark and Action Replay</b></summary>
+
+GameShark / Action Replay v1 and v2, and Action Replay v3, are printed as two
+groups of eight digits and are encrypted, so they aren't written by hand. Type
+them as you find them; Torii decrypts them, and the keypad shows what each line
+does. Codes that ask for the device's button work with R+SELECT held together.
+
+</details>
+
+<details>
+<summary><b>Torii code: tests, blocks and more</b></summary>
+
+Torii code is VBA's `address:value` with more operators, for cheats the other
+formats can't express. Mark a cheat with `cheatN_format = "Torii"`, or just use
+one of its symbols and Torii reads the line as Torii code.
+
+| Line | Does |
+|---|---|
+| `A:V` | write V at A (a `[P]+O` target follows a pointer) |
+| `A\|V` / `A&V` | set / clear bits |
+| `A#V` | add V |
+| `A=V` `A!V` `A<V` `A>V` | run the next line only if A equals / doesn't / is below / above V |
+| `@MASK` / `@@MASK` | only while buttons are held / on the frame they're pressed |
+| `{` … `}{` … `}` | a block covered by the test before it, with an else |
+
+```
+02024104=0001+02024106:0063
+```
+While the halfword at 02024104 is 1, keep 02024106 at 99.
+
+```
+@0300{+0203A000#01+}{+0203A000:00+}
+```
+While L+R are held, count 0203A000 up by one each frame; otherwise keep it at 0.
+
+The full reference, with every operator and the button bits, is in
+[docs/torii-code.md](docs/torii-code.md). The Emerald set's menu is written in
+it.
+
+</details>
+
+<details>
+<summary><b>Game Boy and Game Boy Color</b></summary>
+
+- **Game Genie**, `XXX-XXX` or `XXX-XXX-XXX`: patches the ROM at launch. The
+  9-digit form only patches where the old byte matches, so it finds the right
+  bank.
+- **GameShark**, `01VVLLHH`: writes byte VV to address HHLL every frame, in
+  work RAM (C000-DFFF) or high RAM (FF80-FFFE). `0163A0C1` keeps C1A0 at 0x63.
+
+</details>
+
+<details>
+<summary><b>NES</b></summary>
+
+- **Game Genie**, six or eight letters from `APZLGITYEOXUKSVN`: patches the ROM
+  at launch.
+- **RAM codes**, `AAAA:VV`: writes VV to AAAA every frame, in the NES's 2 KB of
+  RAM (0000-07FF). `0075:09` keeps 0075 at 9.
 
 </details>
 
@@ -337,9 +477,17 @@ and its save states.
   <img src="docs/media/light-home.png" width="48%" alt="Home in the light theme">
 </p>
 
-The menu speaks English and Swedish, and switches the moment you pick one.
-Game and file names show in their own script: Latin, Greek, Cyrillic and
-Vietnamese are built in.
+The menu switches language the moment you pick one, and every screen, help
+page and dialog is translated. Game and file names show in their own script:
+Latin, Greek, Cyrillic and Vietnamese are built in.
+
+| Language | Where it comes from |
+|---|---|
+| English | Built into the kernel |
+| Svenska (Swedish) | `sv.lng` in `torii-lang.zip`, complete |
+
+Anything a pack lacks shows in English, so a partial translation is still
+usable.
 
 <details>
 <summary><b>Installing a language</b></summary>

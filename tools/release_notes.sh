@@ -6,11 +6,17 @@ set -euo pipefail
 cat <<'NOTES'
 ## Install
 
+Tested on a black Omega DE, Revision B (LX16), FPGA firmware 7. Other
+revisions may work, but haven't been tested.
+
 1. Copy `ezkernelnew.bin` to the root of the EZ-Flash Omega DE's SD card.
 2. Put the card in the cart, hold R and switch the GBA on, then confirm the update.
 3. For the menu in another language, unzip `torii-lang.zip`, copy its `.lng`
    files into `/torii/lang` on the card (make the folder if it isn't there),
    and pick one in Settings, System, Language.
+4. For the Pokémon Emerald (USA, Europe) cheat set, unzip `torii-cheats.zip`
+   and copy its `.cht` file to `/torii/cheats`, named after your ROM
+   (`/GBA/Emerald.gba` reads `/torii/cheats/GBA/Emerald.cht`).
 
 If the update stops with `Bad NOR ID`, the cart's kernel NOR is a uniform-sector
 S29GL064A (ID `0x220C`), and EZ-Flash's loader installs no kernel on it, Torii's
