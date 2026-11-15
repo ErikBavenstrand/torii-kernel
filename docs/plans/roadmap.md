@@ -112,7 +112,7 @@ Taken off the 1.0 list (owner, 2026-11-11).
 
 ### Licences
 
-- **Ask Jaga (jagoombacolor) and Dwedit (Goomba Color, PocketNES) to put a licence in their repositories**, or to say in writing that Torii may build and release their code with our patches. Neither repository has one, and the release's binary includes both (`THIRD_PARTY_NOTICES.md`, "Open points"). Nothing else in the licence audit is open.
+- **Ask Jaga (jagoombacolor) and Dwedit (Goomba Color, PocketNES) to put a licence in their repositories**, or to say in writing that Torii may build and release their code with our patches. Neither repository has one, and the release's binary includes both (`THIRD_PARTY_NOTICES.md`, "Open points"). Nothing else in the licence audit is open. Asked on 2026-11-15: [EvilJagaGenius/jagoombacolor#56](https://github.com/EvilJagaGenius/jagoombacolor/issues/56) and [Dwedit/PocketNES#16](https://github.com/Dwedit/PocketNES/issues/16) (PocketNES and Goomba Color); waiting for answers.
 
 ### Research
 
