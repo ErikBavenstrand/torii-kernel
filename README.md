@@ -69,9 +69,10 @@ every game.
 
 ## What you get
 
-- **Save states and an in-game menu.** Turn on Save states, then hold
-  L+R+START in any GBA game: save or load a state, toggle cheats, take a screenshot, reset, sleep, or go back to
-  the menu.
+- **A rebuilt in-game menu and save states.** Far more than the official
+  one: 8 states per save file, loadable later from Torii's menu, plus cheat
+  toggles, cheat search, screenshots, reset and sleep. Turn on Save states,
+  then hold L+R+START in any GBA game.
 - **Named save files.** Up to 16 per game, each with a name you choose: Main,
   Speedrun, Hard mode, your sister's file. Pick one when the game starts.
 - **Saves you don't lose.** Every save is copied to the card with backups, and
