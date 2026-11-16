@@ -7,7 +7,7 @@
 
 usage: logo.py [OUT_DIR]   (`just logo`; docs/media by default)
 
-Writes logo-dark.png and logo-light.png (transparent, for the README on
+Writes torii-logo-dark.png and torii-logo-light.png (transparent, for the README on
 GitHub's dark and light themes), icon.png (512x512, the gate on the menu's
 dark background) and social-preview.png (1280x640, for the repository's
 social preview, which GitHub only takes as an upload in Settings).
@@ -114,9 +114,11 @@ def lockup(scale: int, ink, sub_ink, rim: bool, subtitle: bool) -> Image.Image:
 def main(argv: list[str]) -> int:
     out = Path(argv[0]) if argv else ROOT / "docs/media"
     out.mkdir(parents=True, exist_ok=True)
-    lockup(8, INK_DARK, SUB_DARK, True, True).save(out / "logo-dark.png", optimize=True)
+    lockup(8, INK_DARK, SUB_DARK, True, True).save(
+        out / "torii-logo-dark.png", optimize=True
+    )
     lockup(8, INK_LIGHT, SUB_LIGHT, False, True).save(
-        out / "logo-light.png", optimize=True
+        out / "torii-logo-light.png", optimize=True
     )
 
     icon = Image.new("RGB", (512, 512), BG)
@@ -128,7 +130,9 @@ def main(argv: list[str]) -> int:
     lk = lockup(10, INK_DARK, SUB_DARK, True, True)
     social.paste(lk, ((1280 - lk.width) // 2, (640 - lk.height) // 2), lk)
     social.save(out / "social-preview.png", optimize=True)
-    print(f"logo: logo-dark.png, logo-light.png, icon.png, social-preview.png in {out}")
+    print(
+        f"logo: torii-logo-dark.png, torii-logo-light.png, icon.png, social-preview.png in {out}"
+    )
     return 0
 
 
