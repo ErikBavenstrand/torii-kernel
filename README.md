@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: light)" srcset="docs/media/logo-light.png">
-    <img src="docs/media/logo-dark.png" width="560" alt="Torii: a new kernel for the EZ-Flash Omega DE">
+    <img src="docs/media/logo-dark.png" width="560" alt="Torii, custom kernel for the EZ-Flash Omega DE">
   </picture>
 </p>
 

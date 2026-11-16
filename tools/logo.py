@@ -95,7 +95,7 @@ def lockup(scale: int, ink, sub_ink, rim: bool, subtitle: bool) -> Image.Image:
     g = gate(scale, rim)
     word = text("Torii", bold, ink, scale + 2)
     sub = text(
-        "A new kernel for the EZ-Flash Omega DE", body, sub_ink, max(2, scale // 3)
+        "Custom kernel for the EZ-Flash Omega DE", body, sub_ink, max(2, scale // 3)
     )
     gap = scale * 6
     right = max(word.width, sub.width + scale // 2 if subtitle else 0)
