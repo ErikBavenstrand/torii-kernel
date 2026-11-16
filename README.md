@@ -20,7 +20,9 @@
 <p align="center">
   <a href="#install">Install</a> ·
   <a href="#features">Features</a> ·
+  <a href="#faq">FAQ</a> ·
   <a href="#troubleshooting">Troubleshooting</a> ·
+  <a href="#contents">Contents</a> ·
   <a href="CHANGELOG.md">Changelog</a>
 </p>
 
@@ -70,6 +72,25 @@ every game.
     <td align="center"><sub>Save states from the in-game menu</sub></td>
   </tr>
 </table>
+
+## Contents
+
+- [What you get](#what-you-get)
+- [Install](#install)
+- [Features](#features)
+  - [Cheats](#cheats): [the included set](#included-pokémon-emerald), [writing your own codes](#writing-your-own-codes)
+  - [Box art and your own pictures](#box-art-and-your-own-pictures)
+  - [Themes and settings](#themes-and-settings)
+  - [Languages](#languages)
+  - [Named save files and backups](#named-save-files-and-backups)
+  - [Save states and the in-game menu](#save-states-and-the-in-game-menu)
+  - [Game Boy, Game Boy Color and NES](#game-boy-game-boy-color-and-nes)
+- [FAQ](#faq)
+- [Troubleshooting](#troubleshooting)
+- [Contributing](#contributing)
+- [PC tools](#pc-tools)
+- [Building from source](#building-from-source)
+- [Credits](#credits) · [Licence](#licence)
 
 ## What you get
 
@@ -146,75 +167,6 @@ Everything lives in `/torii`. Keep the folder when you move to a new card.
 </details>
 
 ## Features
-
-### Save states and the in-game menu
-
-<p>
-  <img src="docs/media/ingame-menu.png" width="32%" alt="The in-game menu">
-  <img src="docs/media/ingame-save.png" width="32%" alt="Save state slots">
-  <img src="docs/media/screenshot-taken.png" width="32%" alt="A screenshot taken in game">
-</p>
-
-Hold **L+R+START** in a GBA game to open the menu. It opens in two frames and
-gives the game back exactly as it was. From there you can save and load states
-(8 per save slot), turn cheats on and off, run a cheat search, take up to five
-screenshots, reset the game, or put the console to sleep.
-
-<details>
-<summary><b>How to use it</b></summary>
-
-1. Turn on **Settings → Games → Save states**.
-2. Start a game. GBA games need to start *with addons*, which is the default
-   (Settings → Games → GBA boot mode).
-3. Hold L+R+START. Pick **Save state**, then a slot.
-4. Choose **Back to Torii** when you're done. That's when states and
-   screenshots are written to the card.
-
-States and screenshots stay in the cart until Back to Torii, so switching off
-before that loses them. The game's own save is never at risk. To load a state
-later, open the game's menu in Torii (START on the game) and pick
-**Load state**. Change the hotkeys in **Settings → Hotkeys**.
-
-</details>
-
-### Named save files and backups
-
-<p>
-  <img src="docs/media/saves-slots.png" width="48%" alt="A game's save slots">
-  <img src="docs/media/saves-backups.png" width="48%" alt="Backups of a save slot">
-</p>
-
-Each game can keep up to 16 save files, called slots, and you name each one.
-Start a second playthrough, keep a file at the last boss, or share the cart
-with someone else, without anyone overwriting anyone. When a game has more than
-one, Torii asks which to play as it starts.
-
-Every time a save is copied to the card, the previous one becomes a backup you
-can restore with one press. Deleted slots wait in a trash folder for 30 days.
-
-The copy from the cart to the card is written so that a power cut at any moment
-leaves you with either the old save or the new one, never a broken file. Torii
-also fixes the official kernel's save bugs: small `.sav` files losing data,
-32 KB Game Boy saves (Pokémon Gold, Silver, Crystal and Yellow) lost at power-off,
-wrong save types for Doom, Doom II and the Classic NES Series, and a read
-error writing over a good save.
-
-<details>
-<summary><b>Slots, backups and the trash</b></summary>
-
-- START on a game → **Saves** lists its slots. A plays a slot and makes it the
-  one Play uses. RIGHT shows its backups.
-- **+ New slot** starts an empty save, copies the active one, or imports a
-  `.sav` file, and asks for its name.
-- START on a slot → **Rename** names it again.
-- A game with two or more slots asks which to play when it starts. Turn that
-  off in Settings → Saves → Ask for a slot; holding SELECT as you press A still
-  asks.
-- Settings → Saves → Backups kept sets how many backups each slot keeps.
-- Settings → Saves → Clean up saves finds saves whose game is gone and empties
-  the trash.
-
-</details>
 
 ### Cheats
 
@@ -457,20 +409,33 @@ over any matched cover.
 
 </details>
 
-### Game Boy, Game Boy Color and NES
+### Themes and settings
 
 <p>
-  <img src="docs/media/consoles-gbc-list.png" width="32%" alt="The Game Boy Color list">
-  <img src="docs/media/consoles-gb.png" width="32%" alt="Home facing Game Boy">
-  <img src="docs/media/consoles-nes.png" width="32%" alt="Home facing NES">
+  <img src="docs/media/theme.gif" width="48%" alt="Switching from the dark to the light theme">
+  <img src="docs/media/viewer-first.png" width="48%" alt="The built-in screenshot viewer">
 </p>
 
-GB and GBC games run on [Jagoomba Color](https://github.com/EvilJagaGenius/jagoombacolor),
-NES games on [PocketNES](https://github.com/Dwedit/PocketNES), both built into
-the kernel. They start straight away (no boot menu), keep their settings and
-palette between launches, get save slots like GBA games, and take Game Genie
-and GameShark codes. Hold L and R together in game for the emulator's own menu
-and its save states.
+Light paper or dark graphite, previewed live as you change it. Settings is one
+scrolling page, grouped into Look, Clock, Games, Saves, Cart, Hotkeys, Library
+and System, with L and R to jump between groups. Screenshots you take in game
+open in a built-in viewer from the game's menu or the SD card page.
+
+<details>
+<summary><b>Everything else</b></summary>
+
+- **Favourites and recents** on the home carousel; R on a game toggles a favourite.
+- **Rename** any game with the on-screen keyboard. The file stays as it is.
+- **No-Intro names** for official games, so `pkmn_e.gba` lists as
+  Pokémon Emerald (`just names-update`).
+- **SD card page** to browse folders, with Write to NOR, Rename and Delete.
+- **NOR page** for the cart's 64 MB of game NOR.
+- **Clock**: set the time, 24-hour display, and whether games can read it.
+- **Cart**: rumble, the LED, and the DS's mode B.
+- **Start on**: pick which home item faces you at power-on.
+- **Controls and Questions pages** under Info, so the help is on the cart.
+
+</details>
 
 ### Languages
 
@@ -521,33 +486,89 @@ A pack can also bring a font for a script the menu doesn't cover.
 
 </details>
 
-### Themes and settings
+### Named save files and backups
 
 <p>
-  <img src="docs/media/theme.gif" width="48%" alt="Switching from the dark to the light theme">
-  <img src="docs/media/viewer-first.png" width="48%" alt="The built-in screenshot viewer">
+  <img src="docs/media/saves-slots.png" width="48%" alt="A game's save slots">
+  <img src="docs/media/saves-backups.png" width="48%" alt="Backups of a save slot">
 </p>
 
-Light paper or dark graphite, previewed live as you change it. Settings is one
-scrolling page, grouped into Look, Clock, Games, Saves, Cart, Hotkeys, Library
-and System, with L and R to jump between groups. Screenshots you take in game
-open in a built-in viewer from the game's menu or the SD card page.
+Each game can keep up to 16 save files, called slots, and you name each one.
+Start a second playthrough, keep a file at the last boss, or share the cart
+with someone else, without anyone overwriting anyone. When a game has more than
+one, Torii asks which to play as it starts.
+
+Every time a save is copied to the card, the previous one becomes a backup you
+can restore with one press. Deleted slots wait in a trash folder for 30 days.
+
+The copy from the cart to the card is written so that a power cut at any moment
+leaves you with either the old save or the new one, never a broken file. Torii
+also fixes the official kernel's save bugs: small `.sav` files losing data,
+32 KB Game Boy saves (Pokémon Gold, Silver, Crystal and Yellow) lost at power-off,
+wrong save types for Doom, Doom II and the Classic NES Series, and a read
+error writing over a good save.
 
 <details>
-<summary><b>Everything else</b></summary>
+<summary><b>Slots, backups and the trash</b></summary>
 
-- **Favourites and recents** on the home carousel; R on a game toggles a favourite.
-- **Rename** any game with the on-screen keyboard. The file stays as it is.
-- **No-Intro names** for official games, so `pkmn_e.gba` lists as
-  Pokémon Emerald (`just names-update`).
-- **SD card page** to browse folders, with Write to NOR, Rename and Delete.
-- **NOR page** for the cart's 64 MB of game NOR.
-- **Clock**: set the time, 24-hour display, and whether games can read it.
-- **Cart**: rumble, the LED, and the DS's mode B.
-- **Start on**: pick which home item faces you at power-on.
-- **Controls and Questions pages** under Info, so the help is on the cart.
+- START on a game → **Saves** lists its slots. A plays a slot and makes it the
+  one Play uses. RIGHT shows its backups.
+- **+ New slot** starts an empty save, copies the active one, or imports a
+  `.sav` file, and asks for its name.
+- START on a slot → **Rename** names it again.
+- A game with two or more slots asks which to play when it starts. Turn that
+  off in Settings → Saves → Ask for a slot; holding SELECT as you press A still
+  asks.
+- Settings → Saves → Backups kept sets how many backups each slot keeps.
+- Settings → Saves → Clean up saves finds saves whose game is gone and empties
+  the trash.
 
 </details>
+
+### Save states and the in-game menu
+
+<p>
+  <img src="docs/media/ingame-menu.png" width="32%" alt="The in-game menu">
+  <img src="docs/media/ingame-save.png" width="32%" alt="Save state slots">
+  <img src="docs/media/screenshot-taken.png" width="32%" alt="A screenshot taken in game">
+</p>
+
+Hold **L+R+START** in a GBA game to open the menu. It opens in two frames and
+gives the game back exactly as it was. From there you can save and load states
+(8 per save slot), turn cheats on and off, run a cheat search, take up to five
+screenshots, reset the game, or put the console to sleep.
+
+<details>
+<summary><b>How to use it</b></summary>
+
+1. Turn on **Settings → Games → Save states**.
+2. Start a game. GBA games need to start *with addons*, which is the default
+   (Settings → Games → GBA boot mode).
+3. Hold L+R+START. Pick **Save state**, then a slot.
+4. Choose **Back to Torii** when you're done. That's when states and
+   screenshots are written to the card.
+
+States and screenshots stay in the cart until Back to Torii, so switching off
+before that loses them. The game's own save is never at risk. To load a state
+later, open the game's menu in Torii (START on the game) and pick
+**Load state**. Change the hotkeys in **Settings → Hotkeys**.
+
+</details>
+
+### Game Boy, Game Boy Color and NES
+
+<p>
+  <img src="docs/media/consoles-gbc-list.png" width="32%" alt="The Game Boy Color list">
+  <img src="docs/media/consoles-gb.png" width="32%" alt="Home facing Game Boy">
+  <img src="docs/media/consoles-nes.png" width="32%" alt="Home facing NES">
+</p>
+
+GB and GBC games run on [Jagoomba Color](https://github.com/EvilJagaGenius/jagoombacolor),
+NES games on [PocketNES](https://github.com/Dwedit/PocketNES), both built into
+the kernel. They start straight away (no boot menu), keep their settings and
+palette between launches, get save slots like GBA games, and take Game Genie
+and GameShark codes. Hold L and R together in game for the emulator's own menu
+and its save states.
 
 ## FAQ
 
