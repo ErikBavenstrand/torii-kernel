@@ -1,14 +1,11 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: light)" srcset="docs/media/banner-light.gif">
-    <img src="docs/media/banner-dark.gif" width="480" alt="Torii's home screen turning through its items">
+    <source media="(prefers-color-scheme: light)" srcset="docs/media/logo-light.png">
+    <img src="docs/media/logo-dark.png" width="560" alt="Torii: a new kernel for the EZ-Flash Omega DE">
   </picture>
 </p>
 
-<h1 align="center">Torii</h1>
-
 <p align="center">
-  <b>A new kernel for the EZ-Flash Omega Definitive Edition.</b><br>
   Every cheat format, a menu rebuilt from scratch,<br>
   and a long list of fixes to the official kernel.
 </p>
@@ -25,6 +22,13 @@
   <a href="#features">Features</a> ·
   <a href="#troubleshooting">Troubleshooting</a> ·
   <a href="CHANGELOG.md">Changelog</a>
+</p>
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: light)" srcset="docs/media/banner-light.gif">
+    <img src="docs/media/banner-dark.gif" width="480" alt="Torii's home screen turning through its items">
+  </picture>
 </p>
 
 Torii replaces the menu on your Omega DE. It starts from EZ-Flash's official

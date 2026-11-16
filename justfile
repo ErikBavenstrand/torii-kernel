@@ -193,6 +193,10 @@ test: test-host build emu-headless test-roms _test-kernel-build
 shots *scenarios: build emu-headless test-roms _test-kernel-build
     {{emu_docker}} python3 tests/shots.py "$@"
 
+# Draw Torii's logo, icon and GitHub social preview into docs/media (tools/logo.py)
+logo:
+    uv run -q tools/logo.py
+
 # Record the README's screenshots and GIFs (docs/media) on the emulated cart, from tools/media/*.opts;
 # name scenes to record only those
 [doc("Record the README's screenshots and GIFs (docs/media) on the emulated cart")]
