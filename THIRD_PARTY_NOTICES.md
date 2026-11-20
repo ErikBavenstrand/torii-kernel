@@ -58,10 +58,22 @@ them is in the release binary. `bitstreams/` (FPGA firmware cut from
 ## Open points
 
 Jagoomba Color and PocketNES have no licence file, and neither does Goomba,
-which they descend from. Their source is public, Jagoomba's README welcomes
-reuse of its changes, and EZ-Flash and Simple DE ship builds of them. But no
-text grants the right to redistribute or modify them, so Torii's release of
-them rests on the authors' evident intent, not on a licence. Only Jaga and
-Dwedit can settle it.
+which they descend from. No text grants the right to redistribute or modify
+them, so Torii's release of them rests on the authors' evident intent and on
+long-standing practice, not on a licence:
+
+- Their source is public, and Jagoomba's README welcomes its changes being
+  taken into Goomba Color.
+- Jagoomba's README thanks Sterophonick "for featuring Jagoomba in the
+  excellent Simple kernel for the EZ-Flash Omega carts", which is the same use
+  Torii makes of it.
+- EZ-Flash's own Omega DE kernel (the 1.06 source Torii forks) ships builds of
+  both, and so do other Omega kernels, such as
+  [SimpleLight](https://github.com/Sterophonick/SimpleLight), with credit.
+
+Torii credits both, with links, in this file, the README and on the cart (Info,
+About), and marks its own changes to them with `Torii:` comments in
+`emulators/patches/`. Jaga and Dwedit have been asked to confirm; if either
+asks for something else, Torii will follow it.
 
 This is what Torii's maintainer found, not legal advice.

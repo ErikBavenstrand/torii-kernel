@@ -732,7 +732,8 @@ stand-ins with made-up names.
 ## Credits
 
 - [EZ-Flash](https://www.ezflash.cn) for the Omega DE and the 1.06 kernel source Torii is built on.
-- [Jagoomba Color](https://github.com/EvilJagaGenius/jagoombacolor) by Jaga and [PocketNES](https://github.com/Dwedit/PocketNES) by Dwedit, from Goomba.
+- [Jagoomba Color](https://github.com/EvilJagaGenius/jagoombacolor) by Jaga, based on Dwedit's [Goomba Color](https://www.dwedit.org/gba/goombacolor.php) and FluBBa's Goomba.
+- [PocketNES](https://github.com/Dwedit/PocketNES) by Dwedit, after Loopy and FluBBa.
 - [Galmuri](https://github.com/quiple/galmuri) by Lee Minseo, the menu's fonts (SIL OFL).
 - [KyleBing's retro game console icons](https://github.com/KyleBing/retro-game-console-icons) (CC BY 4.0), the outlines of the console pictures.
 - [FatFs](http://elm-chan.org/fsw/ff/), libgba, minilzo and [mGBA](https://mgba.io).
